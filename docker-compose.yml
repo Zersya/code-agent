@@ -5,6 +5,7 @@ services:
     build:
       context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
       dockerfile: Dockerfile # This refers to the Dockerfile in the Canvas
+    container_name: agent-reviewer
     ports:
       - "4100:3000"
     environment:
