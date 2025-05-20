@@ -1,6 +1,6 @@
 # GitLab Webhook Integration with Qodo-Embed-1
 
-A webhook integration that listens for GitLab repository events, fetches code, generates embeddings using Qodo-Embed-1, and stores them for later retrieval and search.
+A webhook integration that listens for GitLab repository events, fetches code, generates embeddings using Qodo-Embed-1, and stores them for later retrieval and search. It also provides automated code review for merge requests from Repopo.
 
 ## Features
 
@@ -10,6 +10,8 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Database Storage**: Stores embeddings in PostgreSQL database for later retrieval and search
 - **LLM Analysis**: Analyzes code using either OpenRouter or Ollama (local) LLM providers
 - **Security**: Implements webhook authentication and validation
+- **Automated Code Review**: Reviews merge requests from Repopo using sequential thinking
+- **Merge Request Approval**: Automatically approves merge requests that meet quality standards
 
 ## Prerequisites
 
@@ -163,6 +165,30 @@ CREATE TABLE batches (
 ### Vector Search
 
 The system uses the `pgvector` extension for PostgreSQL to enable efficient similarity search of code embeddings. If the extension is not available, it will fall back to storing embeddings as JSONB and using basic filtering.
+
+### Merge Request Review
+
+The system can automatically review merge requests from Repopo using a sequential thinking process:
+
+1. When a merge request webhook is received from Repopo, the system:
+   - Processes the code changes to generate embeddings
+   - Analyzes the code changes using sequential thinking with 4 thought steps
+   - Provides a comprehensive review in Bahasa Indonesia
+   - Approves the merge request if it meets quality standards
+
+2. The review focuses on:
+   - Code quality and best practices
+   - Logical flow and architecture
+   - Code clarity and readability
+   - Potential bugs and edge cases
+
+3. Review comments are structured with:
+   - A greeting: "Halo, berikut review untuk MR ini:"
+   - A review section with analysis
+   - A feedback section with actionable suggestions
+   - An approval message if appropriate: "Silahkan merge! \nTerima kasih"
+
+To enable or disable this feature, set `ENABLE_MR_REVIEW=true` or `ENABLE_MR_REVIEW=false` in your `.env` file.
 
 ## LLM Providers
 

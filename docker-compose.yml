@@ -26,6 +26,7 @@ services:
       - OPENROUTER_API_MODEL=${OPENROUTER_API_MODEL}
       - OLLAMA_API_URL=${OLLAMA_API_URL}
       - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - ENABLE_MR_REVIEW=${ENABLE_MR_REVIEW}
       - TEMP_DIR=/app/temp
     volumes:
       - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container

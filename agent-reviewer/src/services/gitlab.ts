@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { CodeFile } from '../models/embedding.js';
+import { MergeRequestChange, MergeRequestComment } from '../types/review.js';
 
 dotenv.config();
 
@@ -136,6 +137,138 @@ export class GitLabService {
       return response.data;
     } catch (error) {
       console.error('Error fetching merge request details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get merge request changes (diffs)
+   */
+  async getMergeRequestChanges(projectId: number | string, mergeRequestIid: number): Promise<MergeRequestChange[]> {
+    try {
+      console.log(`Fetching changes for merge request !${mergeRequestIid} in project ${projectId}`);
+
+      // Get the list of changed files
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/merge_requests/${mergeRequestIid}/changes`);
+      const changes = response.data.changes || [];
+
+      const result: MergeRequestChange[] = [];
+
+      for (const change of changes) {
+        const oldPath = change.old_path;
+        const newPath = change.new_path;
+        const diffContent = change.diff;
+
+        // Get the language based on the file extension
+        const language = this.detectLanguage(newPath);
+
+        // Get the old and new content if available
+        let oldContent = '';
+        let newContent = '';
+
+        if (change.deleted_file) {
+          // File was deleted, try to get the old content
+          try {
+            oldContent = await this.getFileContent(projectId, oldPath, response.data.source_branch);
+          } catch (error) {
+            console.error(`Error fetching old content for deleted file ${oldPath}:`, error);
+          }
+        } else if (change.new_file) {
+          // File was added, get the new content
+          try {
+            newContent = await this.getFileContent(projectId, newPath, response.data.source_branch);
+          } catch (error) {
+            console.error(`Error fetching new content for added file ${newPath}:`, error);
+          }
+        } else {
+          // File was modified, get both old and new content
+          try {
+            // For old content, we need to get it from the target branch
+            oldContent = await this.getFileContent(projectId, oldPath, response.data.target_branch);
+            // For new content, we get it from the source branch
+            newContent = await this.getFileContent(projectId, newPath, response.data.source_branch);
+          } catch (error) {
+            console.error(`Error fetching content for modified file ${newPath}:`, error);
+          }
+        }
+
+        result.push({
+          oldPath,
+          newPath,
+          oldContent,
+          newContent,
+          diffContent,
+          language,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error fetching merge request changes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get merge request comments (notes)
+   */
+  async getMergeRequestComments(projectId: number | string, mergeRequestIid: number): Promise<MergeRequestComment[]> {
+    try {
+      console.log(`Fetching comments for merge request !${mergeRequestIid} in project ${projectId}`);
+
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/merge_requests/${mergeRequestIid}/notes`, {
+        params: {
+          sort: 'asc',
+          order_by: 'created_at',
+          per_page: 100,
+        },
+      });
+
+      return response.data.map((note: any) => ({
+        id: note.id,
+        body: note.body,
+        author: {
+          id: note.author.id,
+          username: note.author.username,
+        },
+        createdAt: note.created_at,
+      }));
+    } catch (error) {
+      console.error('Error fetching merge request comments:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a comment to a merge request
+   */
+  async addMergeRequestComment(projectId: number | string, mergeRequestIid: number, body: string): Promise<any> {
+    try {
+      console.log(`Adding comment to merge request !${mergeRequestIid} in project ${projectId}`);
+
+      const response = await gitlabApi.post(`/projects/${encodeURIComponent(projectId.toString())}/merge_requests/${mergeRequestIid}/notes`, {
+        body,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error adding comment to merge request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Approve a merge request
+   */
+  async approveMergeRequest(projectId: number | string, mergeRequestIid: number): Promise<any> {
+    try {
+      console.log(`Approving merge request !${mergeRequestIid} in project ${projectId}`);
+
+      const response = await gitlabApi.post(`/projects/${encodeURIComponent(projectId.toString())}/merge_requests/${mergeRequestIid}/approve`);
+
+      return response.data;
+    } catch (error) {
+      console.error('Error approving merge request:', error);
       throw error;
     }
   }

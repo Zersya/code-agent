@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { GitLabPushEvent, GitLabMergeRequestEvent, GitLabWebhookEvent } from '../types/webhook.js';
+import { RepopoWebhookEvent } from '../types/review.js';
 import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
+import { reviewService } from '../services/review.js';
 import { CodeFile, EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 
 /**
@@ -17,11 +19,18 @@ export const processWebhook = async (req: Request, res: Response, next: Function
     // Acknowledge receipt of the webhook immediately
     res.status(202).json({ message: 'Webhook received and processing started' });
 
+    // Check if this is a Repopo webhook event
+    const isRepopoEvent = isRepopoWebhook(req);
+
     // Process the event asynchronously
     if (event.object_kind === 'push') {
       await processPushEvent(event);
     } else if (event.object_kind === 'merge_request') {
-      await processMergeRequestEvent(event);
+      if (isRepopoEvent) {
+        await processRepopoMergeRequestEvent(event as RepopoWebhookEvent);
+      } else {
+        await processMergeRequestEvent(event as GitLabMergeRequestEvent);
+      }
     } else {
       console.log(`Ignoring unsupported event type`);
     }
@@ -30,6 +39,25 @@ export const processWebhook = async (req: Request, res: Response, next: Function
     // We've already sent a response, so we just log the error
   }
 };
+
+/**
+ * Check if a webhook request is from Repopo
+ */
+function isRepopoWebhook(req: Request): boolean {
+  // Check for Repopo-specific headers or query parameters
+  const repopoToken = req.headers['x-repopo-token'] || req.query.repopo_token;
+
+  // Check if the request body contains Repopo-specific fields
+  const hasRepopoFields = req.body && req.body.repopo_token;
+
+  // Check if the request comes from a Repopo domain
+  const repopoReferer = req.headers.referer && req.headers.referer.includes('repopo');
+
+  // Check if the user agent contains Repopo
+  const repopoUserAgent = req.headers['user-agent'] && req.headers['user-agent'].includes('Repopo');
+
+  return Boolean(repopoToken || hasRepopoFields || repopoReferer || repopoUserAgent);
+}
 
 /**
  * Process a push event
@@ -209,5 +237,40 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
   } catch (error) {
     console.error('Error processing merge request event:', error);
+  }
+}
+
+/**
+ * Process a Repopo merge request event
+ * This function handles merge request events from Repopo and triggers the review process
+ */
+async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
+  try {
+    // Only process merge requests that are opened or updated
+    if (!['open', 'update'].includes(event.object_attributes.action || '')) {
+      console.log(`Skipping Repopo merge request event with action: ${event.object_attributes.action}`);
+      return;
+    }
+
+    const projectId = event.project.id;
+    const mergeRequestIid = event.object_attributes.iid;
+
+    console.log(`Processing Repopo merge request event for project ${projectId}, MR !${mergeRequestIid}`);
+
+    // First, process the merge request normally to generate embeddings
+    await processMergeRequestEvent(event);
+
+    // Then, trigger the review process
+    console.log(`Starting review for merge request !${mergeRequestIid} in project ${projectId}`);
+
+    try {
+      // Submit the review (this will add a comment and approve if appropriate)
+      await reviewService.submitReview(projectId, mergeRequestIid);
+      console.log(`Successfully reviewed merge request !${mergeRequestIid} in project ${projectId}`);
+    } catch (reviewError) {
+      console.error(`Error reviewing merge request !${mergeRequestIid} in project ${projectId}:`, reviewError);
+    }
+  } catch (error) {
+    console.error('Error processing Repopo merge request event:', error);
   }
 }
