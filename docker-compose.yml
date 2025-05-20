@@ -34,6 +34,7 @@ services:
     networks:
       - qodo_network # Assigns this service to the qodo_network
       - llm-network # Assigns this service to the llm_network
+      - proxy
 
   qodo-embed-api:
     # Assuming the Dockerfile for qodo-embed-api is in a subdirectory, e.g., ./qodo-embed-api-src
@@ -56,6 +57,7 @@ services:
     networks:
       - qodo_network # Assigns this service to the qodo_network
       - llm-network # Assigns this service to the llm_network
+      - proxy
     # --- Healthcheck (optional) ---
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -94,6 +96,8 @@ services:
 
 # Define the network that both services will share
 networks:
+  proxy:
+    external: true
   llm-network:
     name: llm-network # Explicitly names the network
     driver: bridge    # Default driver
