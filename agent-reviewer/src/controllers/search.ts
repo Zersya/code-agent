@@ -12,7 +12,7 @@ import { CodeEmbedding } from '../models/embedding.js';
  */
 export const searchCode = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { query, projectId, limit = 10, analyze = false } = req.body;
+    const { query, projectId, limit = 20, analyze = false } = req.body;
 
     if (!query) {
       res.status(400).json({ error: 'Search query is required' });

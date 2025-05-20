@@ -8,6 +8,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Code Fetching**: Retrieves all code from the repository, not just diffs
 - **Embedding Generation**: Uses Qodo-Embed-1 model to generate embeddings for code
 - **Database Storage**: Stores embeddings in PostgreSQL database for later retrieval and search
+- **LLM Analysis**: Analyzes code using either OpenRouter or Ollama (local) LLM providers
 - **Security**: Implements webhook authentication and validation
 
 ## Prerequisites
@@ -16,6 +17,8 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - PostgreSQL database (with pgvector extension for vector search)
 - GitLab account with API access
 - Qodo-Embed-1 API access
+- OpenRouter API key (if using OpenRouter as LLM provider)
+- Ollama installed locally (if using Ollama as LLM provider)
 
 ## Installation
 
@@ -52,6 +55,18 @@ A webhook integration that listens for GitLab repository events, fetches code, g
    # Embedding Configuration
    QODO_EMBED_API_KEY='your-qodo-embed-api-key'
    QODO_EMBED_API_URL='https://api.qodo.ai/v1/embeddings'
+
+   # LLM Configuration
+   # Provider can be 'openrouter' or 'ollama'
+   LLM_PROVIDER='openrouter'
+
+   # OpenRouter Configuration (used when LLM_PROVIDER='openrouter')
+   OPENROUTER_API_KEY='your-openrouter-api-key'
+   OPENROUTER_API_URL='https://openrouter.ai/api/v1'
+
+   # Ollama Configuration (used when LLM_PROVIDER='ollama')
+   OLLAMA_API_URL='http://localhost:11434/api'
+   OLLAMA_MODEL='llama3'
    ```
 
 5. Build the project:
@@ -149,12 +164,43 @@ CREATE TABLE batches (
 
 The system uses the `pgvector` extension for PostgreSQL to enable efficient similarity search of code embeddings. If the extension is not available, it will fall back to storing embeddings as JSONB and using basic filtering.
 
+## LLM Providers
+
+The system supports two LLM providers for code analysis:
+
+### OpenRouter
+
+[OpenRouter](https://openrouter.ai/) is a unified API that provides access to various LLM models including Claude, GPT-4, and others. This is the default provider.
+
+**Configuration:**
+- Set `LLM_PROVIDER=openrouter` in your `.env` file
+- Obtain an API key from OpenRouter and set `OPENROUTER_API_KEY` in your `.env` file
+- Optionally, specify a custom API URL with `OPENROUTER_API_URL`
+
+### Ollama
+
+[Ollama](https://ollama.ai/) allows you to run open-source LLMs locally on your machine. This is useful for environments where you need to keep data private or don't have internet access.
+
+**Prerequisites:**
+1. Install Ollama on your machine by following the instructions at [ollama.ai](https://ollama.ai/)
+2. Pull a model (e.g., `ollama pull llama3`)
+
+**Configuration:**
+- Set `LLM_PROVIDER=ollama` in your `.env` file
+- Set `OLLAMA_MODEL` to the name of the model you pulled (default is `llama3`)
+- If Ollama is running on a different machine or port, set `OLLAMA_API_URL` accordingly
+
+### Switching Between Providers
+
+To switch between providers, simply change the `LLM_PROVIDER` value in your `.env` file and restart the application. No code changes are required.
+
 ## Next Steps
 
 1. **Configure GitLab Webhook**: Set up a webhook in your GitLab project pointing to your server's `/webhook` endpoint
 2. **Set Up PostgreSQL**: Install and configure PostgreSQL for storing the embeddings. For vector search capabilities, install the pgvector extension
-3. **Get API Keys**: Obtain API keys for GitLab and Qodo-Embed-1
-4. **Test the Integration**: Make a push to your repository and verify that embeddings are generated and stored
+3. **Get API Keys**: Obtain API keys for GitLab, Qodo-Embed-1, and OpenRouter (if using OpenRouter as LLM provider)
+4. **Set Up Ollama**: If using Ollama as LLM provider, install Ollama and pull the desired model
+5. **Test the Integration**: Make a push to your repository and verify that embeddings are generated and stored
 
 ## Security Considerations
 

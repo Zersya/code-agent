@@ -19,20 +19,20 @@ services:
       # Mount the named volume 'huggingface_cache_vol' to '/cache/huggingface' in the container.
       - huggingface_cache_vol:/cache/huggingface
     # --- Healthcheck (optional, as before) ---
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 60s # Increased start_period to allow for first model download if cache is cold
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s # Increased start_period to allow for first model download if cache is cold
     # --- GPU Support (as before, if needed) ---
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 networks: # Optional: define a custom network
   default:

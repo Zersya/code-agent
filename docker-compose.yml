@@ -19,8 +19,11 @@ services:
       - QODO_EMBED_API_KEY=${QODO_EMBED_API_KEY}
       # Ensure this URL points to the service name and port of qodo-embed-api
       - QODO_EMBED_API_URL=${QODO_EMBED_API_URL}
+      - LLM_PROVIDER=${LLM_PROVIDER}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_API_URL=${OPENROUTER_API_URL}
+      - OLLAMA_API_URL=${OLLAMA_API_URL}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
       - TEMP_DIR=/app/temp
     volumes:
       - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
@@ -64,13 +67,35 @@ services:
               count: 1
               capabilities: [gpu]
 
+# Optional Ollama service (uncomment to use)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+  #   networks:
+  #     - qodo_network
+  #   # Uncomment to use GPU
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
 # Define the network that both services will share
 networks:
   qodo_network:
     name: qodo_network # Explicitly names the network
     driver: bridge    # Default driver
 
-# Define the named volume for Hugging Face cache
+# Define the named volumes
 volumes:
   huggingface_cache_vol:
     driver: local
+  # ollama_data:
+  #   driver: local
