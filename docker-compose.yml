@@ -6,7 +6,7 @@ services:
       context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
       dockerfile: Dockerfile # This refers to the Dockerfile in the Canvas
     ports:
-      - "3000:3000"
+      - "4100:3000"
     environment:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile # Or specify if it's named differently
     container_name: qodo_embed_api
     ports:
-      - "8000:8000"
+      - "4000:8000"
     restart: unless-stopped
     environment:
       - HF_HOME=/cache/huggingface
@@ -49,20 +49,20 @@ services:
     networks:
       - qodo_network # Assigns this service to the qodo_network
     # --- Healthcheck (optional) ---
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 60s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     # --- GPU Support (optional) ---
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 # Define the network that both services will share
 networks:
