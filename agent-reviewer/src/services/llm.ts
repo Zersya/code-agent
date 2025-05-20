@@ -7,6 +7,7 @@ dotenv.config();
 // Environment variables
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_API_URL = process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1';
+const OPENROUTER_API_MODEL = process.env.OPENROUTER_API_MODEL || 'qwen/qwen3-235b-a22b:free';
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openrouter';
@@ -46,7 +47,7 @@ class OpenRouterProvider implements LlmProvider {
   /**
    * Analyze code snippets using OpenRouter
    */
-  async analyzeCode(query: string, codeSnippets: CodeEmbedding[], model: string = 'anthropic/claude-3-opus-20240229'): Promise<string> {
+  async analyzeCode(query: string, codeSnippets: CodeEmbedding[], model: string = OPENROUTER_API_MODEL): Promise<string> {
     try {
       if (!OPENROUTER_API_KEY) {
         return 'OpenRouter LLM analysis is not available. OPENROUTER_API_KEY is not set.';
