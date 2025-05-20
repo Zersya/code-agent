@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  qodo-embed-api:
+    build: .
+    container_name: qodo_embed_api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      # Define where Hugging Face libraries should store cache and models inside the container.
+      # This path will be backed by the named volume.
+      - HF_HOME=/cache/huggingface
+      # You can also set other relevant env vars here if needed:
+      - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B # Already in main.py with getenv
+      - DEVICE=cpu # Already in main.py with getenv
+      # - TRANSFORMERS_CACHE=/cache/huggingface/hub # More specific, HF_HOME is usually sufficient
+    volumes:
+      # Mount the named volume 'huggingface_cache_vol' to '/cache/huggingface' in the container.
+      - huggingface_cache_vol:/cache/huggingface
+    # --- Healthcheck (optional, as before) ---
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s # Increased start_period to allow for first model download if cache is cold
+    # --- GPU Support (as before, if needed) ---
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+networks: # Optional: define a custom network
+  default:
+    name: qodo_network
+
+# Define the named volume that will persist the data
+volumes:
+  huggingface_cache_vol:
+    driver: local # This is the default driver, can be omitted.

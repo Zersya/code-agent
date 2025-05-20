@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  agent-reviewer:
+    build:
+      context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
+      dockerfile: Dockerfile # This refers to the Dockerfile in the Canvas
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - GITLAB_API_TOKEN=${GITLAB_API_TOKEN}
+      - GITLAB_API_URL=${GITLAB_API_URL}
+      - GITLAB_USERNAME=${GITLAB_USERNAME}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - API_KEY=${API_KEY}
+      - APP_URL=${APP_URL}
+      - QODO_EMBED_API_KEY=${QODO_EMBED_API_KEY}
+      # Ensure this URL points to the service name and port of qodo-embed-api
+      - QODO_EMBED_API_URL=http://qodo-embed-api:8000
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_API_URL=${OPENROUTER_API_URL}
+      - TEMP_DIR=/app/temp
+    volumes:
+      - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
+    restart: unless-stopped
+    networks:
+      - qodo_network # Assigns this service to the qodo_network
+
+  qodo-embed-api:
+    # Assuming the Dockerfile for qodo-embed-api is in a subdirectory, e.g., ./qodo-embed-api-src
+    # If it's in the same directory and named differently, adjust accordingly.
+    # If it's also named Dockerfile but for a different service, it needs its own context.
+    # For this example, let's assume its Dockerfile is in a directory named 'qodo_embed_api_service'
+    build:
+      context: ./qodo-embedding-service # Adjust this path to the directory containing the Dockerfile for qodo-embed-api
+      dockerfile: Dockerfile # Or specify if it's named differently
+    container_name: qodo_embed_api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - HF_HOME=/cache/huggingface
+      - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B
+      - DEVICE=cpu
+    volumes:
+      - huggingface_cache_vol:/cache/huggingface
+    networks:
+      - qodo_network # Assigns this service to the qodo_network
+    # --- Healthcheck (optional) ---
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s
+    # --- GPU Support (optional) ---
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+# Define the network that both services will share
+networks:
+  qodo_network:
+    name: qodo_network # Explicitly names the network
+    driver: bridge    # Default driver
+
+# Define the named volume for Hugging Face cache
+volumes:
+  huggingface_cache_vol:
+    driver: local
