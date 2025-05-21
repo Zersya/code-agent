@@ -105,6 +105,8 @@ export class SequentialThinkingService {
             content: `Lanjutkan dengan pemikiran berikutnya (Thought ${i + 1}/4). Ingat untuk menganalisis kode lebih dalam dan membangun berdasarkan pemikiran sebelumnya.` 
           });
         }
+
+        console.log(`Generated thought ${i}:`, thought.thought);
       }
       
       return { thoughts, reviewResult };

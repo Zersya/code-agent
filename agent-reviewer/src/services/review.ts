@@ -44,12 +44,16 @@ export class ReviewService {
       // Format the changes for review
       const formattedChanges = this.formatChangesForReview(changes);
 
+      console.log('Formatted changes for review:', formattedChanges);
+
       // Perform the review using sequential thinking
       const { thoughts, reviewResult } = await sequentialThinkingService.reviewCode(
         formattedChanges,
         mergeRequest.title,
         mergeRequest.description || ''
       );
+
+      console.log('Review result:', reviewResult);
 
       // Determine if the merge request should be approved
       const shouldApprove = this.shouldApproveMergeRequest(reviewResult);
