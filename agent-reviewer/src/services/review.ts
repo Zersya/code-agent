@@ -119,7 +119,7 @@ export class ReviewService {
       // Check if the project has embeddings and trigger embedding process if needed
       // We don't wait for completion here, as we'll still proceed with the review
       // even if the embedding process is still running
-      await this.checkAndEmbedProject(projectId, false);
+      // await this.checkAndEmbedProject(projectId, true);
 
       // Format the changes for review
       const formattedChanges = this.formatChangesForReview(changes);
