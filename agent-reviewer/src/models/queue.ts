@@ -16,6 +16,7 @@ export enum JobStatus {
  */
 export interface EmbeddingJob {
   id: string;
+  projectId: number;
   repositoryUrl: string;
   processingId: string;
   status: JobStatus;

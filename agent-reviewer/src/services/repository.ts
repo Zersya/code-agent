@@ -70,13 +70,11 @@ export class RepositoryService {
   /**
    * Clone a repository from GitLab
    */
-  async cloneRepository(event: { project_id: number }, repositoryUrl: string): Promise<{ repoPath: string, projectId: number }> {
+  async cloneRepository(projectId: number, repositoryUrl: string): Promise<{ repoPath: string, projectId: number }> {
     const repoId = uuidv4();
     const repoPath = path.join(TEMP_DIR, repoId);
 
     try {
-      // Extract project ID from URL
-      const projectId = event.project_id;
 
       if (!projectId) {
         throw new Error('Could not extract project ID from repository URL');

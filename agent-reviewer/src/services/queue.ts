@@ -69,13 +69,15 @@ export class QueueService {
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             started_at TIMESTAMP WITH TIME ZONE,
             completed_at TIMESTAMP WITH TIME ZONE,
-            priority INTEGER NOT NULL DEFAULT 5
+            priority INTEGER NOT NULL DEFAULT 5,
+            project_id INTEGER NOT NULL
           )
         `);
 
         // Create indexes
         await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
         await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_project_id ON embedding_jobs(project_id)');
 
         console.log('Queue tables initialized');
       } finally {
@@ -101,7 +103,8 @@ export class QueueService {
         maxAttempts: this.config.maxAttempts,
         createdAt: new Date(),
         updatedAt: new Date(),
-        priority
+        priority,
+        projectId
       };
 
       // Save the job to the database
@@ -111,7 +114,7 @@ export class QueueService {
 
       // Start processing if not already processing
       if (!this.isProcessing) {
-        this.startProcessing({ project_id: projectId });
+        this.startProcessing();
       }
 
       return job;
@@ -141,7 +144,8 @@ export class QueueService {
           error = EXCLUDED.error,
           updated_at = EXCLUDED.updated_at,
           started_at = EXCLUDED.started_at,
-          completed_at = EXCLUDED.completed_at
+          completed_at = EXCLUDED.completed_at,
+          project_id = EXCLUDED.project_id
       `, [
         job.id,
         job.repositoryUrl,
@@ -154,7 +158,8 @@ export class QueueService {
         job.updatedAt,
         job.startedAt,
         job.completedAt,
-        job.priority
+        job.priority,
+        job.projectId
       ]);
     } finally {
       client.release();
@@ -173,7 +178,7 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
         FROM embedding_jobs
         WHERE processing_id = $1
       `, [processingId]);
@@ -310,7 +315,7 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
         FROM embedding_jobs
         ORDER BY created_at DESC
         LIMIT $1 OFFSET $2
@@ -334,7 +339,7 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
         FROM embedding_jobs
         WHERE status = $1 OR (status = $2 AND updated_at < NOW() - INTERVAL '1 minute' * attempts)
         ORDER BY priority DESC, created_at ASC
@@ -350,19 +355,19 @@ export class QueueService {
   /**
    * Start processing the queue
    */
-  private startProcessing(event: { project_id: number }): void {
+  private startProcessing(): void {
     if (this.isProcessing) {
       return;
     }
 
     this.isProcessing = true;
-    this.processingPromise = this.processQueue(event);
+    this.processingPromise = this.processQueue();
   }
 
   /**
    * Process the queue
    */
-  private async processQueue(event: { project_id: number }): Promise<void> {
+  private async processQueue(): Promise<void> {
     try {
       while (this.isProcessing) {
         // Check if we can process more jobs
@@ -387,7 +392,7 @@ export class QueueService {
             this.activeJobs.set(job.id, job);
 
             // Process the job
-            this.processJob(event, job).catch(error => {
+            this.processJob(job).catch(error => {
               console.error(`Error processing job ${job.id}:`, error);
             });
           }
@@ -408,7 +413,7 @@ export class QueueService {
   /**
    * Process a single job
    */
-  private async processJob(event: { project_id: number }, job: EmbeddingJob): Promise<void> {
+  private async processJob(job: EmbeddingJob): Promise<void> {
     try {
       console.log(`Processing job ${job.id} for repository ${job.repositoryUrl}`);
 
@@ -420,7 +425,7 @@ export class QueueService {
       await this.saveJob(job);
 
       // Process the repository
-      const result = await this.processRepository(event, job.repositoryUrl, job.processingId);
+      const result = await this.processRepository(job.projectId, job.repositoryUrl, job.processingId);
 
       if (result.success) {
         // Job completed successfully
@@ -456,14 +461,14 @@ export class QueueService {
   /**
    * Process a repository
    */
-  private async processRepository(event: { project_id: number }, repositoryUrl: string, processingId: string): Promise<JobResult> {
+  private async processRepository(projectId: number, repositoryUrl: string, processingId: string): Promise<JobResult> {
     let repoPath = '';
 
     try {
       console.log(`Processing repository ${repositoryUrl} (ID: ${processingId})`);
 
       // Clone the repository
-      const { repoPath: clonedRepoPath } = await repositoryService.cloneRepository(event, repositoryUrl);
+      const { repoPath: clonedRepoPath } = await repositoryService.cloneRepository(projectId, repositoryUrl);
       repoPath = clonedRepoPath;
 
       // Get all files from the repository
@@ -476,8 +481,6 @@ export class QueueService {
       }
 
       console.log(`Found ${files.length} files, generating embeddings`);
-
-      const projectId = event.project_id;
 
       // Generate a consistent project ID from the repository URL
       console.log(`Generated consistent project ID: ${projectId} from repository URL: ${repositoryUrl}`);

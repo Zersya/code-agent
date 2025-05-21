@@ -23,7 +23,7 @@ export class ReviewService {
    * @param mergeRequestIid The IID of the merge request
    * @returns The review result
    */
-  async reviewMergeRequest(projectId: number | string, mergeRequestIid: number): Promise<MergeRequestReviewResult> {
+  async reviewMergeRequest(projectId: number, mergeRequestIid: number): Promise<MergeRequestReviewResult> {
     try {
       console.log(`Starting review for merge request !${mergeRequestIid} in project ${projectId}`);
 
@@ -178,7 +178,7 @@ export class ReviewService {
   /**
    * Submit a review for a merge request
    */
-  async submitReview(projectId: number | string, mergeRequestIid: number): Promise<void> {
+  async submitReview(projectId: number, mergeRequestIid: number): Promise<void> {
     try {
       // Check if merge request reviews are enabled
       if (!ENABLE_MR_REVIEW) {
