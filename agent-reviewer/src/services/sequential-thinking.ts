@@ -137,8 +137,8 @@ export class SequentialThinkingService {
   private determineThoughtCount(codeChanges: string): number {
     // Simple logic: if code changes are too big, reduce the number of thoughts
     // This can be improved with more sophisticated logic, like using embedding distance
-    if (codeChanges.length > 1000) {
-      return Math.max(2, Math.floor(SEQUENTIAL_THINKING_THOUGHTS_COUNT / 2));
+    if (codeChanges.length > 500) {
+      return Math.max(1, Math.floor(SEQUENTIAL_THINKING_THOUGHTS_COUNT / 2));
     }
 
     return SEQUENTIAL_THINKING_THOUGHTS_COUNT;
@@ -179,7 +179,8 @@ export class SequentialThinkingService {
     }
 
     return `Kamu adalah senior software engineer yang bertanggung jawab untuk review kode yang menggunakan proses pemikiran sekuensial untuk menganalisis kode.
-Kamu akan melakukan analisis kode dalam ${SEQUENTIAL_THINKING_THOUGHTS_COUNT} langkah pemikiran yang terstruktur, di mana setiap pemikiran membangun dari pemikiran sebelumnya.
+Kamu akan melakukan analisis kode dalam ${SEQUENTIAL_THINKING_THOUGHTS_COUNT} langkah pemikiran yang terstruktur, di mana setiap pemikiran membangun dari pemikiran sebelumnya, 
+jangan pernah memberikan angka langkah pemikiran pada saat memberi kesimpulan dan rekomendasi final.
 
 Untuk setiap langkah pemikiran:
 1. Analisis kode dengan cermat dan teliti

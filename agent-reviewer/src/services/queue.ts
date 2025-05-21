@@ -134,9 +134,9 @@ export class QueueService {
       await client.query(`
         INSERT INTO embedding_jobs (
           id, repository_url, processing_id, status, attempts, max_attempts,
-          error, created_at, updated_at, started_at, completed_at, priority
+          error, created_at, updated_at, started_at, completed_at, priority, project_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (id)
         DO UPDATE SET
           status = EXCLUDED.status,
