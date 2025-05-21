@@ -137,7 +137,8 @@ export class SequentialThinkingService {
   private determineThoughtCount(codeChanges: string): number {
     // Simple logic: if code changes are too big, reduce the number of thoughts
     // This can be improved with more sophisticated logic, like using embedding distance
-    if (codeChanges.length > 500) {
+    console.log('Code changes length:', codeChanges.length);
+    if (codeChanges.length > 200) {
       return Math.max(1, Math.floor(SEQUENTIAL_THINKING_THOUGHTS_COUNT / 2));
     }
 
