@@ -40,6 +40,38 @@ export class ReviewService {
         return true;
       }
 
+      // Check if the project is already being embedded
+      const isBeingEmbedded = await dbService.isProjectBeingEmbedded(numericProjectId);
+
+      if (isBeingEmbedded) {
+        console.log(`Project ${projectId} is already being embedded, skipping duplicate embedding`);
+
+        // If we need to wait for completion, check the job status
+        if (waitForCompletion) {
+          // Get project metadata to get the job ID
+          const metadata = await dbService.getProjectMetadata(numericProjectId);
+
+          if (metadata && metadata.lastEmbeddingJobId) {
+            console.log(`Waiting for existing embedding job ${metadata.lastEmbeddingJobId} to complete`);
+            const job = await queueService.waitForJobCompletion(metadata.lastEmbeddingJobId, EMBEDDING_WAIT_TIMEOUT);
+
+            if (job && job.status === JobStatus.COMPLETED) {
+              console.log(`Existing embedding job completed successfully for project ${projectId}`);
+
+              // Update the project status
+              await dbService.setProjectEmbeddingStatus(numericProjectId, false);
+
+              return true;
+            } else {
+              console.warn(`Existing embedding job did not complete successfully for project ${projectId}`);
+              return false;
+            }
+          }
+        }
+
+        return true; // Return true to indicate that embedding is in progress
+      }
+
       // If auto-embedding is disabled, just return false
       if (!AUTO_EMBED_PROJECTS) {
         console.log(`Project ${projectId} has no embeddings, but auto-embedding is disabled`);
@@ -56,8 +88,13 @@ export class ReviewService {
         return false;
       }
 
-      // Queue the project for embedding with high priority
+      // Generate a unique processing ID
       const processingId = uuidv4();
+
+      // Update the project status to indicate that embedding is in progress
+      await dbService.setProjectEmbeddingStatus(numericProjectId, true, processingId);
+
+      // Queue the project for embedding with high priority
       await queueService.addJob(project.web_url, processingId, 10);
 
       console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
@@ -70,6 +107,9 @@ export class ReviewService {
       // Wait for the embedding process to complete with a timeout
       console.log(`Waiting for embedding process to complete for project ${projectId}`);
       const job = await queueService.waitForJobCompletion(processingId, EMBEDDING_WAIT_TIMEOUT);
+
+      // Update the project status
+      await dbService.setProjectEmbeddingStatus(numericProjectId, false);
 
       if (!job) {
         console.warn(`Could not get job status for project ${projectId}`);
@@ -116,10 +156,18 @@ export class ReviewService {
         };
       }
 
-      // Check if the project has embeddings and trigger embedding process if needed
-      // We don't wait for completion here, as we'll still proceed with the review
-      // even if the embedding process is still running
-      // await this.checkAndEmbedProject(projectId, true);
+      // Check if the project is already being embedded
+      const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+      const isBeingEmbedded = await dbService.isProjectBeingEmbedded(numericProjectId);
+
+      if (isBeingEmbedded) {
+        console.log(`Project ${projectId} is already being embedded, proceeding with review without waiting`);
+      } else {
+        // Check if the project has embeddings and trigger embedding process if needed
+        // We don't wait for completion here, as we'll still proceed with the review
+        // even if the embedding process is still running
+        await this.checkAndEmbedProject(projectId, false);
+      }
 
       // Format the changes for review
       const formattedChanges = this.formatChangesForReview(changes);

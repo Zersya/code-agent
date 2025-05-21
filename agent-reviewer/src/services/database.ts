@@ -116,7 +116,9 @@ class DatabaseService {
           url TEXT,
           default_branch TEXT,
           last_processed_commit TEXT,
-          last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          is_embedding_in_progress BOOLEAN DEFAULT FALSE,
+          last_embedding_job_id TEXT
         )
       `);
 
@@ -413,9 +415,10 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at
+          last_processed_commit, last_processed_at,
+          is_embedding_in_progress, last_embedding_job_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -423,7 +426,9 @@ class DatabaseService {
           url = EXCLUDED.url,
           default_branch = EXCLUDED.default_branch,
           last_processed_commit = EXCLUDED.last_processed_commit,
-          last_processed_at = EXCLUDED.last_processed_at
+          last_processed_at = EXCLUDED.last_processed_at,
+          is_embedding_in_progress = EXCLUDED.is_embedding_in_progress,
+          last_embedding_job_id = EXCLUDED.last_embedding_job_id
       `, [
         metadata.projectId,
         metadata.name,
@@ -431,7 +436,9 @@ class DatabaseService {
         metadata.url,
         metadata.defaultBranch,
         metadata.lastProcessedCommit,
-        metadata.lastProcessedAt
+        metadata.lastProcessedAt,
+        metadata.isEmbeddingInProgress || false,
+        metadata.lastEmbeddingJobId || null
       ]);
     } catch (error) {
       console.error('Error updating project metadata:', error);
@@ -453,7 +460,9 @@ class DatabaseService {
           url,
           default_branch as "defaultBranch",
           last_processed_commit as "lastProcessedCommit",
-          last_processed_at as "lastProcessedAt"
+          last_processed_at as "lastProcessedAt",
+          is_embedding_in_progress as "isEmbeddingInProgress",
+          last_embedding_job_id as "lastEmbeddingJobId"
         FROM projects
         WHERE project_id = $1
       `, [projectId]);
@@ -769,9 +778,10 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at
+          last_processed_commit, last_processed_at,
+          is_embedding_in_progress, last_embedding_job_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -779,7 +789,9 @@ class DatabaseService {
           url = EXCLUDED.url,
           default_branch = EXCLUDED.default_branch,
           last_processed_commit = EXCLUDED.last_processed_commit,
-          last_processed_at = EXCLUDED.last_processed_at
+          last_processed_at = EXCLUDED.last_processed_at,
+          is_embedding_in_progress = EXCLUDED.is_embedding_in_progress,
+          last_embedding_job_id = EXCLUDED.last_embedding_job_id
       `, [
         metadata.projectId,
         metadata.name,
@@ -787,11 +799,64 @@ class DatabaseService {
         metadata.url,
         metadata.defaultBranch,
         metadata.lastProcessedCommit,
-        metadata.lastProcessedAt
+        metadata.lastProcessedAt,
+        metadata.isEmbeddingInProgress || false,
+        metadata.lastEmbeddingJobId || null
       ]);
     } catch (error) {
       console.error('Error saving project metadata:', error);
       throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Set the embedding status for a project
+   * @param projectId The ID of the project
+   * @param isInProgress Whether embedding is in progress
+   * @param jobId The ID of the embedding job
+   */
+  async setProjectEmbeddingStatus(projectId: number, isInProgress: boolean, jobId?: string): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE projects
+        SET is_embedding_in_progress = $2, last_embedding_job_id = $3
+        WHERE project_id = $1
+      `, [projectId, isInProgress, jobId || null]);
+    } catch (error) {
+      console.error('Error setting project embedding status:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Check if a project is currently being embedded
+   * @param projectId The ID of the project
+   * @returns True if the project is currently being embedded, false otherwise
+   */
+  async isProjectBeingEmbedded(projectId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT is_embedding_in_progress
+        FROM projects
+        WHERE project_id = $1
+      `, [projectId]);
+
+      if (result.rows.length === 0) {
+        return false;
+      }
+
+      return result.rows[0].is_embedding_in_progress === true;
+    } catch (error) {
+      console.error('Error checking if project is being embedded:', error);
+      return false;
     } finally {
       client.release();
     }

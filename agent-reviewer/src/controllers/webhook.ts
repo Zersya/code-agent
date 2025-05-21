@@ -5,6 +5,8 @@ import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
+import { queueService } from '../services/queue.js';
+import { v4 as uuidv4 } from 'uuid';
 import { CodeFile, EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 
 /**
@@ -90,7 +92,11 @@ async function processPushEvent(event: GitLabPushEvent) {
         defaultBranch: projectDetails.default_branch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
+        isEmbeddingInProgress: false
       };
+
+      // Save the new project metadata
+      await dbService.saveProjectMetadata(projectMetadata);
     }
 
     // Skip if we've already processed this commit
@@ -99,54 +105,84 @@ async function processPushEvent(event: GitLabPushEvent) {
       return;
     }
 
-    // Get all files from the repository at this commit
-    console.log(`Fetching files for project ${projectId} at commit ${commitId}`);
-    const files = await gitlabService.getAllFiles(projectId, commitId);
-
-    if (files.length === 0) {
-      console.log('No files found, skipping');
+    // Check if the project is already being embedded
+    if (projectMetadata.isEmbeddingInProgress) {
+      console.log(`Project ${projectId} is already being embedded, skipping duplicate embedding`);
       return;
     }
 
-    console.log(`Found ${files.length} files, generating embeddings`);
-
-    // Generate embeddings for all files
-    const embeddings = await embeddingService.generateEmbeddings(
-      files,
-      projectId,
-      commitId,
-      branch
-    );
-
-    // Add repository URL to embeddings
-    const repositoryUrl = event.project.web_url;
-    embeddings.forEach(embedding => {
-      embedding.repositoryUrl = repositoryUrl;
-    });
-
-    console.log(`Generated ${embeddings.length} embeddings, saving to database`);
-
-    // Save embeddings to database
-    await dbService.saveEmbeddings(embeddings);
-
-    // Save batch information
-    const batch: EmbeddingBatch = {
-      projectId,
-      commitId,
-      branch,
-      files,
-      embeddings,
-      createdAt: new Date(),
-    };
-
-    await dbService.saveBatch(batch);
-
-    // Update project metadata
-    projectMetadata.lastProcessedCommit = commitId;
-    projectMetadata.lastProcessedAt = new Date();
+    // Set the project as being embedded
+    projectMetadata.isEmbeddingInProgress = true;
+    const processingId = uuidv4();
+    projectMetadata.lastEmbeddingJobId = processingId;
     await dbService.updateProjectMetadata(projectMetadata);
 
-    console.log(`Successfully processed push event for project ${projectId}, commit ${commitId}`);
+    try {
+      // Get all files from the repository at this commit
+      console.log(`Fetching files for project ${projectId} at commit ${commitId}`);
+      const files = await gitlabService.getAllFiles(projectId, commitId);
+
+      if (files.length === 0) {
+        console.log('No files found, skipping');
+        // Reset the embedding status
+        projectMetadata.isEmbeddingInProgress = false;
+        await dbService.updateProjectMetadata(projectMetadata);
+        return;
+      }
+
+      console.log(`Found ${files.length} files, generating embeddings`);
+
+      // Generate embeddings for all files
+      const embeddings = await embeddingService.generateEmbeddings(
+        files,
+        projectId,
+        commitId,
+        branch
+      );
+
+      // Add repository URL to embeddings
+      const repositoryUrl = event.project.web_url;
+      embeddings.forEach(embedding => {
+        embedding.repositoryUrl = repositoryUrl;
+      });
+
+      console.log(`Generated ${embeddings.length} embeddings, saving to database`);
+
+      // Save embeddings to database
+      await dbService.saveEmbeddings(embeddings);
+
+      // Save batch information
+      const batch: EmbeddingBatch = {
+        projectId,
+        commitId,
+        branch,
+        files,
+        embeddings,
+        createdAt: new Date(),
+      };
+
+      await dbService.saveBatch(batch);
+
+      // Update project metadata
+      projectMetadata.lastProcessedCommit = commitId;
+      projectMetadata.lastProcessedAt = new Date();
+      projectMetadata.isEmbeddingInProgress = false; // Reset the embedding status
+      await dbService.updateProjectMetadata(projectMetadata);
+
+      console.log(`Successfully processed push event for project ${projectId}, commit ${commitId}`);
+    } catch (error) {
+      console.error(`Error processing push event for project ${projectId}:`, error);
+
+      // Reset the embedding status in case of error
+      try {
+        projectMetadata.isEmbeddingInProgress = false;
+        await dbService.updateProjectMetadata(projectMetadata);
+      } catch (updateError) {
+        console.error(`Error resetting embedding status for project ${projectId}:`, updateError);
+      }
+
+      throw error;
+    }
   } catch (error) {
     console.error('Error processing push event:', error);
   }
@@ -184,57 +220,91 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
         defaultBranch: projectDetails.default_branch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
+        isEmbeddingInProgress: false
       };
+
+      // Save the new project metadata
+      await dbService.saveProjectMetadata(projectMetadata);
     }
 
-    // Get all files from the source branch
-    console.log(`Fetching files for project ${projectId} at branch ${sourceBranch}`);
-    const files = await gitlabService.getAllFiles(projectId, sourceBranch);
-
-    if (files.length === 0) {
-      console.log('No files found, skipping');
+    // Check if the project is already being embedded
+    if (projectMetadata.isEmbeddingInProgress) {
+      console.log(`Project ${projectId} is already being embedded, skipping duplicate embedding`);
       return;
     }
 
-    console.log(`Found ${files.length} files, generating embeddings`);
-
-    // Generate embeddings for all files
-    const embeddings = await embeddingService.generateEmbeddings(
-      files,
-      projectId,
-      commitId,
-      sourceBranch
-    );
-
-    // Add repository URL to embeddings
-    const repositoryUrl = event.project.web_url;
-    embeddings.forEach(embedding => {
-      embedding.repositoryUrl = repositoryUrl;
-    });
-
-    console.log(`Generated ${embeddings.length} embeddings, saving to database`);
-
-    // Save embeddings to database
-    await dbService.saveEmbeddings(embeddings);
-
-    // Save batch information
-    const batch: EmbeddingBatch = {
-      projectId,
-      commitId,
-      branch: sourceBranch,
-      files,
-      embeddings,
-      createdAt: new Date(),
-    };
-
-    await dbService.saveBatch(batch);
-
-    // Update project metadata
-    projectMetadata.lastProcessedCommit = commitId;
-    projectMetadata.lastProcessedAt = new Date();
+    // Set the project as being embedded
+    projectMetadata.isEmbeddingInProgress = true;
+    const processingId = uuidv4();
+    projectMetadata.lastEmbeddingJobId = processingId;
     await dbService.updateProjectMetadata(projectMetadata);
 
-    console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
+    try {
+      // Get all files from the source branch
+      console.log(`Fetching files for project ${projectId} at branch ${sourceBranch}`);
+      const files = await gitlabService.getAllFiles(projectId, sourceBranch);
+
+      if (files.length === 0) {
+        console.log('No files found, skipping');
+        // Reset the embedding status
+        projectMetadata.isEmbeddingInProgress = false;
+        await dbService.updateProjectMetadata(projectMetadata);
+        return;
+      }
+
+      console.log(`Found ${files.length} files, generating embeddings`);
+
+      // Generate embeddings for all files
+      const embeddings = await embeddingService.generateEmbeddings(
+        files,
+        projectId,
+        commitId,
+        sourceBranch
+      );
+
+      // Add repository URL to embeddings
+      const repositoryUrl = event.project.web_url;
+      embeddings.forEach(embedding => {
+        embedding.repositoryUrl = repositoryUrl;
+      });
+
+      console.log(`Generated ${embeddings.length} embeddings, saving to database`);
+
+      // Save embeddings to database
+      await dbService.saveEmbeddings(embeddings);
+
+      // Save batch information
+      const batch: EmbeddingBatch = {
+        projectId,
+        commitId,
+        branch: sourceBranch,
+        files,
+        embeddings,
+        createdAt: new Date(),
+      };
+
+      await dbService.saveBatch(batch);
+
+      // Update project metadata
+      projectMetadata.lastProcessedCommit = commitId;
+      projectMetadata.lastProcessedAt = new Date();
+      projectMetadata.isEmbeddingInProgress = false; // Reset the embedding status
+      await dbService.updateProjectMetadata(projectMetadata);
+
+      console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
+    } catch (error) {
+      console.error(`Error processing merge request event for project ${projectId}:`, error);
+
+      // Reset the embedding status in case of error
+      try {
+        projectMetadata.isEmbeddingInProgress = false;
+        await dbService.updateProjectMetadata(projectMetadata);
+      } catch (updateError) {
+        console.error(`Error resetting embedding status for project ${projectId}:`, updateError);
+      }
+
+      throw error;
+    }
   } catch (error) {
     console.error('Error processing merge request event:', error);
   }
@@ -257,8 +327,22 @@ async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
 
     console.log(`Processing Repopo merge request event for project ${projectId}, MR !${mergeRequestIid}`);
 
-    // First, process the merge request normally to generate embeddings
-    await processMergeRequestEvent(event);
+    // Get project metadata
+    let projectMetadata = await dbService.getProjectMetadata(projectId);
+    let shouldProcessEmbeddings = true;
+
+    if (projectMetadata) {
+      // Check if the project is already being embedded
+      if (projectMetadata.isEmbeddingInProgress) {
+        console.log(`Project ${projectId} is already being embedded, skipping duplicate embedding`);
+        shouldProcessEmbeddings = false;
+      }
+    }
+
+    // Process the merge request to generate embeddings if needed
+    if (shouldProcessEmbeddings) {
+      await processMergeRequestEvent(event);
+    }
 
     // Then, trigger the review process
     console.log(`Starting review for merge request !${mergeRequestIid} in project ${projectId}`);

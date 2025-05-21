@@ -226,6 +226,69 @@ export class RepositoryService {
   }
 
   /**
+   * Process a repository
+   * @param repositoryUrl The URL of the repository
+   * @param processingId The ID of the processing job
+   * @returns The numeric project ID
+   */
+  async processRepository(repositoryUrl: string, processingId: string): Promise<number> {
+    let repoPath = '';
+    let numericProjectId = 0;
+
+    try {
+      console.log(`Processing repository ${repositoryUrl} (ID: ${processingId})`);
+
+      // Clone the repository
+      const { repoPath: clonedRepoPath, projectId } = await this.cloneRepository(repositoryUrl);
+      repoPath = clonedRepoPath;
+
+      if (!projectId) {
+        throw new Error('Could not extract project ID from repository URL');
+      }
+
+      // Generate a numeric project ID from the string path
+      numericProjectId = this.generateProjectIdFromPath(projectId);
+      console.log(`Generated numeric project ID: ${numericProjectId} from path: ${projectId}`);
+
+      // Get all files from the repository
+      const files = await this.getFilesFromLocalRepo(repoPath);
+
+      if (files.length === 0) {
+        console.log('No files found, skipping');
+        return numericProjectId;
+      }
+
+      // Process the files and generate embeddings
+      // Implementation details would go here
+
+      return numericProjectId;
+    } catch (error) {
+      console.error(`Error processing repository ${repositoryUrl} (ID: ${processingId}):`, error);
+      throw error;
+    } finally {
+      // Clean up the repository
+      if (repoPath) {
+        this.cleanupRepository(repoPath);
+      }
+    }
+  }
+
+  /**
+   * Generate a numeric project ID from a string path
+   */
+  generateProjectIdFromPath(path: string): number {
+    // Create a hash of the path
+    const hash = require('crypto').createHash('md5').update(path).digest('hex');
+
+    // Convert the first 8 characters of the hash to a number
+    const truncatedHash = hash.substring(0, 8);
+    const numericId = parseInt(truncatedHash, 16);
+
+    // Ensure the ID is positive and within safe integer range
+    return Math.abs(numericId % 2147483647); // Max 32-bit signed integer
+  }
+
+  /**
    * Clean up temporary repository
    */
   cleanupRepository(repoPath: string): void {
