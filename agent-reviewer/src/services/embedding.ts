@@ -10,27 +10,42 @@ const QODO_EMBED_API_URL = process.env.QODO_EMBED_API_URL || 'http://localhost:8
 // Default list of allowed file extensions if not specified in environment variables
 const DEFAULT_ALLOWED_EXTENSIONS = [
   // JavaScript/TypeScript
-  'js', 'ts', 'jsx', 'tsx', 'mjs', 'cjs',
+  'js', 'ts', 'jsx', 'tsx', 'mjs', 'cjs', 'd.ts',
   // Web
-  'html', 'css', 'scss', 'less', 'vue', 'svelte',
+  'html', 'css', 'scss', 'less', 'vue', 'svelte', 'astro',
   // Backend
-  'php', 'py', 'rb', 'java', 'go', 'cs', 'rs', 'swift', 'kt',
+  'php', 'py', 'rb', 'java', 'go', 'cs', 'rs', 'swift', 'kt', 'scala', 'clj', 'ex', 'exs',
   // Data/Config
-  'json', 'xml', 'yaml', 'yml', 'toml', 'ini',
+  'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'env', 'properties', 'conf', 'config',
   // Documentation
-  'md', 'txt',
+  'md', 'txt', 'rst', 'adoc', 'asciidoc',
   // Shell/Scripts
-  'sh', 'bash', 'zsh', 'ps1',
+  'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd',
   // SQL
-  'sql',
+  'sql', 'prisma', 'graphql', 'gql',
   // C/C++
-  'c', 'cpp', 'h', 'hpp'
+  'c', 'cpp', 'h', 'hpp', 'cc', 'hh',
+  // API/Testing
+  'bru', 'http', 'rest', 'spec', 'test',
+  // Mobile
+  'dart', 'kotlin', 'swift', 'xcodeproj',
+  // Other
+  'lock', 'gradle', 'plist', 'editorconfig', 'gitignore'
 ];
 
 // Parse allowed file extensions from environment variable or use defaults
 const ALLOWED_FILE_EXTENSIONS = process.env.ALLOWED_FILE_EXTENSIONS
   ? process.env.ALLOWED_FILE_EXTENSIONS.split(',').map(ext => ext.trim().toLowerCase())
   : DEFAULT_ALLOWED_EXTENSIONS;
+
+// Special files without extensions that should be processed
+const SPECIAL_FILES_WITHOUT_EXTENSIONS = [
+  'dockerfile', 'makefile', 'jenkinsfile', 'vagrantfile', 'procfile',
+  'gemfile', 'rakefile', 'brewfile', 'fastfile',
+  '.gitignore', '.dockerignore', '.env', '.npmrc', '.yarnrc', '.babelrc',
+  '.eslintrc', '.prettierrc', '.editorconfig', 'license', 'readme',
+  'changelog', 'contributing', 'authors', 'codeowners'
+];
 
 const qodoApi = axios.create({
   baseURL: QODO_EMBED_API_URL,
@@ -41,7 +56,7 @@ const qodoApi = axios.create({
 
 export class EmbeddingService {
   /**
-   * Check if a file should be processed based on its extension
+   * Check if a file should be processed based on its extension or name
    * @param filePath The path of the file to check
    * @returns True if the file should be processed, false otherwise
    */
@@ -49,13 +64,40 @@ export class EmbeddingService {
     // Extract the file extension (without the dot)
     const extension = path.extname(filePath).toLowerCase().replace(/^\./, '');
 
-    // If no extension, don't process the file
-    if (!extension) {
-      return false;
+    // If there's an extension, check if it's in the allowed list
+    if (extension) {
+      return ALLOWED_FILE_EXTENSIONS.includes(extension);
     }
 
-    // Check if the extension is in the allowed list
-    return ALLOWED_FILE_EXTENSIONS.includes(extension);
+    // For files without extensions, check if it's a special file
+    const fileName = path.basename(filePath).toLowerCase();
+
+    // Check if it's in our special files list
+    if (SPECIAL_FILES_WITHOUT_EXTENSIONS.includes(fileName)) {
+      return true;
+    }
+
+    // Check for files with dot prefixes (hidden files)
+    if (fileName.startsWith('.') && SPECIAL_FILES_WITHOUT_EXTENSIONS.includes(fileName)) {
+      return true;
+    }
+
+    // For merge request diffs, we might want to process files without extensions
+    // if they appear to contain code. Let's check the first part of the path
+    // to see if it might be a source code file
+    const pathParts = filePath.toLowerCase().split('/');
+    const sourceDirs = ['src', 'lib', 'app', 'source', 'core', 'api', 'server', 'client', 'components'];
+
+    // If the file is in a source directory, it's likely code even without an extension
+    for (const dir of sourceDirs) {
+      if (pathParts.includes(dir)) {
+        console.log(`Processing file without extension in source directory: ${filePath}`);
+        return true;
+      }
+    }
+
+    // By default, skip files without extensions
+    return false;
   }
 
   /**
@@ -64,6 +106,14 @@ export class EmbeddingService {
    */
   getAllowedFileExtensions(): string[] {
     return [...ALLOWED_FILE_EXTENSIONS];
+  }
+
+  /**
+   * Get the list of special files without extensions that are allowed
+   * @returns Array of special files without extensions
+   */
+  getSpecialFilesWithoutExtensions(): string[] {
+    return [...SPECIAL_FILES_WITHOUT_EXTENSIONS];
   }
   /**
    * Generate embeddings for a single code file with retry logic
@@ -125,13 +175,30 @@ export class EmbeddingService {
     const extensionStats = this.getFileExtensionStats(files);
     console.log('File extension statistics:', JSON.stringify(extensionStats, null, 2));
 
-    // First, filter by file extension
+    // First, filter by file extension or special handling for files without extensions
     const extensionFilteredFiles = files.filter(file => {
+      // Check if the file has an allowed extension or is a special file
       const isAllowed = this.isAllowedFileExtension(file.path);
-      if (!isAllowed) {
-        console.log(`Skipping file with unsupported extension: ${file.path}`);
+
+      if (isAllowed) {
+        return true;
       }
-      return isAllowed;
+
+      // For files that didn't pass the extension check, try content-based detection
+      // but only if the file has content
+      if (file.content && file.content.length > 0) {
+        // Extract the extension (if any)
+        const extension = path.extname(file.path).toLowerCase().replace(/^\./, '');
+
+        // If the file has no extension, check if it might contain code
+        if (!extension && this.mightContainCode(file.content)) {
+          console.log(`Processing file without extension that appears to contain code: ${file.path}`);
+          return true;
+        }
+      }
+
+      console.log(`Skipping file with unsupported extension: ${file.path}`);
+      return false;
     });
 
     console.log(`Found ${extensionFilteredFiles.length} files with allowed extensions out of ${files.length} total files`);
@@ -238,6 +305,61 @@ export class EmbeddingService {
   }
 
   /**
+   * Check if a file might contain code based on its content
+   * This is useful for files without extensions
+   * @param content The content of the file
+   * @returns True if the file might contain code, false otherwise
+   */
+  private mightContainCode(content: string): boolean {
+    if (!content || content.length < 10) {
+      return false;
+    }
+
+    // Check for common code patterns
+    const codePatterns = [
+      // Function definitions
+      /function\s+\w+\s*\(/i,
+      // Class definitions
+      /class\s+\w+/i,
+      // Import/require statements
+      /import\s+|require\s*\(/i,
+      // Variable declarations
+      /const\s+|let\s+|var\s+/i,
+      // Control structures
+      /if\s*\(|for\s*\(|while\s*\(|switch\s*\(/i,
+      // HTML tags
+      /<[a-z]+[^>]*>/i,
+      // CSS selectors
+      /\.\w+\s*{|\#\w+\s*{/i,
+      // SQL queries
+      /SELECT\s+|INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM/i,
+      // Shell commands
+      /^#!/,
+      // JSON-like structures
+      /{\s*"\w+"\s*:/i
+    ];
+
+    // Check if any code pattern matches
+    for (const pattern of codePatterns) {
+      if (pattern.test(content)) {
+        return true;
+      }
+    }
+
+    // Check for a reasonable ratio of special characters that are common in code
+    const codeChars = content.split('').filter(char =>
+      ['(', ')', '{', '}', '[', ']', ';', '=', '+', '-', '*', '/', '<', '>', ':', '"', "'"].includes(char)
+    ).length;
+
+    const codeCharRatio = codeChars / content.length;
+    if (codeCharRatio > 0.05) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Get statistics about file extensions in a repository
    * This is useful for debugging and monitoring
    * @param files List of files to analyze
@@ -249,31 +371,55 @@ export class EmbeddingService {
     allowedExtensions: string[];
     allowedFileCount: number;
     skippedFileCount: number;
+    filesWithoutExtension: number;
+    filesWithoutExtensionPaths: string[];
+    specialFilesCount: number;
+    specialFilesPaths: string[];
   } {
     const stats = {
       totalFiles: files.length,
       extensionCounts: {} as Record<string, number>,
       allowedExtensions: ALLOWED_FILE_EXTENSIONS,
       allowedFileCount: 0,
-      skippedFileCount: 0
+      skippedFileCount: 0,
+      filesWithoutExtension: 0,
+      filesWithoutExtensionPaths: [] as string[],
+      specialFilesCount: 0,
+      specialFilesPaths: [] as string[]
     };
 
     // Count files by extension
     for (const file of files) {
       const extension = path.extname(file.path).toLowerCase().replace(/^\./, '');
+      const fileName = path.basename(file.path).toLowerCase();
 
       // Count by extension
       if (extension) {
         stats.extensionCounts[extension] = (stats.extensionCounts[extension] || 0) + 1;
       } else {
         stats.extensionCounts['no-extension'] = (stats.extensionCounts['no-extension'] || 0) + 1;
+        stats.filesWithoutExtension++;
+        stats.filesWithoutExtensionPaths.push(file.path);
+
+        // Check if it's a special file
+        if (SPECIAL_FILES_WITHOUT_EXTENSIONS.includes(fileName) ||
+            (fileName.startsWith('.') && SPECIAL_FILES_WITHOUT_EXTENSIONS.includes(fileName))) {
+          stats.specialFilesCount++;
+          stats.specialFilesPaths.push(file.path);
+        }
       }
 
       // Count allowed vs skipped
       if (this.isAllowedFileExtension(file.path)) {
         stats.allowedFileCount++;
       } else {
-        stats.skippedFileCount++;
+        // For files without extensions, check if they might contain code
+        if (!extension && file.content && this.mightContainCode(file.content)) {
+          // This will be counted as allowed in the next filter step
+          console.log(`File without extension might contain code: ${file.path}`);
+        } else {
+          stats.skippedFileCount++;
+        }
       }
     }
 

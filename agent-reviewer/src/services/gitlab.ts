@@ -334,6 +334,7 @@ export class GitLabService {
       'swift': 'swift',
       'kt': 'kotlin',
       'rs': 'rust',
+      'vue': 'vue',
     };
 
     return languageMap[extension] || 'text';
