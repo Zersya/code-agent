@@ -1,10 +1,36 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import path from 'path';
 import { CodeFile, CodeEmbedding } from '../models/embedding.js';
 
 dotenv.config();
 
 const QODO_EMBED_API_URL = process.env.QODO_EMBED_API_URL || 'http://localhost:8000/v1/embeddings';
+
+// Default list of allowed file extensions if not specified in environment variables
+const DEFAULT_ALLOWED_EXTENSIONS = [
+  // JavaScript/TypeScript
+  'js', 'ts', 'jsx', 'tsx', 'mjs', 'cjs',
+  // Web
+  'html', 'css', 'scss', 'less', 'vue', 'svelte',
+  // Backend
+  'php', 'py', 'rb', 'java', 'go', 'cs', 'rs', 'swift', 'kt',
+  // Data/Config
+  'json', 'xml', 'yaml', 'yml', 'toml', 'ini',
+  // Documentation
+  'md', 'txt',
+  // Shell/Scripts
+  'sh', 'bash', 'zsh', 'ps1',
+  // SQL
+  'sql',
+  // C/C++
+  'c', 'cpp', 'h', 'hpp'
+];
+
+// Parse allowed file extensions from environment variable or use defaults
+const ALLOWED_FILE_EXTENSIONS = process.env.ALLOWED_FILE_EXTENSIONS
+  ? process.env.ALLOWED_FILE_EXTENSIONS.split(',').map(ext => ext.trim().toLowerCase())
+  : DEFAULT_ALLOWED_EXTENSIONS;
 
 const qodoApi = axios.create({
   baseURL: QODO_EMBED_API_URL,
@@ -14,6 +40,31 @@ const qodoApi = axios.create({
 });
 
 export class EmbeddingService {
+  /**
+   * Check if a file should be processed based on its extension
+   * @param filePath The path of the file to check
+   * @returns True if the file should be processed, false otherwise
+   */
+  isAllowedFileExtension(filePath: string): boolean {
+    // Extract the file extension (without the dot)
+    const extension = path.extname(filePath).toLowerCase().replace(/^\./, '');
+
+    // If no extension, don't process the file
+    if (!extension) {
+      return false;
+    }
+
+    // Check if the extension is in the allowed list
+    return ALLOWED_FILE_EXTENSIONS.includes(extension);
+  }
+
+  /**
+   * Get the list of allowed file extensions
+   * @returns Array of allowed file extensions
+   */
+  getAllowedFileExtensions(): string[] {
+    return [...ALLOWED_FILE_EXTENSIONS];
+  }
   /**
    * Generate embeddings for a single code file with retry logic
    */
@@ -70,14 +121,42 @@ export class EmbeddingService {
 
     console.log(`Starting embedding generation for ${files.length} files with batch size ${batchSize}`);
 
-    // Filter out binary files, large files, or files without content first
-    const validFiles = files.filter(file =>
-      file.content &&
-      file.content.length <= 100000 &&
-      !this.isBinaryContent(file.content)
-    );
+    // Log file extension statistics
+    const extensionStats = this.getFileExtensionStats(files);
+    console.log('File extension statistics:', JSON.stringify(extensionStats, null, 2));
 
-    console.log(`Found ${validFiles.length} valid files for embedding after filtering`);
+    // First, filter by file extension
+    const extensionFilteredFiles = files.filter(file => {
+      const isAllowed = this.isAllowedFileExtension(file.path);
+      if (!isAllowed) {
+        console.log(`Skipping file with unsupported extension: ${file.path}`);
+      }
+      return isAllowed;
+    });
+
+    console.log(`Found ${extensionFilteredFiles.length} files with allowed extensions out of ${files.length} total files`);
+
+    // Then filter out binary files, large files, or files without content
+    const validFiles = extensionFilteredFiles.filter(file => {
+      if (!file.content) {
+        console.log(`Skipping file with no content: ${file.path}`);
+        return false;
+      }
+
+      if (file.content.length > 100000) {
+        console.log(`Skipping file that exceeds size limit (${file.content.length} chars): ${file.path}`);
+        return false;
+      }
+
+      if (this.isBinaryContent(file.content)) {
+        console.log(`Skipping binary file: ${file.path}`);
+        return false;
+      }
+
+      return true;
+    });
+
+    console.log(`Found ${validFiles.length} valid files for embedding after all filtering steps`);
 
     // Process files in batches
     for (let i = 0; i < validFiles.length; i += batchSize) {
@@ -156,6 +235,49 @@ export class EmbeddingService {
 
     // If more than 10% of characters are non-printable, consider it binary
     return nonPrintableCount > content.length * 0.1;
+  }
+
+  /**
+   * Get statistics about file extensions in a repository
+   * This is useful for debugging and monitoring
+   * @param files List of files to analyze
+   * @returns Object with statistics about file extensions
+   */
+  getFileExtensionStats(files: CodeFile[]): {
+    totalFiles: number;
+    extensionCounts: Record<string, number>;
+    allowedExtensions: string[];
+    allowedFileCount: number;
+    skippedFileCount: number;
+  } {
+    const stats = {
+      totalFiles: files.length,
+      extensionCounts: {} as Record<string, number>,
+      allowedExtensions: ALLOWED_FILE_EXTENSIONS,
+      allowedFileCount: 0,
+      skippedFileCount: 0
+    };
+
+    // Count files by extension
+    for (const file of files) {
+      const extension = path.extname(file.path).toLowerCase().replace(/^\./, '');
+
+      // Count by extension
+      if (extension) {
+        stats.extensionCounts[extension] = (stats.extensionCounts[extension] || 0) + 1;
+      } else {
+        stats.extensionCounts['no-extension'] = (stats.extensionCounts['no-extension'] || 0) + 1;
+      }
+
+      // Count allowed vs skipped
+      if (this.isAllowedFileExtension(file.path)) {
+        stats.allowedFileCount++;
+      } else {
+        stats.skippedFileCount++;
+      }
+    }
+
+    return stats;
   }
 
   /**
