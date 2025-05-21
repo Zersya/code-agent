@@ -196,43 +196,55 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
       return;
     }
 
-    console.log(`Found ${files.length} files, generating embeddings`);
 
-    // Generate embeddings for all files
-    const embeddings = await embeddingService.generateEmbeddings(
-      files,
-      projectId,
-      commitId,
-      sourceBranch
-    );
+    // Check if the project has embeddings and trigger embedding process if needed
+    // We don't wait for completion here, as we'll still proceed with the review
+    // even if the embedding process is still running
+    await embeddingService.checkAndEmbedProject(projectId, true);
 
-    // Add repository URL to embeddings
-    const repositoryUrl = event.project.web_url;
-    embeddings.forEach(embedding => {
-      embedding.repositoryUrl = repositoryUrl;
-    });
+    // has embeddings
+    // const hasEmbeddings = await dbService.hasEmbeddings(projectId);
+    // if (!hasEmbeddings) {
+    //   console.log(`Found ${files.length} files, generating embeddings`);
 
-    console.log(`Generated ${embeddings.length} embeddings, saving to database`);
+    //   // Generate embeddings for all files
+    //   const embeddings = await embeddingService.generateEmbeddings(
+    //     files,
+    //     projectId,
+    //     commitId,
+    //     sourceBranch
+    //   );
 
-    // Save embeddings to database
-    await dbService.saveEmbeddings(embeddings);
+    //   // Add repository URL to embeddings
+    //   const repositoryUrl = event.project.web_url;
+    //   embeddings.forEach(embedding => {
+    //     embedding.repositoryUrl = repositoryUrl;
+    //   });
 
-    // Save batch information
-    const batch: EmbeddingBatch = {
-      projectId,
-      commitId,
-      branch: sourceBranch,
-      files,
-      embeddings,
-      createdAt: new Date(),
-    };
+    //   console.log(`Generated ${embeddings.length} embeddings, saving to database`);
 
-    await dbService.saveBatch(batch);
+    //   // Save embeddings to database
+    //   await dbService.saveEmbeddings(embeddings);
 
-    // Update project metadata
-    projectMetadata.lastProcessedCommit = commitId;
-    projectMetadata.lastProcessedAt = new Date();
-    await dbService.updateProjectMetadata(projectMetadata);
+    //   // Save batch information
+    //   const batch: EmbeddingBatch = {
+    //     projectId,
+    //     commitId,
+    //     branch: sourceBranch,
+    //     files,
+    //     embeddings,
+    //     createdAt: new Date(),
+    //   };
+
+    //   await dbService.saveBatch(batch);
+
+    //   // Update project metadata
+    //   projectMetadata.lastProcessedCommit = commitId;
+    //   projectMetadata.lastProcessedAt = new Date();
+    //   await dbService.updateProjectMetadata(projectMetadata);
+
+    //   return;
+    // }
 
     console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
   } catch (error) {
