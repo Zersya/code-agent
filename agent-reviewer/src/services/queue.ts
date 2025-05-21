@@ -5,6 +5,7 @@ import { repositoryService } from './repository.js';
 import { embeddingService } from './embedding.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -550,7 +551,6 @@ export class QueueService {
    */
   private generateProjectIdFromPath(path: string): number {
     // Create a hash of the path
-    const crypto = require('crypto');
     const hash = crypto.createHash('md5').update(path).digest('hex');
 
     // Convert the first 8 characters of the hash to a number
