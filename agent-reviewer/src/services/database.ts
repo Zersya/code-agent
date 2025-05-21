@@ -16,6 +16,37 @@ class DatabaseService {
     });
   }
 
+  /**
+   * Check if content contains binary data that might cause database issues
+   */
+  private containsBinaryData(content: string): boolean {
+    // Check for null bytes which cause PostgreSQL errors
+    if (content.includes('\u0000')) {
+      return true;
+    }
+
+    // Check for other non-printable characters that might indicate binary data
+    const nonPrintablePattern = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
+    if (nonPrintablePattern.test(content)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Sanitize content to remove problematic characters for database storage
+   */
+  private sanitizeContent(content: string): string {
+    if (!content) return '';
+
+    if (this.containsBinaryData(content)) {
+      return '[BINARY CONTENT REMOVED]';
+    }
+
+    return content;
+  }
+
   async connect(): Promise<void> {
     try {
       // Test the connection
@@ -169,6 +200,9 @@ class DatabaseService {
     const client = await this.pool.connect();
 
     try {
+      // Sanitize content to prevent database errors with binary data
+      const sanitizedContent = this.sanitizeContent(embedding.content);
+
       // Check if we're using pgvector or JSONB for embeddings
       const res = await client.query(`
         SELECT data_type
@@ -197,7 +231,7 @@ class DatabaseService {
           embedding.projectId,
           embedding.repositoryUrl,
           embedding.filePath,
-          embedding.content,
+          sanitizedContent,
           embedding.embedding,
           embedding.language,
           embedding.commitId,
@@ -225,7 +259,7 @@ class DatabaseService {
           embedding.projectId,
           embedding.repositoryUrl,
           embedding.filePath,
-          embedding.content,
+          sanitizedContent,
           JSON.stringify(embedding.embedding),
           embedding.language,
           embedding.commitId,
@@ -263,6 +297,9 @@ class DatabaseService {
       await client.query('BEGIN');
 
       for (const embedding of embeddings) {
+        // Sanitize content to prevent database errors with binary data
+        const sanitizedContent = this.sanitizeContent(embedding.content);
+
         if (isVector) {
           await client.query(`
             INSERT INTO embeddings (
@@ -282,7 +319,7 @@ class DatabaseService {
             embedding.projectId,
             embedding.repositoryUrl,
             embedding.filePath,
-            embedding.content,
+            sanitizedContent,
             embedding.embedding,
             embedding.language,
             embedding.commitId,
@@ -310,7 +347,7 @@ class DatabaseService {
             embedding.projectId,
             embedding.repositoryUrl,
             embedding.filePath,
-            embedding.content,
+            sanitizedContent,
             JSON.stringify(embedding.embedding),
             embedding.language,
             embedding.commitId,
@@ -337,6 +374,12 @@ class DatabaseService {
     const client = await this.pool.connect();
 
     try {
+      // Sanitize file contents to prevent database errors with binary data
+      const sanitizedFiles = batch.files.map(file => ({
+        ...file,
+        content: this.sanitizeContent(file.content)
+      }));
+
       await client.query(`
         INSERT INTO batches (project_id, commit_id, branch, files, created_at)
         VALUES ($1, $2, $3, $4, $5)
@@ -344,7 +387,7 @@ class DatabaseService {
         batch.projectId,
         batch.commitId,
         batch.branch,
-        JSON.stringify(batch.files),
+        JSON.stringify(sanitizedFiles),
         batch.createdAt
       ]);
     } catch (error) {

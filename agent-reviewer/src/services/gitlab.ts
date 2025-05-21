@@ -76,6 +76,17 @@ export class GitLabService {
         const batch = fileEntries.slice(i, i + batchSize);
         const batchPromises = batch.map(async (file) => {
           try {
+            // Skip binary files to avoid database issues with null bytes
+            if (this.isBinaryFile(file.path)) {
+              console.log(`Skipping binary file: ${file.path}`);
+              return {
+                path: file.path,
+                content: '[BINARY FILE CONTENT SKIPPED]',
+                language: 'binary',
+                lastModified: new Date(),
+              };
+            }
+
             const content = await this.getFileContent(projectId, file.path, ref);
             const language = this.detectLanguage(file.path);
 
@@ -161,6 +172,22 @@ export class GitLabService {
 
         // Get the language based on the file extension
         const language = this.detectLanguage(newPath);
+
+        // Check if this is a binary file
+        const isBinary = this.isBinaryFile(newPath) || this.isBinaryFile(oldPath);
+
+        if (isBinary) {
+          console.log(`Skipping binary file content for ${newPath}`);
+          result.push({
+            oldPath,
+            newPath,
+            oldContent: '[BINARY FILE CONTENT SKIPPED]',
+            newContent: '[BINARY FILE CONTENT SKIPPED]',
+            diffContent,
+            language: 'binary',
+          });
+          continue;
+        }
 
         // Get the old and new content if available
         let oldContent = '';
@@ -310,6 +337,26 @@ export class GitLabService {
     };
 
     return languageMap[extension] || 'text';
+  }
+
+  /**
+   * Check if a file is likely binary based on its extension
+   */
+  private isBinaryFile(filePath: string): boolean {
+    const extension = filePath.split('.').pop()?.toLowerCase() || '';
+
+    // List of common binary file extensions
+    const binaryExtensions = [
+      'png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'webp', 'tiff', 'svg',
+      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+      'zip', 'tar', 'gz', 'rar', '7z',
+      'exe', 'dll', 'so', 'dylib',
+      'ttf', 'otf', 'woff', 'woff2',
+      'mp3', 'mp4', 'avi', 'mov', 'wmv', 'flv',
+      'bin', 'dat'
+    ];
+
+    return binaryExtensions.includes(extension);
   }
 }
 
