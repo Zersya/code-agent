@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
+import { repositoryService } from '../services/repository.js';
 import { llmService } from '../services/llm.js';
 import { CodeEmbedding } from '../models/embedding.js';
 
@@ -27,9 +28,25 @@ export const searchCode = async (req: Request, res: Response): Promise<void> => 
     let results: CodeEmbedding[] = [];
 
     if (projectId) {
+      // Convert projectId to a consistent numeric ID if it's a string
+      let numericProjectId: number;
+      if (typeof projectId === 'string') {
+        // Check if it's a URL or a numeric string
+        if (isNaN(parseInt(projectId, 10))) {
+          // It's likely a URL, generate a consistent ID
+          numericProjectId = repositoryService.generateConsistentProjectId(projectId);
+        } else {
+          // It's a numeric string, convert to number
+          numericProjectId = parseInt(projectId, 10);
+        }
+      } else {
+        // It's already a number
+        numericProjectId = projectId;
+      }
+
       // Search within a specific project
-      console.log(`Searching for code similar to query in project ${projectId}`);
-      results = await dbService.searchSimilarCode(projectId, queryEmbedding, limit);
+      console.log(`Searching for code similar to query in project ${numericProjectId} (original input: ${projectId})`);
+      results = await dbService.searchSimilarCode(numericProjectId, queryEmbedding, limit);
     } else {
       // Search across all projects
       console.log(`Searching for code similar to query across all projects`);

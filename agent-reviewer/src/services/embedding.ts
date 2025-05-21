@@ -4,6 +4,7 @@ import path from 'path';
 import { gitlabService } from './gitlab.js';
 import { dbService } from './database.js';
 import { queueService } from './queue.js';
+import { repositoryService } from './repository.js';
 import { JobStatus } from '../models/queue.js';
 import { v4 as uuidv4 } from 'uuid';
 import { CodeFile, CodeEmbedding } from '../models/embedding.js';
@@ -131,53 +132,57 @@ export class EmbeddingService {
      */
     async checkAndEmbedProject(projectId: number | string, waitForCompletion: boolean = false): Promise<boolean> {
       try {
-        // Convert projectId to number if it's a string
-        const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
-  
+        // Convert projectId to number if it's a string or ensure consistent ID generation
+        const numericProjectId = typeof projectId === 'string'
+          ? isNaN(parseInt(projectId, 10))
+            ? repositoryService.generateConsistentProjectId(projectId)
+            : parseInt(projectId, 10)
+          : projectId;
+
         // Check if the project has embeddings
         const hasEmbeddings = await dbService.hasEmbeddings(numericProjectId);
-  
+
         if (hasEmbeddings) {
           console.log(`Project ${projectId} already has embeddings`);
           return true;
         }
-  
+
         // If auto-embedding is disabled, just return false
         if (!AUTO_EMBED_PROJECTS) {
           console.log(`Project ${projectId} has no embeddings, but auto-embedding is disabled`);
           return false;
         }
-  
+
         console.log(`Project ${projectId} has no embeddings, triggering embedding process`);
-  
+
         // Get project details from GitLab
         const project = await gitlabService.getProject(projectId);
-  
+
         if (!project) {
           console.error(`Could not find project ${projectId} in GitLab`);
           return false;
         }
-  
+
         // Queue the project for embedding with high priority
         const processingId = uuidv4();
         await queueService.addJob(project.web_url, processingId, 10);
-  
+
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
-  
+
         // If we don't need to wait for completion, return true
         if (!waitForCompletion) {
           return true;
         }
-  
+
         // Wait for the embedding process to complete with a timeout
         console.log(`Waiting for embedding process to complete for project ${projectId}`);
         const job = await queueService.waitForJobCompletion(processingId, EMBEDDING_WAIT_TIMEOUT);
-  
+
         if (!job) {
           console.warn(`Could not get job status for project ${projectId}`);
           return false;
         }
-  
+
         if (job.status === JobStatus.COMPLETED) {
           console.log(`Embedding process completed successfully for project ${projectId}`);
           return true;

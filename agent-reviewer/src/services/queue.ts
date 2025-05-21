@@ -5,7 +5,6 @@ import { repositoryService } from './repository.js';
 import { embeddingService } from './embedding.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 
 dotenv.config();
 
@@ -481,9 +480,13 @@ export class QueueService {
 
       console.log(`Found ${files.length} files, generating embeddings`);
 
-      // Generate a numeric project ID from the string path
-      const numericProjectId = this.generateProjectIdFromPath(projectId);
-      console.log(`Generated numeric project ID: ${numericProjectId} from path: ${projectId}`);
+      // Generate a consistent project ID from the repository URL
+      const numericProjectId = repositoryService.generateConsistentProjectId(repositoryUrl);
+      console.log(`Generated consistent project ID: ${numericProjectId} from repository URL: ${repositoryUrl}`);
+
+      // Get the actual repository information (branch and commit)
+      const repoInfo = await repositoryService.getRepositoryInfo(repoPath);
+      const { branch, commitId } = repoInfo;
 
       // Get or create project metadata
       let projectMetadata = await dbService.getProjectMetadata(numericProjectId);
@@ -494,17 +497,13 @@ export class QueueService {
           name: repositoryUrl.split('/').pop() || 'Unknown',
           description: '',
           url: repositoryUrl,
-          defaultBranch: 'main',
+          defaultBranch: branch,
           lastProcessedCommit: '',
           lastProcessedAt: new Date(),
         };
 
         await dbService.saveProjectMetadata(projectMetadata);
       }
-
-      // Get the latest commit from the repository
-      const commitId = uuidv4(); // In a real implementation, you would get this from git
-      const branch = 'main'; // In a real implementation, you would get this from git
 
       // Generate embeddings for all files with retry logic
       const embeddings = await this.generateEmbeddingsWithRetry(
@@ -598,20 +597,7 @@ export class QueueService {
     throw lastError || new Error('Failed to generate embeddings');
   }
 
-  /**
-   * Generate a numeric project ID from a string path
-   */
-  private generateProjectIdFromPath(path: string): number {
-    // Create a hash of the path
-    const hash = crypto.createHash('md5').update(path).digest('hex');
 
-    // Convert the first 8 characters of the hash to a number
-    const truncatedHash = hash.substring(0, 8);
-    const numericId = parseInt(truncatedHash, 16);
-
-    // Ensure the ID is positive and within safe integer range
-    return Math.abs(numericId % 2147483647); // Max 32-bit signed integer
-  }
 
   /**
    * Stop processing the queue

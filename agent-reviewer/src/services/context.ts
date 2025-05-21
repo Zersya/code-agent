@@ -39,8 +39,12 @@ export class ContextService {
     try {
       console.log(`Getting context for project ${projectId}`);
 
-      // Convert projectId to number if it's a string
-      const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+      // Convert projectId to number if it's a string or ensure consistent ID generation
+      const numericProjectId = typeof projectId === 'string'
+        ? isNaN(parseInt(projectId, 10))
+          ? repositoryService.generateConsistentProjectId(projectId)
+          : parseInt(projectId, 10)
+        : projectId;
 
       // Get project metadata
       const projectMetadata = await dbService.getProjectMetadata(numericProjectId);
@@ -265,8 +269,14 @@ export class ContextService {
    */
   private async isEmbeddingInProgress(projectId: number | string): Promise<boolean> {
     try {
+      // Convert projectId to number if it's a string or ensure consistent ID generation
+      const numericProjectId = typeof projectId === 'string'
+        ? isNaN(parseInt(projectId, 10))
+          ? repositoryService.generateConsistentProjectId(projectId)
+          : parseInt(projectId, 10)
+        : projectId;
+
       // Get project metadata to get the URL
-      const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
       const projectMetadata = await dbService.getProjectMetadata(numericProjectId);
 
       if (!projectMetadata || !projectMetadata.url) {

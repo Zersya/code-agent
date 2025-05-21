@@ -5,6 +5,7 @@ import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
+import { repositoryService } from '../services/repository.js';
 import { CodeFile, EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 
 /**
@@ -70,24 +71,27 @@ async function processPushEvent(event: GitLabPushEvent) {
       return;
     }
 
-    const projectId = event.project_id;
+    const gitlabProjectId = event.project_id;
     const commitId = event.after;
     const branch = event.ref.replace('refs/heads/', '');
 
-    console.log(`Processing push event for project ${projectId}, commit ${commitId}, branch ${branch}`);
+    // Generate a consistent project ID
+    const projectId = repositoryService.generateConsistentProjectId(event.project.web_url);
+
+    console.log(`Processing push event for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, commit ${commitId}, branch ${branch}`);
 
     // Get project metadata
     let projectMetadata = await dbService.getProjectMetadata(projectId);
 
     if (!projectMetadata) {
-      const projectDetails = await gitlabService.getProject(projectId);
+      const projectDetails = await gitlabService.getProject(gitlabProjectId);
 
       projectMetadata = {
         projectId,
         name: projectDetails.name,
         description: projectDetails.description || '',
         url: projectDetails.web_url,
-        defaultBranch: projectDetails.default_branch,
+        defaultBranch: branch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
       };
@@ -110,7 +114,7 @@ async function processPushEvent(event: GitLabPushEvent) {
 
     console.log(`Found ${files.length} files, generating embeddings`);
 
-    // Generate embeddings for all files
+    // Generate embeddings for all files using the consistent project ID
     const embeddings = await embeddingService.generateEmbeddings(
       files,
       projectId,
@@ -163,33 +167,36 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
       return;
     }
 
-    const projectId = event.project.id;
+    const gitlabProjectId = event.project.id;
     const mergeRequestIid = event.object_attributes.iid;
     const sourceBranch = event.object_attributes.source_branch;
     const commitId = event.object_attributes.last_commit.id;
 
-    console.log(`Processing merge request event for project ${projectId}, MR !${mergeRequestIid}, commit ${commitId}`);
+    // Generate a consistent project ID
+    const projectId = repositoryService.generateConsistentProjectId(event.project.web_url);
+
+    console.log(`Processing merge request event for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, MR !${mergeRequestIid}, commit ${commitId}`);
 
     // Get project metadata
     let projectMetadata = await dbService.getProjectMetadata(projectId);
 
     if (!projectMetadata) {
-      const projectDetails = await gitlabService.getProject(projectId);
+      const projectDetails = await gitlabService.getProject(gitlabProjectId);
 
       projectMetadata = {
         projectId,
         name: projectDetails.name,
         description: projectDetails.description || '',
         url: projectDetails.web_url,
-        defaultBranch: projectDetails.default_branch,
+        defaultBranch: sourceBranch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
       };
     }
 
     // Get all files from the source branch
-    console.log(`Fetching files for project ${projectId} at branch ${sourceBranch}`);
-    const files = await gitlabService.getAllFiles(projectId, sourceBranch);
+    console.log(`Fetching files for GitLab project ${gitlabProjectId} at branch ${sourceBranch}`);
+    const files = await gitlabService.getAllFiles(gitlabProjectId, sourceBranch);
 
     if (files.length === 0) {
       console.log('No files found, skipping');

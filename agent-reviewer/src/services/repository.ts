@@ -4,6 +4,7 @@ import path from 'path';
 import util from 'util';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { CodeFile } from '../models/embedding.js';
 
 dotenv.config();
@@ -41,6 +42,29 @@ export class RepositoryService {
       console.error('Error extracting project ID:', error);
       return null;
     }
+  }
+
+  /**
+   * Generate a consistent project ID from a repository URL or path
+   * This ensures the same ID is used across projects and embeddings tables
+   */
+  generateConsistentProjectId(repositoryUrl: string): number {
+    // Extract the project ID from the URL
+    const projectPath = this.extractProjectId(repositoryUrl);
+
+    if (!projectPath) {
+      throw new Error('Could not extract project ID from repository URL');
+    }
+
+    // Create a hash of the path
+    const hash = crypto.createHash('md5').update(projectPath).digest('hex');
+
+    // Convert the first 8 characters of the hash to a number
+    const truncatedHash = hash.substring(0, 8);
+    const numericId = parseInt(truncatedHash, 16);
+
+    // Ensure the ID is positive and within safe integer range
+    return Math.abs(numericId % 2147483647); // Max 32-bit signed integer
   }
 
   /**
@@ -131,6 +155,34 @@ export class RepositoryService {
         fs.rmSync(repoPath, { recursive: true, force: true });
       }
       throw error;
+    }
+  }
+
+  /**
+   * Get Git repository information (branch and commit)
+   */
+  async getRepositoryInfo(repoPath: string): Promise<{ branch: string, commitId: string }> {
+    try {
+      // Get current branch
+      const { stdout: branchOutput } = await execPromise('git rev-parse --abbrev-ref HEAD', {
+        cwd: repoPath,
+        maxBuffer: 1024 * 1024
+      });
+      const branch = branchOutput.trim();
+
+      // Get current commit
+      const { stdout: commitOutput } = await execPromise('git rev-parse HEAD', {
+        cwd: repoPath,
+        maxBuffer: 1024 * 1024
+      });
+      const commitId = commitOutput.trim();
+
+      console.log(`Repository info - Branch: ${branch}, Commit: ${commitId}`);
+      return { branch, commitId };
+    } catch (error) {
+      console.error('Error getting repository info:', error);
+      // Return default values if we can't get the actual info
+      return { branch: 'main', commitId: uuidv4() };
     }
   }
 
