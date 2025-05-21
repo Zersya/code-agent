@@ -164,13 +164,14 @@ Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjut
   ): string {
     return `Tolong review perubahan kode berikut dari merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".
 
-Mulai dengan Thought 1/4 untuk menganalisis perubahan kode ini:
+Mulai dengan Pemikiran 1 untuk menganalisis perubahan kode ini:
 
 \`\`\`diff
 ${codeChanges}
 \`\`\`
 
-Lakukan analisis kode secara bertahap dengan 4 langkah pemikiran, di mana setiap pemikiran membangun dari pemikiran sebelumnya.`;
+Lakukan analisis kode secara bertahap dengan 4 langkah pemikiran, di mana setiap pemikiran membangun dari pemikiran sebelumnya. 
+Jika ada hitungan (1,2,3,4) pada Feedback atau Hasil Review, ingat untuk tidak melakukan hitungan berlanjut pada setiap pemikiran.`;
   }
 
   /**
