@@ -130,17 +130,11 @@ export class EmbeddingService {
      * @param waitForCompletion Whether to wait for the embedding process to complete
      * @returns True if the project has embeddings or embedding was triggered, false otherwise
      */
-    async checkAndEmbedProject(projectId: number | string, waitForCompletion: boolean = false): Promise<boolean> {
+    async checkAndEmbedProject(projectId: number, waitForCompletion: boolean = false): Promise<boolean> {
       try {
-        // Convert projectId to number if it's a string or ensure consistent ID generation
-        const numericProjectId = typeof projectId === 'string'
-          ? isNaN(parseInt(projectId, 10))
-            ? repositoryService.generateConsistentProjectId(projectId)
-            : parseInt(projectId, 10)
-          : projectId;
-
+      
         // Check if the project has embeddings
-        const hasEmbeddings = await dbService.hasEmbeddings(numericProjectId);
+        const hasEmbeddings = await dbService.hasEmbeddings(projectId);
 
         if (hasEmbeddings) {
           console.log(`Project ${projectId} already has embeddings`);
@@ -165,7 +159,7 @@ export class EmbeddingService {
 
         // Queue the project for embedding with high priority
         const processingId = uuidv4();
-        await queueService.addJob(project.web_url, processingId, 10);
+        await queueService.addJob(projectId, project.web_url, processingId, 10);
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 

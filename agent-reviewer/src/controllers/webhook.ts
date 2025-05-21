@@ -76,7 +76,7 @@ async function processPushEvent(event: GitLabPushEvent) {
     const branch = event.ref.replace('refs/heads/', '');
 
     // Generate a consistent project ID
-    const projectId = repositoryService.generateConsistentProjectId(event.project.web_url);
+    const projectId = event.project.id
 
     console.log(`Processing push event for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, commit ${commitId}, branch ${branch}`);
 
@@ -173,7 +173,7 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     const commitId = event.object_attributes.last_commit.id;
 
     // Generate a consistent project ID
-    const projectId = repositoryService.generateConsistentProjectId(event.project.web_url);
+    const projectId = event.project.id
 
     console.log(`Processing merge request event for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, MR !${mergeRequestIid}, commit ${commitId}`);
 

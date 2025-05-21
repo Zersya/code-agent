@@ -5,6 +5,7 @@ import { repositoryService } from './repository.js';
 import { embeddingService } from './embedding.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 import dotenv from 'dotenv';
+import { GitLabPushEvent } from '../types/webhook.js';
 
 dotenv.config();
 
@@ -89,7 +90,7 @@ export class QueueService {
   /**
    * Add a job to the queue
    */
-  async addJob(repositoryUrl: string, processingId: string, priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL): Promise<EmbeddingJob> {
+  async addJob(projectId: number, repositoryUrl: string, processingId: string, priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL): Promise<EmbeddingJob> {
     try {
       const job: EmbeddingJob = {
         id: uuidv4(),
@@ -110,7 +111,7 @@ export class QueueService {
 
       // Start processing if not already processing
       if (!this.isProcessing) {
-        this.startProcessing();
+        this.startProcessing({ project_id: projectId });
       }
 
       return job;
@@ -349,19 +350,19 @@ export class QueueService {
   /**
    * Start processing the queue
    */
-  private startProcessing(): void {
+  private startProcessing(event: { project_id: number }): void {
     if (this.isProcessing) {
       return;
     }
 
     this.isProcessing = true;
-    this.processingPromise = this.processQueue();
+    this.processingPromise = this.processQueue(event);
   }
 
   /**
    * Process the queue
    */
-  private async processQueue(): Promise<void> {
+  private async processQueue(event: { project_id: number }): Promise<void> {
     try {
       while (this.isProcessing) {
         // Check if we can process more jobs
@@ -386,7 +387,7 @@ export class QueueService {
             this.activeJobs.set(job.id, job);
 
             // Process the job
-            this.processJob(job).catch(error => {
+            this.processJob(event, job).catch(error => {
               console.error(`Error processing job ${job.id}:`, error);
             });
           }
@@ -407,7 +408,7 @@ export class QueueService {
   /**
    * Process a single job
    */
-  private async processJob(job: EmbeddingJob): Promise<void> {
+  private async processJob(event: { project_id: number }, job: EmbeddingJob): Promise<void> {
     try {
       console.log(`Processing job ${job.id} for repository ${job.repositoryUrl}`);
 
@@ -419,7 +420,7 @@ export class QueueService {
       await this.saveJob(job);
 
       // Process the repository
-      const result = await this.processRepository(job.repositoryUrl, job.processingId);
+      const result = await this.processRepository(event, job.repositoryUrl, job.processingId);
 
       if (result.success) {
         // Job completed successfully
@@ -455,19 +456,15 @@ export class QueueService {
   /**
    * Process a repository
    */
-  private async processRepository(repositoryUrl: string, processingId: string): Promise<JobResult> {
+  private async processRepository(event: { project_id: number }, repositoryUrl: string, processingId: string): Promise<JobResult> {
     let repoPath = '';
 
     try {
       console.log(`Processing repository ${repositoryUrl} (ID: ${processingId})`);
 
       // Clone the repository
-      const { repoPath: clonedRepoPath, projectId } = await repositoryService.cloneRepository(repositoryUrl);
+      const { repoPath: clonedRepoPath } = await repositoryService.cloneRepository(event, repositoryUrl);
       repoPath = clonedRepoPath;
-
-      if (!projectId) {
-        throw new Error('Could not extract project ID from repository URL');
-      }
 
       // Get all files from the repository
       console.log(`Getting files from repository ${repositoryUrl}`);
@@ -480,20 +477,21 @@ export class QueueService {
 
       console.log(`Found ${files.length} files, generating embeddings`);
 
+      const projectId = event.project_id;
+
       // Generate a consistent project ID from the repository URL
-      const numericProjectId = repositoryService.generateConsistentProjectId(repositoryUrl);
-      console.log(`Generated consistent project ID: ${numericProjectId} from repository URL: ${repositoryUrl}`);
+      console.log(`Generated consistent project ID: ${projectId} from repository URL: ${repositoryUrl}`);
 
       // Get the actual repository information (branch and commit)
       const repoInfo = await repositoryService.getRepositoryInfo(repoPath);
       const { branch, commitId } = repoInfo;
 
       // Get or create project metadata
-      let projectMetadata = await dbService.getProjectMetadata(numericProjectId);
+      let projectMetadata = await dbService.getProjectMetadata(projectId);
 
       if (!projectMetadata) {
         projectMetadata = {
-          projectId: numericProjectId,
+          projectId: projectId,
           name: repositoryUrl.split('/').pop() || 'Unknown',
           description: '',
           url: repositoryUrl,
@@ -508,7 +506,7 @@ export class QueueService {
       // Generate embeddings for all files with retry logic
       const embeddings = await this.generateEmbeddingsWithRetry(
         files,
-        numericProjectId,
+        projectId,
         commitId,
         branch
       );
@@ -525,7 +523,7 @@ export class QueueService {
 
       // Save batch information
       const batch: EmbeddingBatch = {
-        projectId: numericProjectId,
+        projectId: projectId,
         commitId,
         branch,
         files,

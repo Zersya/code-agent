@@ -35,19 +35,15 @@ export class ContextService {
    * @param changes The changes to review
    * @returns The project context
    */
-  async getProjectContext(projectId: number | string, changes: MergeRequestChange[]): Promise<ProjectContext> {
+  async getProjectContext(projectId: number, changes: MergeRequestChange[]): Promise<ProjectContext> {
     try {
       console.log(`Getting context for project ${projectId}`);
 
       // Convert projectId to number if it's a string or ensure consistent ID generation
-      const numericProjectId = typeof projectId === 'string'
-        ? isNaN(parseInt(projectId, 10))
-          ? repositoryService.generateConsistentProjectId(projectId)
-          : parseInt(projectId, 10)
-        : projectId;
+     
 
       // Get project metadata
-      const projectMetadata = await dbService.getProjectMetadata(numericProjectId);
+      const projectMetadata = await dbService.getProjectMetadata(projectId);
 
       // Check if project exists in the database
       if (!projectMetadata) {
@@ -62,7 +58,7 @@ export class ContextService {
 
         // Create project metadata
         const newProjectMetadata: ProjectMetadata = {
-          projectId: numericProjectId,
+          projectId: projectId,
           name: project.name,
           description: project.description || '',
           url: project.web_url,
@@ -76,7 +72,7 @@ export class ContextService {
 
         // Queue the project for embedding with high priority
         const processingId = uuidv4();
-        await queueService.addJob(project.web_url, processingId, 10);
+        await queueService.addJob(projectId, project.web_url, processingId, 10);
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 
@@ -91,11 +87,11 @@ export class ContextService {
             console.log(`Embedding process completed successfully for project ${projectId}`);
 
             // Now that embeddings are available, get relevant files
-            const relevantFiles = await this.findRelevantFiles(numericProjectId, changes);
+            const relevantFiles = await this.findRelevantFiles(projectId, changes);
             const contextSummary = this.generateContextSummary(relevantFiles);
 
             return {
-              projectId: numericProjectId,
+              projectId: projectId,
               projectMetadata: newProjectMetadata,
               relevantFiles,
               contextSummary
@@ -107,7 +103,7 @@ export class ContextService {
 
         // Return empty context since embedding is in progress or failed
         return {
-          projectId: numericProjectId,
+          projectId: projectId,
           projectMetadata: newProjectMetadata,
           relevantFiles: [],
           contextSummary: 'Project context is being generated. This may take some time.'
@@ -115,14 +111,14 @@ export class ContextService {
       }
 
       // Check if the project has any embeddings
-      const hasEmbeddings = await dbService.hasEmbeddings(numericProjectId);
+      const hasEmbeddings = await dbService.hasEmbeddings(projectId);
 
       if (!hasEmbeddings) {
         console.log(`Project ${projectId} exists but has no embeddings, triggering embedding process`);
 
         // Queue the project for embedding with high priority
         const processingId = uuidv4();
-        await queueService.addJob(projectMetadata.url, processingId, 10);
+        await queueService.addJob(projectId, projectMetadata.url, processingId, 10);
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 
@@ -139,11 +135,11 @@ export class ContextService {
         }
 
         // Check again if embeddings are now available
-        const embeddings = await dbService.getEmbeddingsByProject(numericProjectId);
+        const embeddings = await dbService.getEmbeddingsByProject(projectId);
 
         if (embeddings.length === 0) {
           return {
-            projectId: numericProjectId,
+            projectId: projectId,
             projectMetadata,
             relevantFiles: [],
             contextSummary: 'Project context is being generated. This may take some time.'
@@ -152,13 +148,13 @@ export class ContextService {
       }
 
       // Get relevant files based on the changes
-      const relevantFiles = await this.findRelevantFiles(numericProjectId, changes);
+      const relevantFiles = await this.findRelevantFiles(projectId, changes);
 
       // Generate a summary of the context
       const contextSummary = this.generateContextSummary(relevantFiles);
 
       return {
-        projectId: numericProjectId,
+        projectId: projectId,
         projectMetadata,
         relevantFiles,
         contextSummary
@@ -267,17 +263,11 @@ export class ContextService {
    * @param projectId The ID of the project
    * @returns True if an embedding process is in progress, false otherwise
    */
-  private async isEmbeddingInProgress(projectId: number | string): Promise<boolean> {
+  private async isEmbeddingInProgress(projectId: number): Promise<boolean> {
     try {
-      // Convert projectId to number if it's a string or ensure consistent ID generation
-      const numericProjectId = typeof projectId === 'string'
-        ? isNaN(parseInt(projectId, 10))
-          ? repositoryService.generateConsistentProjectId(projectId)
-          : parseInt(projectId, 10)
-        : projectId;
-
+    
       // Get project metadata to get the URL
-      const projectMetadata = await dbService.getProjectMetadata(numericProjectId);
+      const projectMetadata = await dbService.getProjectMetadata(projectId);
 
       if (!projectMetadata || !projectMetadata.url) {
         return false;

@@ -23,60 +23,60 @@ export class RepositoryService {
   /**
    * Extract project ID from GitLab repository URL
    */
-  extractProjectId(repositoryUrl: string): string | null {
-    try {
-      // Handle URLs like https://gitlab.com/namespace/project
-      const url = new URL(repositoryUrl);
+  // extractProjectId(repositoryUrl: string): string | null {
+  //   try {
+  //     // Handle URLs like https://gitlab.com/namespace/project
+  //     const url = new URL(repositoryUrl);
 
-      // Remove leading and trailing slashes from pathname
-      const pathname = url.pathname.replace(/^\/|\/$/g, '');
+  //     // Remove leading and trailing slashes from pathname
+  //     const pathname = url.pathname.replace(/^\/|\/$/g, '');
 
-      // For GitLab instances, the project ID is the URL-encoded path with namespace
-      if (pathname) {
-        console.log(`Extracted project path: ${pathname} from URL: ${repositoryUrl}`);
-        return pathname;
-      }
+  //     // For GitLab instances, the project ID is the URL-encoded path with namespace
+  //     if (pathname) {
+  //       console.log(`Extracted project path: ${pathname} from URL: ${repositoryUrl}`);
+  //       return pathname;
+  //     }
 
-      return null;
-    } catch (error) {
-      console.error('Error extracting project ID:', error);
-      return null;
-    }
-  }
+  //     return null;
+  //   } catch (error) {
+  //     console.error('Error extracting project ID:', error);
+  //     return null;
+  //   }
+  // }
 
   /**
    * Generate a consistent project ID from a repository URL or path
    * This ensures the same ID is used across projects and embeddings tables
    */
-  generateConsistentProjectId(repositoryUrl: string): number {
-    // Extract the project ID from the URL
-    const projectPath = this.extractProjectId(repositoryUrl);
+  // generateConsistentProjectId(repositoryUrl: string): number {
+  //   // Extract the project ID from the URL
+  //   const projectPath = this.extractProjectId(repositoryUrl);
 
-    if (!projectPath) {
-      throw new Error('Could not extract project ID from repository URL');
-    }
+  //   if (!projectPath) {
+  //     throw new Error('Could not extract project ID from repository URL');
+  //   }
 
-    // Create a hash of the path
-    const hash = crypto.createHash('md5').update(projectPath).digest('hex');
+  //   // Create a hash of the path
+  //   const hash = crypto.createHash('md5').update(projectPath).digest('hex');
 
-    // Convert the first 8 characters of the hash to a number
-    const truncatedHash = hash.substring(0, 8);
-    const numericId = parseInt(truncatedHash, 16);
+  //   // Convert the first 8 characters of the hash to a number
+  //   const truncatedHash = hash.substring(0, 8);
+  //   const numericId = parseInt(truncatedHash, 16);
 
-    // Ensure the ID is positive and within safe integer range
-    return Math.abs(numericId % 2147483647); // Max 32-bit signed integer
-  }
+  //   // Ensure the ID is positive and within safe integer range
+  //   return Math.abs(numericId % 2147483647); // Max 32-bit signed integer
+  // }
 
   /**
    * Clone a repository from GitLab
    */
-  async cloneRepository(repositoryUrl: string): Promise<{ repoPath: string, projectId: string | null }> {
+  async cloneRepository(event: { project_id: number }, repositoryUrl: string): Promise<{ repoPath: string, projectId: number }> {
     const repoId = uuidv4();
     const repoPath = path.join(TEMP_DIR, repoId);
 
     try {
       // Extract project ID from URL
-      const projectId = this.extractProjectId(repositoryUrl);
+      const projectId = event.project_id;
 
       if (!projectId) {
         throw new Error('Could not extract project ID from repository URL');

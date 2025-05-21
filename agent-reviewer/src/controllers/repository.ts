@@ -14,11 +14,11 @@ import { JobStatus } from '../models/queue.js';
  */
 export const processRepository = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { repositoryUrl } = req.body;
+    const { projectId, repositoryUrl } = req.body;
     const { priority } = req.query;
 
-    if (!repositoryUrl) {
-      res.status(400).json({ error: 'Repository URL is required' });
+    if (!projectId || !repositoryUrl) {
+      res.status(400).json({ error: 'Project ID and repository URL are required' });
       return;
     }
 
@@ -27,7 +27,7 @@ export const processRepository = async (req: Request, res: Response): Promise<vo
 
     // Add the job to the queue with optional priority
     const priorityLevel = priority === 'high' ? 10 : priority === 'low' ? 0 : 5;
-    await queueService.addJob(repositoryUrl, processingId, priorityLevel);
+    await queueService.addJob(projectId, repositoryUrl, processingId, priorityLevel);
 
     res.status(202).json({
       message: 'Repository processing queued',
