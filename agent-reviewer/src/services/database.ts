@@ -515,6 +515,31 @@ class DatabaseService {
     }
   }
 
+  /**
+   * Check if a project has any embeddings
+   * @param projectId The ID of the project
+   * @returns True if the project has embeddings, false otherwise
+   */
+  async hasEmbeddings(projectId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT COUNT(*) as count
+        FROM embeddings
+        WHERE project_id = $1
+        LIMIT 1
+      `, [projectId]);
+
+      return result.rows[0].count > 0;
+    } catch (error) {
+      console.error('Error checking if project has embeddings:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
   async getEmbeddingsByCommit(projectId: number, commitId: string): Promise<CodeEmbedding[]> {
     const client = await this.pool.connect();
 

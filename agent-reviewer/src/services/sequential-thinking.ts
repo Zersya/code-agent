@@ -1,4 +1,5 @@
 import { SequentialThought } from '../types/review.js';
+import { ProjectContext } from './context.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -58,12 +59,14 @@ export class SequentialThinkingService {
    * @param codeChanges The code changes to review
    * @param mergeRequestTitle The title of the merge request
    * @param mergeRequestDescription The description of the merge request
+   * @param projectContext Optional project context to enhance the review
    * @returns An array of sequential thoughts and the final review
    */
   async reviewCode(
     codeChanges: string,
     mergeRequestTitle: string,
-    mergeRequestDescription: string
+    mergeRequestDescription: string,
+    projectContext?: ProjectContext
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     const thoughts: SequentialThought[] = [];
     let reviewResult = '';
@@ -71,44 +74,49 @@ export class SequentialThinkingService {
     try {
       // Generate the system prompt
       const systemPrompt = this.generateSystemPrompt();
-      
-      // Generate the user prompt with code changes
-      const userPrompt = this.generateUserPrompt(codeChanges, mergeRequestTitle, mergeRequestDescription);
-      
+
+      // Generate the user prompt with code changes and project context
+      const userPrompt = this.generateUserPrompt(
+        codeChanges,
+        mergeRequestTitle,
+        mergeRequestDescription,
+        projectContext
+      );
+
       // Initialize the conversation with the first thought
       let messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ];
-      
+
       // Generate exactly 4 thoughts
       for (let i = 1; i <= 4; i++) {
         const isLastThought = i === 4;
-        
+
         // Call the LLM API
         const response = await this.callLlmApi(messages);
-        
+
         // Extract the thought from the response
         const thought = this.extractThought(response, i, isLastThought);
         thoughts.push(thought);
-        
+
         // Add the thought to the conversation
         messages.push({ role: 'assistant', content: response });
-        
+
         // If this is the last thought, extract the review result
         if (isLastThought) {
           reviewResult = this.extractReviewResult(response);
         } else {
           // Add a prompt for the next thought
-          messages.push({ 
-            role: 'user', 
-            content: `Lanjutkan dengan pemikiran berikutnya (Thought ${i + 1}/4). Ingat untuk menganalisis kode lebih dalam dan membangun berdasarkan pemikiran sebelumnya.` 
+          messages.push({
+            role: 'user',
+            content: `Lanjutkan dengan pemikiran berikutnya (Thought ${i + 1}/4). Ingat untuk menganalisis kode lebih dalam dan membangun berdasarkan pemikiran sebelumnya.`
           });
         }
 
         console.log(`Generated thought ${i}:`, thought.thought);
       }
-      
+
       return { thoughts, reviewResult };
     } catch (error) {
       console.error('Error in sequential thinking process:', error);
@@ -120,7 +128,7 @@ export class SequentialThinkingService {
    * Generate the system prompt for the LLM
    */
   private generateSystemPrompt(): string {
-    return `Kamu adalah asisten review kode yang menggunakan proses pemikiran sekuensial untuk menganalisis kode.
+    return `Kamu adalah senior software engineer yang bertanggung jawab untuk review kode yang menggunakan proses pemikiran sekuensial untuk menganalisis kode.
 Kamu akan melakukan analisis kode dalam 4 langkah pemikiran yang terstruktur, di mana setiap pemikiran membangun dari pemikiran sebelumnya.
 
 Untuk setiap langkah pemikiran:
@@ -128,8 +136,18 @@ Untuk setiap langkah pemikiran:
 2. Fokus pada kualitas kode, alur logika, kejelasan, dan potensi bug
 3. Berikan wawasan yang semakin mendalam pada setiap langkah
 4. Gunakan Bahasa Indonesia yang formal dan profesional
+5. Jika konteks proyek disediakan, gunakan untuk memahami kode lebih baik
 
+Pada pemikiran pertama (Thought 1), lakukan analisis awal dan identifikasi perubahan utama.
+Pada pemikiran kedua (Thought 2), analisis lebih dalam tentang implementasi dan potensi masalah.
+Pada pemikiran ketiga (Thought 3), pertimbangkan konteks proyek yang lebih luas dan dampak perubahan.
 Pada pemikiran terakhir (Thought 4), berikan kesimpulan dan rekomendasi final, termasuk apakah kode memenuhi standar kualitas untuk disetujui.
+
+Jika konteks proyek disediakan, gunakan untuk:
+- Memahami struktur dan arsitektur proyek
+- Mengidentifikasi pola dan konvensi yang digunakan dalam proyek
+- Mengevaluasi apakah perubahan konsisten dengan kode yang ada
+- Mendeteksi potensi konflik atau masalah integrasi
 
 Setelah 4 langkah pemikiran, berikan hasil review final dalam format berikut:
 
@@ -155,23 +173,37 @@ Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjut
   }
 
   /**
-   * Generate the user prompt with code changes
+   * Generate the user prompt with code changes and project context
    */
   private generateUserPrompt(
     codeChanges: string,
     mergeRequestTitle: string,
-    mergeRequestDescription: string
+    mergeRequestDescription: string,
+    projectContext?: ProjectContext
   ): string {
-    return `Tolong review perubahan kode berikut dari merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".
+    let prompt = `Tolong review perubahan kode berikut dari merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".`;
 
-Mulai dengan Pemikiran 1 untuk menganalisis perubahan kode ini:
+    // Add project context if available
+    if (projectContext && projectContext.relevantFiles.length > 0) {
+      prompt += `\n\nBerikut adalah konteks proyek yang relevan untuk membantu review kode:
+${projectContext.contextSummary}`;
+    }
+
+    prompt += `\n\nMulai dengan Pemikiran 1 untuk menganalisis perubahan kode ini:
 
 \`\`\`diff
 ${codeChanges}
 \`\`\`
 
-Lakukan analisis kode secara bertahap dengan 4 langkah pemikiran, di mana setiap pemikiran membangun dari pemikiran sebelumnya. 
+Lakukan analisis kode secara bertahap dengan 4 langkah pemikiran, di mana setiap pemikiran membangun dari pemikiran sebelumnya.
 Jika ada hitungan (1,2,3,4) pada Feedback atau Hasil Review, ingat untuk tidak melakukan hitungan berlanjut pada setiap pemikiran.`;
+
+    // If we have project context, add a reminder to use it
+    if (projectContext && projectContext.relevantFiles.length > 0) {
+      prompt += `\n\nGunakan konteks proyek yang diberikan untuk memahami kode lebih baik dan memberikan review yang lebih relevan dan mendalam.`;
+    }
+
+    return prompt;
   }
 
   /**
@@ -186,7 +218,7 @@ Jika ada hitungan (1,2,3,4) pada Feedback atau Hasil Review, ingat untuk tidak m
           temperature: 0.1,
           max_tokens: 2000,
         });
-        
+
         return response.data.choices[0].message.content;
       } else if (LLM_PROVIDER === 'ollama') {
         const response = await this.api.post('/chat', {
@@ -197,7 +229,7 @@ Jika ada hitungan (1,2,3,4) pada Feedback atau Hasil Review, ingat untuk tidak m
           },
           stream: false,
         });
-        
+
         return response.data.message.content;
       } else {
         throw new Error(`Unsupported LLM provider: ${LLM_PROVIDER}`);
@@ -226,11 +258,11 @@ Jika ada hitungan (1,2,3,4) pada Feedback atau Hasil Review, ingat untuk tidak m
   private extractReviewResult(response: string): string {
     // Try to extract the review section from the response
     const reviewMatch = response.match(/## Review[\s\S]*$/);
-    
+
     if (reviewMatch) {
       return reviewMatch[0];
     }
-    
+
     // If no review section is found, return the entire response
     return response;
   }

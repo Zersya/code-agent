@@ -189,6 +189,58 @@ export class QueueService {
   }
 
   /**
+   * Wait for a job to complete with a timeout
+   * @param processingId The processing ID of the job
+   * @param maxWaitSeconds Maximum time to wait in seconds
+   * @param checkIntervalMs Interval between checks in milliseconds
+   * @returns The completed job or null if timeout or error
+   */
+  async waitForJobCompletion(
+    processingId: string,
+    maxWaitSeconds: number = 300, // 5 minutes default
+    checkIntervalMs: number = 2000 // 2 seconds default
+  ): Promise<EmbeddingJob | null> {
+    console.log(`Waiting for job ${processingId} to complete (timeout: ${maxWaitSeconds}s)`);
+
+    const startTime = Date.now();
+    const timeoutMs = maxWaitSeconds * 1000;
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        // Get the current job status
+        const job = await this.getJobByProcessingId(processingId);
+
+        if (!job) {
+          console.warn(`Job ${processingId} not found while waiting for completion`);
+          return null;
+        }
+
+        // Check if the job is completed or failed
+        if (job.status === JobStatus.COMPLETED) {
+          console.log(`Job ${processingId} completed successfully`);
+          return job;
+        } else if (job.status === JobStatus.FAILED) {
+          console.warn(`Job ${processingId} failed: ${job.error}`);
+          return job;
+        }
+
+        // Log progress
+        const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+        console.log(`Job ${processingId} status: ${job.status} (elapsed: ${elapsedSeconds}s)`);
+
+        // Wait before checking again
+        await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
+      } catch (error) {
+        console.error(`Error waiting for job ${processingId}:`, error);
+        // Continue waiting despite error
+      }
+    }
+
+    console.warn(`Timeout waiting for job ${processingId} to complete after ${maxWaitSeconds}s`);
+    return await this.getJobByProcessingId(processingId);
+  }
+
+  /**
    * Get queue statistics
    */
   async getQueueStats(): Promise<{
