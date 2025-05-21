@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { webhookAuth } from './middleware/webhook-auth.js';
 import { apiAuth } from './middleware/api-auth.js';
 import { processWebhook } from './controllers/webhook.js';
-import { processRepository, getRepositoryStatus } from './controllers/repository.js';
+import { processRepository, getRepositoryStatus, getQueueStatus } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
 import { dbService } from './services/database.js';
 
@@ -31,13 +31,14 @@ app.post('/webhook', webhookAuth, processWebhook);
 // Repository embedding API
 app.post('/api/repositories/embed', apiAuth, processRepository);
 app.get('/api/repositories/status/:processingId', apiAuth, getRepositoryStatus);
+app.get('/api/queue/status', apiAuth, getQueueStatus);
 
 // Code search API
 app.post('/api/search', apiAuth, searchCode);
 app.get('/api/projects', apiAuth, listProjects);
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

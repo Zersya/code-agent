@@ -28,6 +28,9 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL}
       - ENABLE_MR_REVIEW=${ENABLE_MR_REVIEW}
       - TEMP_DIR=/app/temp
+      - QUEUE_CONCURRENCY=${QUEUE_CONCURRENCY}
+      - QUEUE_MAX_ATTEMPTS=${QUEUE_MAX_ATTEMPTS}
+      - QUEUE_RETRY_DELAY=${QUEUE_RETRY_DELAY}
     volumes:
       - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
     restart: unless-stopped

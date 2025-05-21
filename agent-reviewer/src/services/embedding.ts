@@ -15,67 +15,126 @@ const qodoApi = axios.create({
 
 export class EmbeddingService {
   /**
-   * Generate embeddings for a single code file
+   * Generate embeddings for a single code file with retry logic
    */
-  async generateEmbedding(text: string): Promise<number[]> {
-    try {
-      const response = await qodoApi.post('', {
-        model: 'qodo-embed-1',
-        input: text,
-      });
+  async generateEmbedding(text: string, maxRetries: number = 3): Promise<number[]> {
+    let retries = 0;
+    let lastError: Error | null = null;
 
-      return response.data.data[0].embedding;
-    } catch (error) {
-      console.error('Error generating embedding:', error);
-      throw error;
+    while (retries <= maxRetries) {
+      try {
+        const response = await qodoApi.post('', {
+          model: 'qodo-embed-1',
+          input: text,
+        });
+
+        return response.data.data[0].embedding;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`Error generating embedding (attempt ${retries + 1}/${maxRetries + 1}):`, error);
+
+        // Check if we should retry
+        if (retries >= maxRetries) {
+          break;
+        }
+
+        // Exponential backoff with jitter
+        const baseDelay = Math.pow(2, retries) * 1000;
+        const jitter = Math.random() * 1000;
+        const delay = baseDelay + jitter;
+
+        console.log(`Retrying embedding generation in ${Math.round(delay)}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        retries++;
+      }
     }
+
+    // If we've exhausted all retries, throw the last error
+    throw lastError || new Error('Failed to generate embedding after multiple attempts');
   }
 
   /**
-   * Generate embeddings for multiple code files in batches
+   * Generate embeddings for multiple code files in batches with improved concurrency control
    */
-  async generateEmbeddings(files: CodeFile[], projectId: number, commitId: string, branch: string): Promise<CodeEmbedding[]> {
+  async generateEmbeddings(
+    files: CodeFile[],
+    projectId: number,
+    commitId: string,
+    branch: string,
+    batchSize: number = 3, // Reduced batch size for better stability
+    maxRetries: number = 3
+  ): Promise<CodeEmbedding[]> {
     const embeddings: CodeEmbedding[] = [];
-    const batchSize = 5; // Process files in small batches to avoid rate limits
+    const failedFiles: { file: CodeFile, error: string }[] = [];
 
-    for (let i = 0; i < files.length; i += batchSize) {
-      const batch = files.slice(i, i + batchSize);
-      console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(files.length / batchSize)}`);
+    console.log(`Starting embedding generation for ${files.length} files with batch size ${batchSize}`);
 
-      const batchPromises = batch.map(async (file) => {
-        try {
-          // Skip binary files, large files, or files without content
-          if (!file.content || file.content.length > 100000 || this.isBinaryContent(file.content)) {
-            return null;
+    // Filter out binary files, large files, or files without content first
+    const validFiles = files.filter(file =>
+      file.content &&
+      file.content.length <= 100000 &&
+      !this.isBinaryContent(file.content)
+    );
+
+    console.log(`Found ${validFiles.length} valid files for embedding after filtering`);
+
+    // Process files in batches
+    for (let i = 0; i < validFiles.length; i += batchSize) {
+      const batch = validFiles.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(validFiles.length / batchSize);
+
+      console.log(`Processing batch ${batchNumber} of ${totalBatches} (${batch.length} files)`);
+
+      try {
+        // Process each file in the batch sequentially to avoid overwhelming the API
+        for (const file of batch) {
+          try {
+            console.log(`Generating embedding for file: ${file.path}`);
+
+            const embedding = await this.generateEmbedding(file.content, maxRetries);
+
+            embeddings.push({
+              projectId,
+              repositoryUrl: '',  // Will be filled in by the caller
+              filePath: file.path,
+              content: file.content,
+              embedding,
+              language: file.language,
+              commitId,
+              branch,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            console.log(`Successfully generated embedding for file: ${file.path}`);
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`Failed to generate embedding for file ${file.path} after retries:`, error);
+            failedFiles.push({ file, error: errorMessage });
           }
 
-          const embedding = await this.generateEmbedding(file.content);
-
-          return {
-            projectId,
-            repositoryUrl: '',  // Will be filled in by the caller
-            filePath: file.path,
-            content: file.content,
-            embedding,
-            language: file.language,
-            commitId,
-            branch,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        } catch (error) {
-          console.error(`Error processing embedding for file ${file.path}:`, error);
-          return null;
+          // Add a small delay between files to avoid overwhelming the API
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
-      });
 
-      const batchResults = await Promise.all(batchPromises);
-      embeddings.push(...batchResults.filter(Boolean) as CodeEmbedding[]);
-
-      // Add a small delay between batches to avoid rate limiting
-      if (i + batchSize < files.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Add a delay between batches to avoid rate limiting
+        if (i + batchSize < validFiles.length) {
+          const delay = 2000; // 2 seconds between batches
+          console.log(`Waiting ${delay}ms before processing next batch`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (batchError) {
+        console.error(`Error processing batch ${batchNumber}:`, batchError);
+        // Continue with the next batch even if this one failed
       }
+    }
+
+    // Log summary
+    console.log(`Embedding generation complete. Generated ${embeddings.length} embeddings.`);
+    if (failedFiles.length > 0) {
+      console.warn(`Failed to generate embeddings for ${failedFiles.length} files.`);
     }
 
     return embeddings;

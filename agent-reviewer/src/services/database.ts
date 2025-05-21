@@ -17,6 +17,14 @@ class DatabaseService {
   }
 
   /**
+   * Get a database client from the pool
+   * This is useful for transaction operations
+   */
+  async getClient() {
+    return await this.pool.connect();
+  }
+
+  /**
    * Check if content contains binary data that might cause database issues
    */
   private containsBinaryData(content: string): boolean {
