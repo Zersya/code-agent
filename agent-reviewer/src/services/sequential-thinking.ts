@@ -86,21 +86,27 @@ export class SequentialThinkingService {
         projectContext
       );
 
+      // Determine the number of thoughts based on code changes sizes, if its too big reduce the number of thoughts
+      // if its too small use the configured number of thoughts
+      const thoughtsCount = this.determineThoughtCount(codeChanges);
+
       // Initialize the conversation with the first thought
       let messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ];
 
+      
+
       // Generate thoughts based on configured count
-      for (let i = 1; i <= SEQUENTIAL_THINKING_THOUGHTS_COUNT; i++) {
-        const isLastThought = i === SEQUENTIAL_THINKING_THOUGHTS_COUNT;
+      for (let i = 1; i <= thoughtsCount; i++) {
+        const isLastThought = i === thoughtsCount;
 
         // Call the LLM API
         const response = await this.callLlmApi(messages);
 
         // Extract the thought from the response
-        const thought = this.extractThought(response, i, isLastThought);
+        const thought = this.extractThought(response, i, isLastThought, thoughtsCount);
         thoughts.push(thought);
 
         // Add the thought to the conversation
@@ -113,7 +119,7 @@ export class SequentialThinkingService {
           // Add a prompt for the next thought
           messages.push({
             role: 'user',
-            content: `Lanjutkan dengan pemikiran berikutnya (Thought ${i + 1}/${SEQUENTIAL_THINKING_THOUGHTS_COUNT}). Ingat untuk menganalisis kode lebih dalam dan membangun berdasarkan pemikiran sebelumnya.`
+            content: `Lanjutkan dengan pemikiran berikutnya (Thought ${i + 1}/${thoughtsCount}). Ingat untuk menganalisis kode lebih dalam dan membangun berdasarkan pemikiran sebelumnya.`
           });
         }
 
@@ -127,6 +133,18 @@ export class SequentialThinkingService {
     }
   }
 
+
+  private determineThoughtCount(codeChanges: string): number {
+    // Simple logic: if code changes are too big, reduce the number of thoughts
+    // This can be improved with more sophisticated logic, like using embedding distance
+    if (codeChanges.length > 1000) {
+      return Math.max(2, Math.floor(SEQUENTIAL_THINKING_THOUGHTS_COUNT / 2));
+    }
+
+    return SEQUENTIAL_THINKING_THOUGHTS_COUNT;
+  }
+
+  
   /**
    * Generate the system prompt for the LLM
    */
@@ -135,19 +153,19 @@ export class SequentialThinkingService {
     let thoughtInstructions = '';
 
     if (SEQUENTIAL_THINKING_THOUGHTS_COUNT >= 1) {
-      thoughtInstructions += 'Pada pemikiran pertama (Thought 1), lakukan analisis awal dan identifikasi perubahan utama.\n';
+      thoughtInstructions += `Pada pemikiran pertama (Thought 1), ${SEQUENTIAL_THINKING_THOUGHTS_COUNT === 1 ? 'berikan kesimpulan dan rekomendasi final' : ' dan'} lakukan analisis awal dan identifikasi perubahan utama.\n`;
     }
 
     if (SEQUENTIAL_THINKING_THOUGHTS_COUNT >= 2) {
-      thoughtInstructions += 'Pada pemikiran kedua (Thought 2), analisis lebih dalam tentang implementasi dan potensi masalah.\n';
+      thoughtInstructions += `Pada pemikiran kedua (Thought 2), ${SEQUENTIAL_THINKING_THOUGHTS_COUNT === 2 ? 'berikan kesimpulan dan rekomendasi final' : ' dan'} analisis lebih dalam tentang implementasi dan potensi masalah.\n`;
     }
 
     if (SEQUENTIAL_THINKING_THOUGHTS_COUNT >= 3) {
-      thoughtInstructions += 'Pada pemikiran ketiga (Thought 3), pertimbangkan konteks proyek yang lebih luas dan dampak perubahan.\n';
+      thoughtInstructions += `Pada pemikiran ketiga (Thought 3), ${SEQUENTIAL_THINKING_THOUGHTS_COUNT === 3 ? 'berikan kesimpulan dan rekomendasi final' : ' dan'} pertimbangkan konteks proyek yang lebih luas dan dampak perubahan.\n`;
     }
 
     if (SEQUENTIAL_THINKING_THOUGHTS_COUNT >= 4) {
-      thoughtInstructions += `Pada pemikiran keempat (Thought 4), ${SEQUENTIAL_THINKING_THOUGHTS_COUNT === 4 ? 'berikan kesimpulan dan rekomendasi final' : 'lanjutkan analisis dengan lebih mendalam'}.\n`;
+      thoughtInstructions += `Pada pemikiran keempat (Thought 4), ${SEQUENTIAL_THINKING_THOUGHTS_COUNT === 4 ? 'berikan kesimpulan dan rekomendasi final' : ' dan'} lanjutkan analisis dengan lebih mendalam\n`;
     }
 
     // For any additional thoughts beyond 4
@@ -271,11 +289,11 @@ Jika ada hitungan pada Feedback atau Hasil Review, ingat untuk tidak melakukan h
   /**
    * Extract the thought from the LLM response
    */
-  private extractThought(response: string, thoughtNumber: number, isLastThought: boolean): SequentialThought {
+  private extractThought(response: string, thoughtNumber: number, isLastThought: boolean, thoughtsCount: number): SequentialThought {
     return {
       thought: response,
       thoughtNumber,
-      totalThoughts: SEQUENTIAL_THINKING_THOUGHTS_COUNT,
+      totalThoughts: thoughtsCount,
       nextThoughtNeeded: !isLastThought,
     };
   }
