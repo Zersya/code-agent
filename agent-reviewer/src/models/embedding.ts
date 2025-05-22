@@ -28,6 +28,7 @@ export interface ProjectMetadata {
   defaultBranch: string;
   lastProcessedCommit: string;
   lastProcessedAt: Date;
+  lastReembeddingAt?: Date;
 }
 
 export interface EmbeddingBatch {

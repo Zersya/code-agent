@@ -77,4 +77,5 @@ export interface MergeRequestComment {
 export interface MergeRequestReviewResult {
   reviewText: string;
   shouldApprove: boolean;
+  shouldContinue: boolean;
 }

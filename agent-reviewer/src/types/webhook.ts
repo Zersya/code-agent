@@ -119,4 +119,55 @@ export interface GitLabMergeRequestEvent {
   labels: any[];
 }
 
-export type GitLabWebhookEvent = GitLabPushEvent | GitLabMergeRequestEvent;
+export interface GitLabNoteAttributes {
+  id: number;
+  note: string;
+  attachment: string | null;
+  author: GitLabUser;
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  resolvable: boolean;
+  confidential: boolean;
+  internal: boolean;
+  noteable_iid: number;
+  url: string;
+}
+
+export interface GitLabNoteEvent {
+  object_kind: 'note';
+  event_type: string;
+  user: GitLabUser;
+  project_id: number;
+  project: GitLabProject;
+  repository: GitLabRepository;
+  object_attributes: GitLabNoteAttributes;
+  merge_request?: GitLabMergeRequestAttributes;
+  issue?: any;
+  snippet?: any;
+}
+
+export interface GitLabEmojiEvent {
+  object_kind: 'emoji';
+  event_type: string;
+  user: GitLabUser;
+  project_id: number;
+  project: GitLabProject;
+  object_attributes: {
+    id: number;
+    user_id: number;
+    created_at: string;
+    updated_at: string;
+    awardable_id: number;
+    awardable_type: string;
+    name: string;
+    action: 'award' | 'revoke';
+  };
+  note?: GitLabNoteAttributes;
+  merge_request?: GitLabMergeRequestAttributes;
+  issue?: any;
+}
+
+export type GitLabWebhookEvent = GitLabPushEvent | GitLabMergeRequestEvent | GitLabNoteEvent | GitLabEmojiEvent;

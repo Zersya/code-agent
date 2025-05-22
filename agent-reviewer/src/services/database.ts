@@ -116,9 +116,21 @@ class DatabaseService {
           url TEXT,
           default_branch TEXT,
           last_processed_commit TEXT,
-          last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          last_reembedding_at TIMESTAMP WITH TIME ZONE
         )
       `);
+
+      // Add the last_reembedding_at column if it doesn't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE projects
+          ADD COLUMN IF NOT EXISTS last_reembedding_at TIMESTAMP WITH TIME ZONE
+        `);
+      } catch (error) {
+        // Column might already exist, ignore the error
+        console.log('Column last_reembedding_at might already exist:', error);
+      }
 
       // Create embeddings table based on vector extension availability
       if (vectorExtensionAvailable) {
@@ -187,6 +199,21 @@ class DatabaseService {
           branch TEXT,
           files JSONB,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
+      // Create merge request reviews table for tracking review history
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS merge_request_reviews (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          last_reviewed_commit_sha TEXT NOT NULL,
+          review_comment_id INTEGER,
+          reviewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(project_id, merge_request_iid)
         )
       `);
 
@@ -413,9 +440,9 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at
+          last_processed_commit, last_processed_at, last_reembedding_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -423,7 +450,8 @@ class DatabaseService {
           url = EXCLUDED.url,
           default_branch = EXCLUDED.default_branch,
           last_processed_commit = EXCLUDED.last_processed_commit,
-          last_processed_at = EXCLUDED.last_processed_at
+          last_processed_at = EXCLUDED.last_processed_at,
+          last_reembedding_at = EXCLUDED.last_reembedding_at
       `, [
         metadata.projectId,
         metadata.name,
@@ -431,7 +459,8 @@ class DatabaseService {
         metadata.url,
         metadata.defaultBranch,
         metadata.lastProcessedCommit,
-        metadata.lastProcessedAt
+        metadata.lastProcessedAt,
+        metadata.lastReembeddingAt
       ]);
     } catch (error) {
       console.error('Error updating project metadata:', error);
@@ -453,7 +482,8 @@ class DatabaseService {
           url,
           default_branch as "defaultBranch",
           last_processed_commit as "lastProcessedCommit",
-          last_processed_at as "lastProcessedAt"
+          last_processed_at as "lastProcessedAt",
+          last_reembedding_at as "lastReembeddingAt"
         FROM projects
         WHERE project_id = $1
       `, [projectId]);
@@ -748,7 +778,8 @@ class DatabaseService {
           url,
           default_branch as "defaultBranch",
           last_processed_commit as "lastProcessedCommit",
-          last_processed_at as "lastProcessedAt"
+          last_processed_at as "lastProcessedAt",
+          last_reembedding_at as "lastReembeddingAt"
         FROM projects
         ORDER BY name
       `);
@@ -871,9 +902,9 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at
+          last_processed_commit, last_processed_at, last_reembedding_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -881,7 +912,8 @@ class DatabaseService {
           url = EXCLUDED.url,
           default_branch = EXCLUDED.default_branch,
           last_processed_commit = EXCLUDED.last_processed_commit,
-          last_processed_at = EXCLUDED.last_processed_at
+          last_processed_at = EXCLUDED.last_processed_at,
+          last_reembedding_at = EXCLUDED.last_reembedding_at
       `, [
         metadata.projectId,
         metadata.name,
@@ -889,10 +921,118 @@ class DatabaseService {
         metadata.url,
         metadata.defaultBranch,
         metadata.lastProcessedCommit,
-        metadata.lastProcessedAt
+        metadata.lastProcessedAt,
+        metadata.lastReembeddingAt
       ]);
     } catch (error) {
       console.error('Error saving project metadata:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update the last re-embedding timestamp for a project
+   * @param projectId The ID of the project
+   * @param timestamp The timestamp when re-embedding was initiated
+   */
+  async updateLastReembeddingTimestamp(projectId: number, timestamp: Date): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE projects
+        SET last_reembedding_at = $2, updated_at = NOW()
+        WHERE project_id = $1
+      `, [projectId, timestamp]);
+    } catch (error) {
+      console.error('Error updating last re-embedding timestamp:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save or update merge request review history
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @param lastReviewedCommitSha The SHA of the last reviewed commit
+   * @param reviewCommentId The ID of the review comment (optional)
+   */
+  async saveMergeRequestReview(
+    projectId: number,
+    mergeRequestIid: number,
+    lastReviewedCommitSha: string,
+    reviewCommentId?: number
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO merge_request_reviews (
+          project_id, merge_request_iid, last_reviewed_commit_sha, review_comment_id,
+          reviewed_at, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW())
+        ON CONFLICT (project_id, merge_request_iid)
+        DO UPDATE SET
+          last_reviewed_commit_sha = EXCLUDED.last_reviewed_commit_sha,
+          review_comment_id = EXCLUDED.review_comment_id,
+          reviewed_at = EXCLUDED.reviewed_at,
+          updated_at = EXCLUDED.updated_at
+      `, [projectId, mergeRequestIid, lastReviewedCommitSha, reviewCommentId]);
+
+      console.log(`Saved review history for MR !${mergeRequestIid} in project ${projectId}, last reviewed commit: ${lastReviewedCommitSha}`);
+    } catch (error) {
+      console.error('Error saving merge request review history:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get merge request review history
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @returns The review history or null if not found
+   */
+  async getMergeRequestReview(projectId: number, mergeRequestIid: number): Promise<{
+    id: number;
+    projectId: number;
+    mergeRequestIid: number;
+    lastReviewedCommitSha: string;
+    reviewCommentId: number | null;
+    reviewedAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          project_id as "projectId",
+          merge_request_iid as "mergeRequestIid",
+          last_reviewed_commit_sha as "lastReviewedCommitSha",
+          review_comment_id as "reviewCommentId",
+          reviewed_at as "reviewedAt",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM merge_request_reviews
+        WHERE project_id = $1 AND merge_request_iid = $2
+      `, [projectId, mergeRequestIid]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting merge request review history:', error);
       throw error;
     } finally {
       client.release();

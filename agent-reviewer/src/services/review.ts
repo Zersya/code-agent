@@ -1,6 +1,7 @@
 import { MergeRequestChange, MergeRequestComment, /* MergeRequestReview, */ MergeRequestReviewResult, SequentialThought } from '../types/review.js';
 import { gitlabService } from './gitlab.js';
 import { contextService, ProjectContext } from './context.js';
+import { dbService } from './database.js';
 
 import dotenv from 'dotenv';
 import axios from 'axios';
@@ -309,6 +310,7 @@ ${codeChanges}
         return {
           reviewText: 'Merge request has already been reviewed.',
           shouldApprove: false,
+          shouldContinue: false,
         };
       }
 
@@ -373,6 +375,7 @@ ${codeChanges}
       return {
         reviewText: reviewComment,
         shouldApprove,
+        shouldContinue: true,
       };
     } catch (error) {
       console.error(`Error reviewing merge request !${mergeRequestIid} in project ${projectId}:`, error);
@@ -455,8 +458,20 @@ ${codeChanges}
       // Perform the review
       const reviewResult = await this.reviewMergeRequest(projectId, mergeRequestIid);
 
+      if (!reviewResult.shouldContinue) {
+        console.log(`Review for merge request !${mergeRequestIid} in project ${projectId} should not continue, skipping`);
+        return;
+      }
+
       // Add the review comment
-      await gitlabService.addMergeRequestComment(projectId, mergeRequestIid, reviewResult.reviewText);
+      const comment = await gitlabService.addMergeRequestComment(projectId, mergeRequestIid, reviewResult.reviewText);
+
+      // Get the current merge request to get the latest commit SHA
+      const mergeRequest = await gitlabService.getMergeRequest(projectId, mergeRequestIid);
+      const currentCommitSha = mergeRequest.sha;
+
+      // Save the review history
+      await dbService.saveMergeRequestReview(projectId, mergeRequestIid, currentCommitSha, comment.id);
 
       // If the review indicates approval, approve the merge request
       if (reviewResult.shouldApprove) {
@@ -469,6 +484,119 @@ ${codeChanges}
       console.error(`Error submitting review for merge request !${mergeRequestIid} in project ${projectId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Submit a re-review for a merge request focusing on new changes since last review
+   */
+  async submitReReview(projectId: number, mergeRequestIid: number): Promise<void> {
+    try {
+      // Check if merge request reviews are enabled
+      if (!ENABLE_MR_REVIEW) {
+        console.log(`Merge request reviews are disabled. Skipping re-review for !${mergeRequestIid} in project ${projectId}`);
+        return;
+      }
+
+      console.log(`Starting re-review for merge request !${mergeRequestIid} in project ${projectId}`);
+
+      // Get the current merge request
+      const mergeRequest = await gitlabService.getMergeRequest(projectId, mergeRequestIid);
+      const currentCommitSha = mergeRequest.sha;
+
+      // Get the previous review history
+      const reviewHistory = await dbService.getMergeRequestReview(projectId, mergeRequestIid);
+
+      if (!reviewHistory) {
+        console.log(`No previous review found for MR !${mergeRequestIid}, performing full review instead`);
+        await this.submitReview(projectId, mergeRequestIid);
+        return;
+      }
+
+      const lastReviewedCommitSha = reviewHistory.lastReviewedCommitSha;
+
+      // Check if there are new commits since the last review
+      if (currentCommitSha === lastReviewedCommitSha) {
+        console.log(`No new commits since last review for MR !${mergeRequestIid}, skipping re-review`);
+        return;
+      }
+
+      // Get changes between the last reviewed commit and current commit
+      const newChanges = await gitlabService.getChangesBetweenCommits(projectId, lastReviewedCommitSha, currentCommitSha);
+
+      if (newChanges.length === 0) {
+        console.log(`No changes found between commits for MR !${mergeRequestIid}, skipping re-review`);
+        return;
+      }
+
+      console.log(`Found ${newChanges.length} new changes since last review for MR !${mergeRequestIid}`);
+
+      // Format the new changes for review
+      const formattedChanges = this.formatChangesForReview(newChanges);
+
+      // Get project context if enabled
+      let projectContext = undefined;
+      if (ENABLE_PROJECT_CONTEXT) {
+        try {
+          console.log(`Getting project context for re-review of project ${projectId}`);
+          projectContext = await contextService.getProjectContext(projectId, newChanges);
+          console.log(`Retrieved project context with ${projectContext.relevantFiles.length} relevant files`);
+        } catch (contextError) {
+          console.warn(`Error getting project context for re-review, continuing without it:`, contextError);
+        }
+      }
+
+      // Perform the re-review using direct LLM call
+      const { reviewResult } = await this.reviewCodeWithLLM(
+        formattedChanges,
+        mergeRequest.title,
+        mergeRequest.description || '',
+        projectContext
+      );
+
+      // Determine if the merge request should be approved based on new changes
+      const shouldApprove = this.shouldApproveMergeRequest(reviewResult);
+
+      // Format the re-review comment
+      const reviewComment = this.formatReReviewComment(reviewResult, shouldApprove, lastReviewedCommitSha, currentCommitSha);
+
+      // Add the re-review comment
+      const comment = await gitlabService.addMergeRequestComment(projectId, mergeRequestIid, reviewComment);
+
+      // Update the review history with the new commit SHA
+      await dbService.saveMergeRequestReview(projectId, mergeRequestIid, currentCommitSha, comment.id);
+
+      // If the re-review indicates approval, approve the merge request
+      if (shouldApprove) {
+        await gitlabService.approveMergeRequest(projectId, mergeRequestIid);
+        console.log(`Approved merge request !${mergeRequestIid} in project ${projectId} after re-review`);
+      } else {
+        console.log(`Did not approve merge request !${mergeRequestIid} in project ${projectId} after re-review`);
+      }
+
+      console.log(`Successfully completed re-review for merge request !${mergeRequestIid} in project ${projectId}`);
+    } catch (error) {
+      console.error(`Error submitting re-review for merge request !${mergeRequestIid} in project ${projectId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Format the re-review comment
+   */
+  private formatReReviewComment(reviewResult: string, shouldApprove: boolean, fromCommit: string, toCommit: string): string {
+    // Start with a re-review greeting
+    let comment = `Halo, berikut re-review untuk perubahan terbaru di MR ini:\n\n`;
+    comment += `📝 **Re-review untuk commit ${fromCommit.substring(0, 8)}...${toCommit.substring(0, 8)}**\n\n`;
+
+    // Add the review result
+    comment += reviewResult;
+
+    // If the MR should be approved, make sure the approval message is included
+    if (shouldApprove && !comment.includes('Silahkan merge!')) {
+      comment += '\n\nSilahkan merge! \nTerima kasih';
+    }
+
+    return comment;
   }
 }
 
