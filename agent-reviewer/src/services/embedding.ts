@@ -132,7 +132,7 @@ export class EmbeddingService {
      */
     async checkAndEmbedProject(projectId: number, waitForCompletion: boolean = false): Promise<boolean> {
       try {
-      
+
         // Check if the project has embeddings
         const hasEmbeddings = await dbService.hasEmbeddings(projectId);
 
@@ -189,6 +189,32 @@ export class EmbeddingService {
         return false;
       }
     }
+
+  /**
+   * Trigger re-embedding for a project after a merge
+   * This clears existing embeddings and queues a new embedding job
+   * @param projectId The ID of the project
+   * @param repositoryUrl The URL of the repository
+   * @param targetBranch The target branch that was merged into (usually main/master)
+   * @returns True if re-embedding was successfully queued, false otherwise
+   */
+  async triggerProjectReEmbedding(projectId: number, repositoryUrl: string, targetBranch: string): Promise<boolean> {
+    try {
+      console.log(`Triggering re-embedding for project ${projectId} after merge to ${targetBranch}`);
+
+      // Queue the project for re-embedding with high priority
+      const processingId = uuidv4();
+      await queueService.addJob(projectId, repositoryUrl, processingId, 10); // High priority
+
+      console.log(`Project ${projectId} queued for re-embedding after merge (processingId: ${processingId})`);
+
+      return true;
+    } catch (error) {
+      console.error(`Error triggering re-embedding for project ${projectId}:`, error);
+      return false;
+    }
+  }
+
   /**
    * Generate embeddings for a single code file with retry logic
    */

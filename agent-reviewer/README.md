@@ -12,6 +12,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Security**: Implements webhook authentication and validation
 - **Automated Code Review**: Reviews merge requests from Repopo using sequential thinking
 - **Merge Request Approval**: Automatically approves merge requests that meet quality standards
+- **Automatic Re-embedding**: Automatically re-embeds projects when merge requests are successfully merged
 
 ## Prerequisites
 
@@ -189,6 +190,53 @@ The system can automatically review merge requests from Repopo using a sequentia
    - An approval message if appropriate: "Silahkan merge! \nTerima kasih"
 
 To enable or disable this feature, set `ENABLE_MR_REVIEW=true` or `ENABLE_MR_REVIEW=false` in your `.env` file.
+
+## Automatic Project Re-embedding
+
+The system automatically re-embeds projects when merge requests are successfully merged to ensure that the embedded knowledge base stays current with the latest code changes.
+
+### How It Works
+
+1. **Merge Detection**: When a GitLab webhook indicates a merge request has been successfully merged (action: 'merge', state: 'merged'), the system triggers the re-embedding process.
+
+2. **Data Cleanup**: The system first clears all existing embeddings and batches for the affected project to prevent conflicts and ensure a clean re-embedding.
+
+3. **Queue Re-embedding**: A new embedding job is queued with high priority (priority level 10) to process the entire repository with the latest merged code.
+
+4. **Asynchronous Processing**: The re-embedding process runs asynchronously through the existing queue system, so it doesn't block the webhook response.
+
+### Benefits
+
+- **Up-to-date Context**: Code reviews and searches always use the most current version of the codebase
+- **Improved Accuracy**: Embeddings reflect the actual state of the main branch after merges
+- **Automatic Maintenance**: No manual intervention required to keep embeddings current
+- **Performance Optimized**: Uses the existing queue system with proper concurrency controls
+
+### Configuration
+
+The re-embedding feature is automatically enabled and uses the same configuration as the regular embedding process:
+
+- **File Filtering**: Uses the same `ALLOWED_FILE_EXTENSIONS` configuration
+- **Queue Settings**: Respects `QUEUE_CONCURRENCY` and `QUEUE_MAX_ATTEMPTS` settings
+- **Embedding API**: Uses the same Qodo-Embed-1 API configuration
+
+### Monitoring
+
+Re-embedding activities are logged with clear messages:
+
+```
+Processing merge completion event for project 12345, MR !42, target branch: main
+Triggering re-embedding for project 12345 after successful merge to main
+Cleared existing data for project 12345: 150 embeddings, 5 batches
+Project 12345 queued for re-embedding after merge (processingId: uuid-here)
+```
+
+### Rate Limiting
+
+The system includes built-in rate limiting to prevent overwhelming the embedding API:
+- Re-embedding only triggers for actual merge completions, not merge attempts
+- Uses the existing queue system's concurrency controls
+- Includes delays between batch processing to respect API limits
 
 ## LLM Providers
 

@@ -28,6 +28,7 @@ export interface EmbeddingJob {
   startedAt?: Date;
   completedAt?: Date;
   priority: number;
+  isReembedding?: boolean;
 }
 
 /**

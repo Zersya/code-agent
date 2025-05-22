@@ -762,6 +762,108 @@ class DatabaseService {
     }
   }
 
+  /**
+   * Delete all embeddings for a specific project
+   * @param projectId The ID of the project
+   * @returns Number of deleted embeddings
+   */
+  async deleteProjectEmbeddings(projectId: number): Promise<number> {
+    const client = await this.pool.connect();
+
+    try {
+      console.log(`Deleting all embeddings for project ${projectId}`);
+
+      const result = await client.query(`
+        DELETE FROM embeddings
+        WHERE project_id = $1
+      `, [projectId]);
+
+      const deletedCount = result.rowCount || 0;
+      console.log(`Deleted ${deletedCount} embeddings for project ${projectId}`);
+
+      return deletedCount;
+    } catch (error) {
+      console.error('Error deleting project embeddings:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Delete all batches for a specific project
+   * @param projectId The ID of the project
+   * @returns Number of deleted batches
+   */
+  async deleteProjectBatches(projectId: number): Promise<number> {
+    const client = await this.pool.connect();
+
+    try {
+      console.log(`Deleting all batches for project ${projectId}`);
+
+      const result = await client.query(`
+        DELETE FROM batches
+        WHERE project_id = $1
+      `, [projectId]);
+
+      const deletedCount = result.rowCount || 0;
+      console.log(`Deleted ${deletedCount} batches for project ${projectId}`);
+
+      return deletedCount;
+    } catch (error) {
+      console.error('Error deleting project batches:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Clear all embedding data for a project (embeddings and batches)
+   * This is used before re-embedding a project
+   * @param projectId The ID of the project
+   * @returns Object with counts of deleted embeddings and batches
+   */
+  async clearProjectEmbeddingData(projectId: number): Promise<{ deletedEmbeddings: number; deletedBatches: number }> {
+    const client = await this.pool.connect();
+
+    try {
+      console.log(`Clearing all embedding data for project ${projectId}`);
+
+      // Start a transaction to ensure atomicity
+      await client.query('BEGIN');
+
+      // Delete embeddings
+      const embeddingsResult = await client.query(`
+        DELETE FROM embeddings
+        WHERE project_id = $1
+      `, [projectId]);
+
+      // Delete batches
+      const batchesResult = await client.query(`
+        DELETE FROM batches
+        WHERE project_id = $1
+      `, [projectId]);
+
+      // Commit the transaction
+      await client.query('COMMIT');
+
+      const deletedEmbeddings = embeddingsResult.rowCount || 0;
+      const deletedBatches = batchesResult.rowCount || 0;
+
+      console.log(`Cleared embedding data for project ${projectId}: ${deletedEmbeddings} embeddings, ${deletedBatches} batches`);
+
+      return { deletedEmbeddings, deletedBatches };
+    } catch (error) {
+      // Rollback the transaction on error
+      await client.query('ROLLBACK');
+      console.error('Error clearing project embedding data:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async saveProjectMetadata(metadata: ProjectMetadata): Promise<void> {
     const client = await this.pool.connect();
 

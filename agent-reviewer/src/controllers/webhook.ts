@@ -161,7 +161,13 @@ async function processPushEvent(event: GitLabPushEvent) {
  */
 async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
   try {
-    // Only process merge requests that are opened or updated
+    // Handle merge completion events differently
+    if (event.object_attributes.action === 'merge') {
+      await processMergeCompletionEvent(event);
+      return;
+    }
+
+    // Only process merge requests that are opened or updated for regular processing
     if (!['open', 'update'].includes(event.object_attributes.action || '')) {
       console.log(`Skipping merge request event with action: ${event.object_attributes.action}`);
       return;
@@ -260,11 +266,55 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
 }
 
 /**
+ * Process a merge completion event
+ * This function handles when a merge request is successfully merged and triggers re-embedding
+ */
+async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
+  try {
+    const projectId = event.project.id;
+    const mergeRequestIid = event.object_attributes.iid;
+    const targetBranch = event.object_attributes.target_branch;
+    const repositoryUrl = event.project.web_url;
+
+    console.log(`Processing merge completion event for project ${projectId}, MR !${mergeRequestIid}, target branch: ${targetBranch}`);
+
+    // Check if the merge was successful
+    if (event.object_attributes.state !== 'merged') {
+      console.log(`Merge request !${mergeRequestIid} is not in merged state (${event.object_attributes.state}), skipping re-embedding`);
+      return;
+    }
+
+    // Trigger re-embedding for the project
+    console.log(`Triggering re-embedding for project ${projectId} after successful merge to ${targetBranch}`);
+
+    try {
+      const reEmbeddingSuccess = await embeddingService.triggerProjectReEmbedding(projectId, repositoryUrl, targetBranch);
+
+      if (reEmbeddingSuccess) {
+        console.log(`Successfully queued re-embedding for project ${projectId} after merge !${mergeRequestIid}`);
+      } else {
+        console.error(`Failed to queue re-embedding for project ${projectId} after merge !${mergeRequestIid}`);
+      }
+    } catch (reEmbeddingError) {
+      console.error(`Error triggering re-embedding for project ${projectId} after merge !${mergeRequestIid}:`, reEmbeddingError);
+    }
+  } catch (error) {
+    console.error('Error processing merge completion event:', error);
+  }
+}
+
+/**
  * Process a Repopo merge request event
  * This function handles merge request events from Repopo and triggers the review process
  */
 async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
   try {
+    // Handle merge completion events for Repopo as well
+    if (event.object_attributes.action === 'merge') {
+      await processMergeCompletionEvent(event);
+      return;
+    }
+
     // Only process merge requests that are opened or updated
     if (!['open', 'update'].includes(event.object_attributes.action || '')) {
       console.log(`Skipping Repopo merge request event with action: ${event.object_attributes.action}`);

@@ -92,7 +92,7 @@ export class QueueService {
   /**
    * Add a job to the queue
    */
-  async addJob(projectId: number, repositoryUrl: string, processingId: string, priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL): Promise<EmbeddingJob> {
+  async addJob(projectId: number, repositoryUrl: string, processingId: string, priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL, isReembedding: boolean = false): Promise<EmbeddingJob> {
     try {
       const job: EmbeddingJob = {
         id: uuidv4(),
@@ -104,7 +104,8 @@ export class QueueService {
         createdAt: new Date(),
         updatedAt: new Date(),
         priority,
-        projectId
+        projectId,
+        isReembedding
       };
 
       // Save the job to the database
@@ -443,6 +444,14 @@ export class QueueService {
       }
 
       job.updatedAt = new Date();
+
+      if (job.isReembedding) {
+        console.log(`Re-embedding completed for project ${job.projectId}, clearing existing data`);
+        // Clear existing embedding data
+        const clearResult = await dbService.clearProjectEmbeddingData(job.projectId);
+        console.log(`Cleared existing data for project ${job.projectId}: ${clearResult.deletedEmbeddings} embeddings, ${clearResult.deletedBatches} batches`);
+      }
+
       await this.saveJob(job);
     } catch (error) {
       console.error(`Error processing job ${job.id}:`, error);
