@@ -222,6 +222,7 @@ export class RepositoryService {
                 content,
                 language,
                 lastModified: stats.mtime,
+                size: stats.size,
               });
             } catch (error) {
               console.error(`Error reading file ${fullPath}:`, error);

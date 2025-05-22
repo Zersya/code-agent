@@ -5,6 +5,7 @@ export interface CodeFile {
   content: string;
   language: string;
   lastModified: Date;
+  size: number;
 }
 
 export interface CodeEmbedding {

@@ -171,3 +171,158 @@ export interface GitLabEmojiEvent {
 }
 
 export type GitLabWebhookEvent = GitLabPushEvent | GitLabMergeRequestEvent | GitLabNoteEvent | GitLabEmojiEvent;
+
+// GitHub webhook event types
+
+export interface GitHubUser {
+  id: number;
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  type: string;
+}
+
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string;
+  html_url: string;
+  clone_url: string;
+  ssh_url: string;
+  default_branch: string;
+  owner: GitHubUser;
+}
+
+export interface GitHubCommit {
+  id: string;
+  message: string;
+  timestamp: string;
+  url: string;
+  author: {
+    name: string;
+    email: string;
+  };
+  added: string[];
+  modified: string[];
+  removed: string[];
+}
+
+export interface GitHubPushEvent {
+  ref: string;
+  before: string;
+  after: string;
+  repository: GitHubRepository;
+  pusher: GitHubUser;
+  sender: GitHubUser;
+  commits: GitHubCommit[];
+  head_commit: GitHubCommit;
+}
+
+export interface GitHubPullRequest {
+  id: number;
+  number: number;
+  state: string;
+  title: string;
+  body: string;
+  html_url: string;
+  head: {
+    ref: string;
+    sha: string;
+    repo: GitHubRepository;
+  };
+  base: {
+    ref: string;
+    sha: string;
+    repo: GitHubRepository;
+  };
+  user: GitHubUser;
+  merged: boolean;
+  mergeable: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitHubPullRequestEvent {
+  action: string;
+  number: number;
+  pull_request: GitHubPullRequest;
+  repository: GitHubRepository;
+  sender: GitHubUser;
+}
+
+export interface GitHubIssueComment {
+  id: number;
+  body: string;
+  user: GitHubUser;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+}
+
+export interface GitHubIssueCommentEvent {
+  action: string;
+  issue?: {
+    id: number;
+    number: number;
+    title: string;
+    body: string;
+    state: string;
+    user: GitHubUser;
+    html_url: string;
+    pull_request?: {
+      url: string;
+      html_url: string;
+    };
+  };
+  comment: GitHubIssueComment;
+  repository: GitHubRepository;
+  sender: GitHubUser;
+}
+
+export interface GitHubPullRequestReviewCommentEvent {
+  action: string;
+  pull_request: GitHubPullRequest;
+  comment: {
+    id: number;
+    body: string;
+    user: GitHubUser;
+    created_at: string;
+    updated_at: string;
+    html_url: string;
+    path: string;
+    position: number;
+    line: number;
+  };
+  repository: GitHubRepository;
+  sender: GitHubUser;
+}
+
+export type GitHubWebhookEvent = GitHubPushEvent | GitHubPullRequestEvent | GitHubIssueCommentEvent | GitHubPullRequestReviewCommentEvent;
+
+export type WebhookEvent = GitLabWebhookEvent | GitHubWebhookEvent;
+
+// Agentic coding interfaces
+export interface AgenticCodingRequest {
+  platform: 'gitlab' | 'github';
+  projectId: number | string;
+  repositoryUrl: string;
+  instructions: string;
+  context: {
+    pullRequestNumber?: number;
+    mergeRequestIid?: number;
+    commentId: number;
+    author: string;
+    branch?: string;
+    commitSha?: string;
+  };
+}
+
+export interface AgenticCodingResult {
+  success: boolean;
+  filesModified: string[];
+  filesCreated: string[];
+  summary: string;
+  errors?: string[];
+  warnings?: string[];
+}

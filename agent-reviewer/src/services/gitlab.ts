@@ -84,6 +84,7 @@ export class GitLabService {
                 content: '[BINARY FILE CONTENT SKIPPED]',
                 language: 'binary',
                 lastModified: new Date(),
+                size: 0,
               };
             }
 
@@ -95,6 +96,7 @@ export class GitLabService {
               content,
               language,
               lastModified: new Date(),
+              size: content.length,
             };
           } catch (error) {
             console.error(`Error processing file ${file.path}:`, error);

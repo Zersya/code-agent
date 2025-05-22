@@ -14,12 +14,14 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Merge Request Approval**: Automatically approves merge requests that meet quality standards
 - **Automatic Re-embedding**: Automatically re-embeds projects when merge requests are successfully merged
 - **Emoji-Triggered Re-reviews**: Automatically triggers re-reviews when developers add emoji reactions to bot comments
+- **🤖 Agentic Coding Mode**: Automatically responds to developer comments starting with `/agent` to generate code changes
 
 ## Prerequisites
 
 - Node.js 18+
 - PostgreSQL database (with pgvector extension for vector search)
-- GitLab account with API access
+- GitLab account with API access (for GitLab repositories)
+- GitHub account with API access (for GitHub repositories)
 - Qodo-Embed-1 API access
 - OpenRouter API key (if using OpenRouter as LLM provider)
 - Ollama installed locally (if using Ollama as LLM provider)
@@ -347,6 +349,75 @@ The system gracefully handles various error scenarios:
 - **No New Commits**: Skips re-review if no changes since last review
 - **API Failures**: Continues processing with appropriate error logging
 - **Invalid Webhooks**: Ignores non-merge request notes and invalid emoji events
+
+## 🤖 Agentic Coding Mode
+
+The system now supports **Agentic Coding Mode**, which allows developers to request automated code changes by commenting with `/agent` followed by their instructions. This feature works with both GitLab and GitHub repositories.
+
+### Quick Start
+
+Comment on any pull request or merge request with:
+
+```
+/agent Add error handling to the login function in auth.js
+```
+
+The system will:
+1. **Analyze your request** and gather relevant codebase context
+2. **Generate appropriate code changes** using AI analysis
+3. **Validate the changes** for potential issues
+4. **Respond with a detailed summary** of what would be changed
+
+### Supported Platforms
+
+- ✅ **GitLab**: Comments on merge requests
+- ✅ **GitHub**: Comments on pull requests and review comments
+
+### Configuration
+
+Add these environment variables to enable agentic coding:
+
+```bash
+# GitHub API Configuration (if using GitHub)
+GITHUB_API_TOKEN=your_github_token_here
+GITHUB_API_URL=https://api.github.com
+
+# Agentic Coding Configuration
+ENABLE_AGENTIC_CODING=true
+```
+
+### Example Usage
+
+```
+/agent Refactor the UserService class to use async/await instead of promises
+```
+
+```
+/agent Add TypeScript types to the API response interfaces
+```
+
+```
+/agent Fix the memory leak in the WebSocket connection handler
+```
+
+### How It Works
+
+1. **Comment Detection**: Webhook listens for comments starting with `/agent`
+2. **Context Gathering**: Uses semantic search to find relevant code files
+3. **AI Analysis**: Generates appropriate code changes using LLM
+4. **Response**: Posts detailed summary of proposed changes
+
+### Documentation
+
+For detailed documentation, examples, and troubleshooting, see [docs/AGENTIC_CODING.md](docs/AGENTIC_CODING.md).
+
+### Testing
+
+Test the agentic coding functionality:
+
+```bash
+node scripts/test-agentic-coding.js
+```
 
 ## LLM Providers
 
