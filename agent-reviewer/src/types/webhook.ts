@@ -121,7 +121,7 @@ export interface GitLabMergeRequestEvent {
 
 export interface GitLabNoteAttributes {
   id: number;
-  body: string;
+  note: string;
   attachment: string | null;
   author: GitLabUser;
   created_at: string;

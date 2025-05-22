@@ -423,7 +423,7 @@ async function processEmojiEvent(event: GitLabEmojiEvent) {
     }
 
     // Check if the note contains the trigger phrase for re-review
-    const noteBody = event.note.body;
+    const noteBody = event.note.note;
     const triggerPhrase = 'Merge request has already been reviewed';
 
     if (!noteBody.includes(triggerPhrase)) {
