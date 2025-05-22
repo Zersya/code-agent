@@ -365,15 +365,15 @@ async function processNoteEvent(event: GitLabNoteEvent) {
     }
 
     // Check if this note contains the trigger phrase for re-review
-    const noteBody = event.object_attributes.note;
-    const triggerPhrase = 'Merge request has already been reviewed';
+    // const noteBody = event.object_attributes.note;
+    // const triggerPhrase = 'Merge request has already been reviewed';
 
-    if (!noteBody.includes(triggerPhrase)) {
-      console.log('Note does not contain re-review trigger phrase, skipping');
-      return;
-    }
+    // if (!noteBody.includes(triggerPhrase)) {
+    //   console.log('Note does not contain re-review trigger phrase, skipping');
+    //   return;
+    // }
 
-    console.log(`Found note with re-review trigger phrase: "${triggerPhrase}"`);
+    // console.log(`Found note with re-review trigger phrase: "${triggerPhrase}"`);
 
     // Get emoji reactions for this note to check if any were added
     const projectId = event.project_id;
@@ -425,15 +425,15 @@ async function processEmojiEvent(event: GitLabEmojiEvent) {
     }
 
     // Check if the note contains the trigger phrase for re-review
-    const noteBody = event.note.note;
-    const triggerPhrase = 'Merge request has already been reviewed';
+    // const noteBody = event.note.note;
+    // const triggerPhrase = 'Merge request has already been reviewed';
 
-    if (!noteBody.includes(triggerPhrase)) {
-      console.log('Note does not contain re-review trigger phrase, skipping');
-      return;
-    }
+    // if (!noteBody.includes(triggerPhrase)) {
+    //   console.log('Note does not contain re-review trigger phrase, skipping');
+    //   return;
+    // }
 
-    console.log(`Emoji ${event.object_attributes.name} added to note with re-review trigger phrase, triggering re-review`);
+    // console.log(`Emoji ${event.object_attributes.name} added to note with re-review trigger phrase, triggering re-review`);
 
     const projectId = event.project_id;
     const mergeRequestIid = event.merge_request.iid;
