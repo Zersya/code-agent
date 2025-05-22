@@ -363,7 +363,7 @@ async function processNoteEvent(event: GitLabNoteEvent) {
     }
 
     // Check if this note contains the trigger phrase for re-review
-    const noteBody = event.object_attributes.body;
+    const noteBody = event.object_attributes.note;
     const triggerPhrase = 'Merge request has already been reviewed';
 
     if (!noteBody.includes(triggerPhrase)) {
