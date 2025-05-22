@@ -37,7 +37,7 @@ export const processWebhook = async (req: Request, res: Response, next: Function
     } else if (event.object_kind === 'emoji') {
       await processEmojiEvent(event as GitLabEmojiEvent);
     } else {
-      console.log(`Ignoring unsupported event type: ${event.object_kind}`);
+      console.log(`Ignoring unsupported event type: ${event}`);
     }
   } catch (error) {
     console.error('Error processing webhook:', error);
