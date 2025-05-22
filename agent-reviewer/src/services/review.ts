@@ -310,6 +310,7 @@ ${codeChanges}
         return {
           reviewText: 'Merge request has already been reviewed.',
           shouldApprove: false,
+          shouldContinue: false,
         };
       }
 
@@ -374,6 +375,7 @@ ${codeChanges}
       return {
         reviewText: reviewComment,
         shouldApprove,
+        shouldContinue: true,
       };
     } catch (error) {
       console.error(`Error reviewing merge request !${mergeRequestIid} in project ${projectId}:`, error);
@@ -455,6 +457,11 @@ ${codeChanges}
 
       // Perform the review
       const reviewResult = await this.reviewMergeRequest(projectId, mergeRequestIid);
+
+      if (!reviewResult.shouldContinue) {
+        console.log(`Review for merge request !${mergeRequestIid} in project ${projectId} should not continue, skipping`);
+        return;
+      }
 
       // Add the review comment
       const comment = await gitlabService.addMergeRequestComment(projectId, mergeRequestIid, reviewResult.reviewText);
