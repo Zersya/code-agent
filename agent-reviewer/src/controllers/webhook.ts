@@ -402,10 +402,10 @@ async function processNoteEvent(event: GitLabNoteEvent) {
  */
 async function processEmojiEvent(event: GitLabEmojiEvent) {
   try {
-    console.log(`Processing emoji event for project ${event.project_id}, emoji ${event.object_attributes.name}, action: ${event.object_attributes.action}`);
+    console.log(`Processing emoji event for project ${event.project_id}, emoji ${event.object_attributes.name}, action: ${event.object_attributes.action}, event type: ${event.event_type}`);
 
     // Only process emoji additions (not removals)
-    if (event.object_attributes.action !== 'award') {
+    if (event.event_type !== 'award') {
       console.log('Emoji was removed, not added, skipping');
       return;
     }
