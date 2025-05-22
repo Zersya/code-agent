@@ -163,7 +163,7 @@ export interface GitLabEmojiEvent {
     awardable_id: number;
     awardable_type: string;
     name: string;
-    action: 'add' | 'remove';
+    action: 'award' | 'revoke';
   };
   note?: GitLabNoteAttributes;
   merge_request?: GitLabMergeRequestAttributes;
