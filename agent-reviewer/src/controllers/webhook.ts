@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { GitLabPushEvent, GitLabMergeRequestEvent, GitLabWebhookEvent } from '../types/webhook.js';
+import { GitLabPushEvent, GitLabMergeRequestEvent, GitLabWebhookEvent, GitLabNoteEvent, GitLabEmojiEvent } from '../types/webhook.js';
 import { RepopoWebhookEvent } from '../types/review.js';
 import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
@@ -32,8 +32,12 @@ export const processWebhook = async (req: Request, res: Response, next: Function
       } else {
         await processMergeRequestEvent(event as GitLabMergeRequestEvent);
       }
+    } else if (event.object_kind === 'note') {
+      await processNoteEvent(event as GitLabNoteEvent);
+    } else if (event.object_kind === 'emoji') {
+      await processEmojiEvent(event as GitLabEmojiEvent);
     } else {
-      console.log(`Ignoring unsupported event type`);
+      console.log(`Ignoring unsupported event type: ${event.object_kind}`);
     }
   } catch (error) {
     console.error('Error processing webhook:', error);
@@ -341,5 +345,115 @@ async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
     }
   } catch (error) {
     console.error('Error processing Repopo merge request event:', error);
+  }
+}
+
+/**
+ * Process a note (comment) event
+ * This function handles note events and checks for emoji reactions that trigger re-reviews
+ */
+async function processNoteEvent(event: GitLabNoteEvent) {
+  try {
+    console.log(`Processing note event for project ${event.project_id}, note ${event.object_attributes.id}`);
+
+    // Only process notes on merge requests
+    if (event.object_attributes.noteable_type !== 'MergeRequest' || !event.merge_request) {
+      console.log('Note is not on a merge request, skipping');
+      return;
+    }
+
+    // Check if this note contains the trigger phrase for re-review
+    const noteBody = event.object_attributes.body;
+    const triggerPhrase = 'Merge request has already been reviewed';
+
+    if (!noteBody.includes(triggerPhrase)) {
+      console.log('Note does not contain re-review trigger phrase, skipping');
+      return;
+    }
+
+    console.log(`Found note with re-review trigger phrase: "${triggerPhrase}"`);
+
+    // Get emoji reactions for this note to check if any were added
+    const projectId = event.project_id;
+    const noteId = event.object_attributes.id;
+
+    try {
+      const emojis = await gitlabService.getNoteEmojis(projectId, noteId);
+
+      if (emojis.length > 0) {
+        console.log(`Found ${emojis.length} emoji reactions on note ${noteId}, triggering re-review`);
+
+        const mergeRequestIid = event.merge_request.iid;
+        await triggerReReview(projectId, mergeRequestIid, 'emoji_reaction_on_note');
+      } else {
+        console.log(`No emoji reactions found on note ${noteId}`);
+      }
+    } catch (error) {
+      console.error(`Error checking emoji reactions for note ${noteId}:`, error);
+    }
+  } catch (error) {
+    console.error('Error processing note event:', error);
+  }
+}
+
+/**
+ * Process an emoji event
+ * This function handles emoji reactions and triggers re-reviews when appropriate
+ */
+async function processEmojiEvent(event: GitLabEmojiEvent) {
+  try {
+    console.log(`Processing emoji event for project ${event.project_id}, emoji ${event.object_attributes.name}, action: ${event.object_attributes.action}`);
+
+    // Only process emoji additions (not removals)
+    if (event.object_attributes.action !== 'add') {
+      console.log('Emoji was removed, not added, skipping');
+      return;
+    }
+
+    // Only process emojis on notes/comments
+    if (event.object_attributes.awardable_type !== 'Note' || !event.note) {
+      console.log('Emoji is not on a note, skipping');
+      return;
+    }
+
+    // Check if the note is on a merge request
+    if (!event.merge_request) {
+      console.log('Note is not on a merge request, skipping');
+      return;
+    }
+
+    // Check if the note contains the trigger phrase for re-review
+    const noteBody = event.note.body;
+    const triggerPhrase = 'Merge request has already been reviewed';
+
+    if (!noteBody.includes(triggerPhrase)) {
+      console.log('Note does not contain re-review trigger phrase, skipping');
+      return;
+    }
+
+    console.log(`Emoji ${event.object_attributes.name} added to note with re-review trigger phrase, triggering re-review`);
+
+    const projectId = event.project_id;
+    const mergeRequestIid = event.merge_request.iid;
+
+    await triggerReReview(projectId, mergeRequestIid, 'emoji_reaction');
+  } catch (error) {
+    console.error('Error processing emoji event:', error);
+  }
+}
+
+/**
+ * Trigger a re-review for a merge request
+ */
+async function triggerReReview(projectId: number, mergeRequestIid: number, trigger: string) {
+  try {
+    console.log(`Triggering re-review for MR !${mergeRequestIid} in project ${projectId} due to ${trigger}`);
+
+    // Submit the re-review
+    await reviewService.submitReReview(projectId, mergeRequestIid);
+
+    console.log(`Successfully triggered re-review for MR !${mergeRequestIid} in project ${projectId}`);
+  } catch (error) {
+    console.error(`Error triggering re-review for MR !${mergeRequestIid} in project ${projectId}:`, error);
   }
 }

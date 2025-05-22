@@ -301,6 +301,134 @@ export class GitLabService {
   }
 
   /**
+   * Get commits between two commit SHAs
+   */
+  async getCommitsBetween(projectId: number | string, fromSha: string, toSha: string): Promise<any[]> {
+    try {
+      console.log(`Fetching commits between ${fromSha} and ${toSha} for project ${projectId}`);
+
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/repository/commits`, {
+        params: {
+          since: fromSha,
+          until: toSha,
+          per_page: 100,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching commits between SHAs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get changes for commits between two SHAs
+   */
+  async getChangesBetweenCommits(projectId: number | string, fromSha: string, toSha: string): Promise<MergeRequestChange[]> {
+    try {
+      console.log(`Fetching changes between commits ${fromSha} and ${toSha} for project ${projectId}`);
+
+      // Get the diff between the two commits
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/repository/compare`, {
+        params: {
+          from: fromSha,
+          to: toSha,
+        },
+      });
+
+      const diffs = response.data.diffs || [];
+      const result: MergeRequestChange[] = [];
+
+      for (const diff of diffs) {
+        const oldPath = diff.old_path;
+        const newPath = diff.new_path;
+        const diffContent = diff.diff;
+
+        // Determine the language based on file extension
+        const language = this.getLanguageFromPath(newPath);
+
+        let oldContent = '';
+        let newContent = '';
+
+        if (diff.new_file) {
+          // File was added
+          try {
+            newContent = await this.getFileContent(projectId, newPath, toSha);
+          } catch (error) {
+            console.error(`Error fetching content for new file ${newPath}:`, error);
+          }
+        } else if (diff.deleted_file) {
+          // File was deleted
+          try {
+            oldContent = await this.getFileContent(projectId, oldPath, fromSha);
+          } catch (error) {
+            console.error(`Error fetching content for deleted file ${oldPath}:`, error);
+          }
+        } else {
+          // File was modified
+          try {
+            oldContent = await this.getFileContent(projectId, oldPath, fromSha);
+            newContent = await this.getFileContent(projectId, newPath, toSha);
+          } catch (error) {
+            console.error(`Error fetching content for modified file ${newPath}:`, error);
+          }
+        }
+
+        result.push({
+          oldPath,
+          newPath,
+          oldContent,
+          newContent,
+          diffContent,
+          language,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error fetching changes between commits:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific note/comment by ID
+   */
+  async getNote(projectId: number | string, noteId: number): Promise<any> {
+    try {
+      console.log(`Fetching note ${noteId} for project ${projectId}`);
+
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/notes/${noteId}`);
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching note:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get emoji reactions for a note
+   */
+  async getNoteEmojis(projectId: number | string, noteId: number): Promise<any[]> {
+    try {
+      console.log(`Fetching emoji reactions for note ${noteId} in project ${projectId}`);
+
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/notes/${noteId}/award_emoji`);
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching note emoji reactions:', error);
+      throw error;
+    }
+  }
+
+  getLanguageFromPath(filePath: string): string {
+    return this.detectLanguage(filePath);
+  }
+
+  /**
    * Simple language detection based on file extension
    */
   private detectLanguage(filePath: string): string {

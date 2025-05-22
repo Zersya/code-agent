@@ -13,6 +13,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Automated Code Review**: Reviews merge requests from Repopo using sequential thinking
 - **Merge Request Approval**: Automatically approves merge requests that meet quality standards
 - **Automatic Re-embedding**: Automatically re-embeds projects when merge requests are successfully merged
+- **Emoji-Triggered Re-reviews**: Automatically triggers re-reviews when developers add emoji reactions to bot comments
 
 ## Prerequisites
 
@@ -237,6 +238,91 @@ The system includes built-in rate limiting to prevent overwhelming the embedding
 - Re-embedding only triggers for actual merge completions, not merge attempts
 - Uses the existing queue system's concurrency controls
 - Includes delays between batch processing to respect API limits
+
+## Emoji-Triggered Re-reviews
+
+The system automatically triggers re-reviews when developers add emoji reactions to bot comments containing the phrase "Merge request has already been reviewed". This allows developers to request fresh reviews when they've made changes after the initial review.
+
+### How It Works
+
+1. **Emoji Detection**: The system monitors GitLab webhook events for emoji reactions (👍, 👎, 🔄, or any emoji) added to comments.
+
+2. **Trigger Phrase Matching**: Only comments containing the exact phrase "Merge request has already been reviewed" will trigger re-reviews when reacted to with emojis.
+
+3. **New Commit Analysis**: When triggered, the system:
+   - Compares the current merge request's latest commit SHA with the previously reviewed commit SHA stored in the database
+   - Fetches only the changes introduced in commits since the last review
+   - Analyzes only the incremental changes, not the entire merge request
+
+4. **Incremental Review**: The re-review process:
+   - Uses the same LLM-powered sequential thinking review process
+   - Focuses specifically on new changes since the last review
+   - Posts a new comment indicating this is a re-review of recent changes
+   - Updates the merge request approval status if the new changes meet quality standards
+
+### Benefits
+
+- **Efficient Reviews**: Only analyzes new changes, saving time and computational resources
+- **Developer-Friendly**: Simple emoji reaction triggers re-review without complex commands
+- **Contextual Analysis**: Maintains review history to provide incremental feedback
+- **Automatic Approval**: Can approve merge requests if new changes meet quality standards
+
+### Usage
+
+1. **Initial Review**: The bot reviews a merge request and posts a comment ending with "Merge request has already been reviewed"
+2. **Developer Makes Changes**: Developer pushes new commits to the merge request
+3. **Request Re-review**: Developer adds any emoji reaction (👍, 👎, 🔄, etc.) to the bot's review comment
+4. **Automatic Re-review**: The system automatically:
+   - Detects the emoji reaction
+   - Identifies new commits since the last review
+   - Analyzes only the new changes
+   - Posts an incremental review comment
+   - Updates approval status if appropriate
+
+### Database Schema
+
+The system uses a `merge_request_reviews` table to track review history:
+
+```sql
+CREATE TABLE merge_request_reviews (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL,
+  merge_request_iid INTEGER NOT NULL,
+  last_reviewed_commit_sha TEXT NOT NULL,
+  review_comment_id INTEGER,
+  reviewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(project_id, merge_request_iid)
+);
+```
+
+### Configuration
+
+The re-review feature uses the same configuration as regular reviews:
+- **LLM Provider**: Uses the configured OpenRouter or Ollama provider
+- **Review Settings**: Respects `ENABLE_MR_REVIEW` setting
+- **Project Context**: Uses `ENABLE_PROJECT_CONTEXT` if enabled
+
+### Monitoring
+
+Re-review activities are logged with detailed messages:
+
+```
+Processing emoji event for project 12345, emoji 👍, action: add
+Emoji 👍 added to note with re-review trigger phrase, triggering re-review
+Starting re-review for merge request !42 in project 12345
+Found 3 new changes since last review for MR !42
+Successfully completed re-review for merge request !42 in project 12345
+```
+
+### Error Handling
+
+The system gracefully handles various error scenarios:
+- **Missing Review History**: Falls back to full review if no previous review found
+- **No New Commits**: Skips re-review if no changes since last review
+- **API Failures**: Continues processing with appropriate error logging
+- **Invalid Webhooks**: Ignores non-merge request notes and invalid emoji events
 
 ## LLM Providers
 

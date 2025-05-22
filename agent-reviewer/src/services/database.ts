@@ -190,6 +190,21 @@ class DatabaseService {
         )
       `);
 
+      // Create merge request reviews table for tracking review history
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS merge_request_reviews (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          last_reviewed_commit_sha TEXT NOT NULL,
+          review_comment_id INTEGER,
+          reviewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(project_id, merge_request_iid)
+        )
+      `);
+
       // Create indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_project_id ON embeddings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_commit_id ON embeddings(commit_id)');
@@ -893,6 +908,91 @@ class DatabaseService {
       ]);
     } catch (error) {
       console.error('Error saving project metadata:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save or update merge request review history
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @param lastReviewedCommitSha The SHA of the last reviewed commit
+   * @param reviewCommentId The ID of the review comment (optional)
+   */
+  async saveMergeRequestReview(
+    projectId: number,
+    mergeRequestIid: number,
+    lastReviewedCommitSha: string,
+    reviewCommentId?: number
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO merge_request_reviews (
+          project_id, merge_request_iid, last_reviewed_commit_sha, review_comment_id,
+          reviewed_at, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW())
+        ON CONFLICT (project_id, merge_request_iid)
+        DO UPDATE SET
+          last_reviewed_commit_sha = EXCLUDED.last_reviewed_commit_sha,
+          review_comment_id = EXCLUDED.review_comment_id,
+          reviewed_at = EXCLUDED.reviewed_at,
+          updated_at = EXCLUDED.updated_at
+      `, [projectId, mergeRequestIid, lastReviewedCommitSha, reviewCommentId]);
+
+      console.log(`Saved review history for MR !${mergeRequestIid} in project ${projectId}, last reviewed commit: ${lastReviewedCommitSha}`);
+    } catch (error) {
+      console.error('Error saving merge request review history:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get merge request review history
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @returns The review history or null if not found
+   */
+  async getMergeRequestReview(projectId: number, mergeRequestIid: number): Promise<{
+    id: number;
+    projectId: number;
+    mergeRequestIid: number;
+    lastReviewedCommitSha: string;
+    reviewCommentId: number | null;
+    reviewedAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          project_id as "projectId",
+          merge_request_iid as "mergeRequestIid",
+          last_reviewed_commit_sha as "lastReviewedCommitSha",
+          review_comment_id as "reviewCommentId",
+          reviewed_at as "reviewedAt",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM merge_request_reviews
+        WHERE project_id = $1 AND merge_request_iid = $2
+      `, [projectId, mergeRequestIid]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting merge request review history:', error);
       throw error;
     } finally {
       client.release();
