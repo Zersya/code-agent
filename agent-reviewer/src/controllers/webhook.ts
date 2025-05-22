@@ -98,6 +98,7 @@ async function processPushEvent(event: GitLabPushEvent) {
         defaultBranch: branch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
+        lastReembeddingAt: undefined
       };
     }
 
@@ -201,6 +202,7 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
         defaultBranch: sourceBranch,
         lastProcessedCommit: '',
         lastProcessedAt: new Date(),
+        lastReembeddingAt: undefined
       };
     }
 

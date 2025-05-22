@@ -196,21 +196,64 @@ export class EmbeddingService {
    * @param projectId The ID of the project
    * @param repositoryUrl The URL of the repository
    * @param targetBranch The target branch that was merged into (usually main/master)
+   * @param forceReembedding Whether to force re-embedding regardless of the weekly limit (default: false)
    * @returns True if re-embedding was successfully queued, false otherwise
    */
-  async triggerProjectReEmbedding(projectId: number, repositoryUrl: string, targetBranch: string): Promise<boolean> {
+  async triggerProjectReEmbedding(projectId: number, repositoryUrl: string, targetBranch: string, forceReembedding: boolean = false): Promise<boolean> {
     try {
       console.log(`Triggering re-embedding for project ${projectId} after merge to ${targetBranch}`);
 
+      // Check if we should skip re-embedding due to weekly limit (unless forced)
+      if (!forceReembedding) {
+        const shouldSkip = await this.shouldSkipReembeddingDueToWeeklyLimit(projectId);
+        if (shouldSkip) {
+          console.log(`Skipping re-embedding for project ${projectId} due to weekly limit (last re-embedding was within 7 days)`);
+          return false;
+        }
+      }
+
+      // Update the last re-embedding timestamp before queuing the job
+      const reembeddingTimestamp = new Date();
+      await dbService.updateLastReembeddingTimestamp(projectId, reembeddingTimestamp);
+
       // Queue the project for re-embedding with high priority
       const processingId = uuidv4();
-      await queueService.addJob(projectId, repositoryUrl, processingId, 10); // High priority
+      await queueService.addJob(projectId, repositoryUrl, processingId, 10, true); // High priority, mark as re-embedding
 
       console.log(`Project ${projectId} queued for re-embedding after merge (processingId: ${processingId})`);
 
       return true;
     } catch (error) {
       console.error(`Error triggering re-embedding for project ${projectId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if re-embedding should be skipped due to weekly limit
+   * @param projectId The ID of the project
+   * @returns True if re-embedding should be skipped, false otherwise
+   */
+  private async shouldSkipReembeddingDueToWeeklyLimit(projectId: number): Promise<boolean> {
+    try {
+      const projectMetadata = await dbService.getProjectMetadata(projectId);
+
+      if (!projectMetadata || !projectMetadata.lastReembeddingAt) {
+        // No previous re-embedding recorded, allow re-embedding
+        return false;
+      }
+
+      const now = new Date();
+      const lastReembedding = new Date(projectMetadata.lastReembeddingAt);
+      const daysSinceLastReembedding = (now.getTime() - lastReembedding.getTime()) / (1000 * 60 * 60 * 24);
+
+      console.log(`Project ${projectId}: Last re-embedding was ${daysSinceLastReembedding.toFixed(2)} days ago`);
+
+      // Skip if less than 7 days have passed
+      return daysSinceLastReembedding < 7;
+    } catch (error) {
+      console.error(`Error checking weekly limit for project ${projectId}:`, error);
+      // On error, allow re-embedding to proceed
       return false;
     }
   }

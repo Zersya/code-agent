@@ -70,9 +70,21 @@ export class QueueService {
             started_at TIMESTAMP WITH TIME ZONE,
             completed_at TIMESTAMP WITH TIME ZONE,
             priority INTEGER NOT NULL DEFAULT 5,
-            project_id INTEGER NOT NULL
+            project_id INTEGER NOT NULL,
+            is_reembedding BOOLEAN DEFAULT FALSE
           )
         `);
+
+        // Add the is_reembedding column if it doesn't exist (migration)
+        try {
+          await client.query(`
+            ALTER TABLE embedding_jobs
+            ADD COLUMN IF NOT EXISTS is_reembedding BOOLEAN DEFAULT FALSE
+          `);
+        } catch (error) {
+          // Column might already exist, ignore the error
+          console.log('Column is_reembedding might already exist:', error);
+        }
 
         // Create indexes
         await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
@@ -135,9 +147,9 @@ export class QueueService {
       await client.query(`
         INSERT INTO embedding_jobs (
           id, repository_url, processing_id, status, attempts, max_attempts,
-          error, created_at, updated_at, started_at, completed_at, priority, project_id
+          error, created_at, updated_at, started_at, completed_at, priority, project_id, is_reembedding
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (id)
         DO UPDATE SET
           status = EXCLUDED.status,
@@ -146,7 +158,8 @@ export class QueueService {
           updated_at = EXCLUDED.updated_at,
           started_at = EXCLUDED.started_at,
           completed_at = EXCLUDED.completed_at,
-          project_id = EXCLUDED.project_id
+          project_id = EXCLUDED.project_id,
+          is_reembedding = EXCLUDED.is_reembedding
       `, [
         job.id,
         job.repositoryUrl,
@@ -160,7 +173,8 @@ export class QueueService {
         job.startedAt,
         job.completedAt,
         job.priority,
-        job.projectId
+        job.projectId,
+        job.isReembedding || false
       ]);
     } finally {
       client.release();
@@ -179,7 +193,8 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId",
+          is_reembedding as "isReembedding"
         FROM embedding_jobs
         WHERE processing_id = $1
       `, [processingId]);
@@ -316,7 +331,8 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId",
+          is_reembedding as "isReembedding"
         FROM embedding_jobs
         ORDER BY created_at DESC
         LIMIT $1 OFFSET $2
@@ -340,7 +356,8 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId"
+          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId",
+          is_reembedding as "isReembedding"
         FROM embedding_jobs
         WHERE status = $1 OR (status = $2 AND updated_at < NOW() - INTERVAL '1 minute' * attempts)
         ORDER BY priority DESC, created_at ASC
@@ -425,6 +442,13 @@ export class QueueService {
       job.updatedAt = new Date();
       await this.saveJob(job);
 
+      // If this is a re-embedding job, clear existing data first
+      if (job.isReembedding) {
+        console.log(`Re-embedding job for project ${job.projectId}, clearing existing data first`);
+        const clearResult = await dbService.clearProjectEmbeddingData(job.projectId);
+        console.log(`Cleared existing data for project ${job.projectId}: ${clearResult.deletedEmbeddings} embeddings, ${clearResult.deletedBatches} batches`);
+      }
+
       // Process the repository
       const result = await this.processRepository(job.projectId, job.repositoryUrl, job.processingId);
 
@@ -444,14 +468,6 @@ export class QueueService {
       }
 
       job.updatedAt = new Date();
-
-      if (job.isReembedding) {
-        console.log(`Re-embedding completed for project ${job.projectId}, clearing existing data`);
-        // Clear existing embedding data
-        const clearResult = await dbService.clearProjectEmbeddingData(job.projectId);
-        console.log(`Cleared existing data for project ${job.projectId}: ${clearResult.deletedEmbeddings} embeddings, ${clearResult.deletedBatches} batches`);
-      }
-
       await this.saveJob(job);
     } catch (error) {
       console.error(`Error processing job ${job.id}:`, error);
@@ -510,6 +526,7 @@ export class QueueService {
           defaultBranch: branch,
           lastProcessedCommit: '',
           lastProcessedAt: new Date(),
+          lastReembeddingAt: undefined
         };
 
         await dbService.saveProjectMetadata(projectMetadata);

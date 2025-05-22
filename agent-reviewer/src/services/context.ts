@@ -40,7 +40,7 @@ export class ContextService {
       console.log(`Getting context for project ${projectId}`);
 
       // Convert projectId to number if it's a string or ensure consistent ID generation
-     
+
 
       // Get project metadata
       const projectMetadata = await dbService.getProjectMetadata(projectId);
@@ -64,7 +64,8 @@ export class ContextService {
           url: project.web_url,
           defaultBranch: project.default_branch,
           lastProcessedCommit: '',
-          lastProcessedAt: new Date()
+          lastProcessedAt: new Date(),
+          lastReembeddingAt: undefined
         };
 
         // Save project metadata
@@ -265,7 +266,7 @@ export class ContextService {
    */
   private async isEmbeddingInProgress(projectId: number): Promise<boolean> {
     try {
-    
+
       // Get project metadata to get the URL
       const projectMetadata = await dbService.getProjectMetadata(projectId);
 

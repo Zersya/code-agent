@@ -145,7 +145,8 @@ CREATE TABLE projects (
   url TEXT,
   default_branch TEXT,
   last_processed_commit TEXT,
-  last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  last_processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_reembedding_at TIMESTAMP WITH TIME ZONE
 )
 ```
 
@@ -232,10 +233,33 @@ Cleared existing data for project 12345: 150 embeddings, 5 batches
 Project 12345 queued for re-embedding after merge (processingId: uuid-here)
 ```
 
+### Weekly Re-embedding Schedule
+
+To prevent excessive re-embedding operations while ensuring the knowledge base stays current, the system implements a weekly schedule check:
+
+**How It Works:**
+- Each project tracks its last re-embedding timestamp in the `last_reembedding_at` field
+- Before triggering automatic re-embedding on merge completion, the system checks if the last re-embedding occurred within the past 7 days
+- If less than 7 days have passed, the re-embedding is skipped with appropriate logging
+- Manual re-embedding requests can bypass this limit by setting the `forceReembedding` parameter to `true`
+
+**Benefits:**
+- **Resource Optimization**: Prevents unnecessary re-embedding operations for frequently merged projects
+- **Cost Control**: Reduces API calls to the embedding service
+- **Performance**: Maintains system responsiveness by avoiding queue overload
+- **Flexibility**: Allows manual override when immediate re-embedding is needed
+
+**Monitoring:**
+```
+Skipping re-embedding for project 12345 due to weekly limit (last re-embedding was within 7 days)
+Project 12345: Last re-embedding was 3.2 days ago
+```
+
 ### Rate Limiting
 
 The system includes built-in rate limiting to prevent overwhelming the embedding API:
 - Re-embedding only triggers for actual merge completions, not merge attempts
+- Weekly schedule check prevents excessive re-embedding operations
 - Uses the existing queue system's concurrency controls
 - Includes delays between batch processing to respect API limits
 
