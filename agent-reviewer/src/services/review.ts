@@ -283,17 +283,30 @@ ${codeChanges}
     notionContext.contexts.forEach((context, index) => {
       formatted += `**Tugas ${index + 1}: ${context.title}**\n`;
 
+      // User Story section
       if (context.description) {
-        formatted += `Deskripsi: ${context.description.substring(0, 300)}${context.description.length > 300 ? '...' : ''}\n`;
+        const lines = context.description.split('\n');
+        const userStoryLines = lines.filter(line =>
+          line.trim() &&
+          !line.toLowerCase().includes('acceptance criteria') &&
+          !line.toLowerCase().includes('screenshots') &&
+          !line.toLowerCase().includes('to-do list')
+        );
+
+        if (userStoryLines.length > 0) {
+          formatted += `User Story: ${userStoryLines.join(' ').substring(0, 300)}${userStoryLines.join(' ').length > 300 ? '...' : ''}\n`;
+        }
       }
 
+      // To-do List (Requirements)
       if (context.requirements.length > 0) {
-        formatted += `Requirements:\n`;
+        formatted += `To-do List:\n`;
         context.requirements.forEach(req => {
           formatted += `- ${req}\n`;
         });
       }
 
+      // Acceptance Criteria
       if (context.acceptanceCriteria.length > 0) {
         formatted += `Acceptance Criteria:\n`;
         context.acceptanceCriteria.forEach(criteria => {
@@ -301,11 +314,12 @@ ${codeChanges}
         });
       }
 
+      // Technical Specifications
       if (context.technicalSpecs) {
         formatted += `Technical Specifications: ${context.technicalSpecs.substring(0, 200)}${context.technicalSpecs.length > 200 ? '...' : ''}\n`;
       }
 
-      formatted += `URL: ${context.url}\n\n`;
+      formatted += `Notion URL: ${context.url}\n\n`;
     });
 
     if (notionContext.errors.length > 0) {

@@ -336,25 +336,93 @@ export class NotionService {
     const allContent = pageContent.blocks.map(block => block.content).join('\n');
     description = allContent.substring(0, 1000); // Limit description length
 
-    // Parse content for specific sections
-    for (const block of pageContent.blocks) {
-      const content = block.content.toLowerCase();
-      const originalContent = block.content;
+    // Parse content for specific sections based on Notion structure
+    let currentSection = '';
+    let userStoryContent = '';
 
-      // Look for requirements
-      if (content.includes('requirement') || content.includes('must') || content.includes('should')) {
-        requirements.push(originalContent);
+    for (let i = 0; i < pageContent.blocks.length; i++) {
+      const block = pageContent.blocks[i];
+      const content = block.content.trim();
+      const contentLower = content.toLowerCase();
+
+      // Identify section headers
+      if (contentLower.startsWith('# user story') || contentLower === 'user story') {
+        currentSection = 'user_story';
+        continue;
+      } else if (contentLower.startsWith('# acceptance criteria') || contentLower === 'acceptance criteria') {
+        currentSection = 'acceptance_criteria';
+        continue;
+      } else if (contentLower.startsWith('# to-do list') || contentLower === 'to-do list') {
+        currentSection = 'todo';
+        continue;
+      } else if (contentLower.startsWith('# screenshots') || contentLower === 'screenshots') {
+        currentSection = 'screenshots';
+        continue;
+      } else if (contentLower.startsWith('#')) {
+        // Any other heading resets the section
+        currentSection = 'other';
+        continue;
       }
 
-      // Look for acceptance criteria
-      if (content.includes('acceptance') || content.includes('criteria') || content.includes('done when')) {
-        acceptanceCriteria.push(originalContent);
-      }
+      // Skip empty content
+      if (!content) continue;
 
-      // Look for technical specifications
-      if (content.includes('technical') || content.includes('implementation') || content.includes('architecture')) {
-        technicalSpecs += originalContent + '\n';
+      // Process content based on current section
+      switch (currentSection) {
+        case 'user_story':
+          if (content.startsWith('-') || content.includes('task') || content.includes('feature')) {
+            userStoryContent += content + '\n';
+          }
+          break;
+
+        case 'acceptance_criteria':
+          // Handle checkbox-style acceptance criteria (including nested items)
+          if (content.startsWith('- [') || content.startsWith('- [ ]') || content.startsWith('- [x]')) {
+            // Clean up the checkbox format and extract the criteria text
+            const criteriaText = content.replace(/^- \[[x\s]\]\s*/, '').trim();
+            if (criteriaText) {
+              acceptanceCriteria.push(criteriaText);
+            }
+          } else if (content.match(/^\s+- \[/)) {
+            // Handle nested checkbox items (indented)
+            const nestedCriteriaText = content.replace(/^\s+- \[[x\s]\]\s*/, '').trim();
+            if (nestedCriteriaText) {
+              acceptanceCriteria.push(`  ${nestedCriteriaText}`); // Keep indentation for nested items
+            }
+          } else if (content.startsWith('-') && !content.startsWith('- [')) {
+            // Handle regular bullet points in acceptance criteria
+            const criteriaText = content.replace(/^-\s*/, '').trim();
+            if (criteriaText) {
+              acceptanceCriteria.push(criteriaText);
+            }
+          } else if (content.includes('criteria') || content.includes('must') || content.includes('should')) {
+            acceptanceCriteria.push(content);
+          }
+          break;
+
+        case 'todo':
+          // Handle to-do items as requirements
+          if (content.startsWith('- [') || content.startsWith('-')) {
+            const todoText = content.replace(/^- \[[x\s]\]\s*/, '').replace(/^-\s*/, '').trim();
+            if (todoText) {
+              requirements.push(todoText);
+            }
+          }
+          break;
+
+        case 'other':
+          // Look for technical specifications in other sections
+          if (contentLower.includes('technical') || contentLower.includes('implementation') ||
+              contentLower.includes('architecture') || contentLower.includes('specification')) {
+            technicalSpecs += content + '\n';
+          }
+          break;
       }
+    }
+
+    // Use user story content as part of description if available
+    if (userStoryContent.trim()) {
+      description = userStoryContent.trim() + '\n\n' + description;
     }
 
     return {
