@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch } from '../models/embedding.js';
+import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
 
 dotenv.config();
 
@@ -217,10 +218,30 @@ class DatabaseService {
         )
       `);
 
+      // Create webhook processing table for duplicate prevention
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS webhook_processing (
+          id TEXT PRIMARY KEY,
+          webhook_key TEXT NOT NULL UNIQUE,
+          event_type TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          completed_at TIMESTAMP WITH TIME ZONE,
+          error TEXT,
+          server_id TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
       // Create indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_project_id ON embeddings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_commit_id ON embeddings(commit_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_batches_project_id_commit_id ON batches(project_id, commit_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_webhook_key ON webhook_processing(webhook_key)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_status ON webhook_processing(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_started_at ON webhook_processing(started_at)');
 
       console.log('Database schema initialized');
     } catch (error) {
@@ -1033,6 +1054,181 @@ class DatabaseService {
       return result.rows[0];
     } catch (error) {
       console.error('Error getting merge request review history:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Create a new webhook processing record
+   * @param record The webhook processing record to create
+   */
+  async createWebhookProcessing(record: WebhookProcessingRecord): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO webhook_processing (
+          id, webhook_key, event_type, project_id, status,
+          started_at, completed_at, error, server_id, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `, [
+        record.id,
+        record.webhookKey,
+        record.eventType,
+        record.projectId,
+        record.status,
+        record.startedAt,
+        record.completedAt,
+        record.error,
+        record.serverId,
+        record.createdAt,
+        record.updatedAt
+      ]);
+    } catch (error) {
+      console.error('Error creating webhook processing record:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get active webhook processing record by webhook key
+   * @param webhookKey The webhook key to search for
+   * @returns The active processing record or null if not found
+   */
+  async getActiveWebhookProcessing(webhookKey: string): Promise<WebhookProcessingRecord | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          webhook_key as "webhookKey",
+          event_type as "eventType",
+          project_id as "projectId",
+          status,
+          started_at as "startedAt",
+          completed_at as "completedAt",
+          error,
+          server_id as "serverId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM webhook_processing
+        WHERE webhook_key = $1 AND status = $2
+      `, [webhookKey, WebhookProcessingStatus.PROCESSING]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0] as WebhookProcessingRecord;
+    } catch (error) {
+      console.error('Error getting active webhook processing:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update webhook processing status
+   * @param processingId The processing ID to update
+   * @param status The new status
+   * @param completedAt The completion timestamp (optional)
+   * @param error The error message (optional)
+   */
+  async updateWebhookProcessingStatus(
+    processingId: string,
+    status: WebhookProcessingStatus,
+    completedAt?: Date,
+    error?: string
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE webhook_processing
+        SET status = $2, completed_at = $3, error = $4, updated_at = NOW()
+        WHERE id = $1
+      `, [processingId, status, completedAt, error]);
+    } catch (dbError) {
+      console.error('Error updating webhook processing status:', dbError);
+      throw dbError;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Clean up stale webhook processing records
+   * @param cutoffTime Records started before this time will be cleaned up
+   * @returns Number of records cleaned up
+   */
+  async cleanupStaleWebhookProcessing(cutoffTime: Date): Promise<number> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        DELETE FROM webhook_processing
+        WHERE status = $1 AND started_at < $2
+      `, [WebhookProcessingStatus.PROCESSING, cutoffTime]);
+
+      return result.rowCount || 0;
+    } catch (error) {
+      console.error('Error cleaning up stale webhook processing:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get webhook processing statistics
+   * @returns Statistics about webhook processing
+   */
+  async getWebhookProcessingStats(): Promise<{
+    active: number;
+    completed: number;
+    failed: number;
+  }> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          status,
+          COUNT(*) as count
+        FROM webhook_processing
+        GROUP BY status
+      `);
+
+      const stats = {
+        active: 0,
+        completed: 0,
+        failed: 0
+      };
+
+      result.rows.forEach(row => {
+        switch (row.status) {
+          case WebhookProcessingStatus.PROCESSING:
+            stats.active = parseInt(row.count);
+            break;
+          case WebhookProcessingStatus.COMPLETED:
+            stats.completed = parseInt(row.count);
+            break;
+          case WebhookProcessingStatus.FAILED:
+            stats.failed = parseInt(row.count);
+            break;
+        }
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting webhook processing stats:', error);
       throw error;
     } finally {
       client.release();

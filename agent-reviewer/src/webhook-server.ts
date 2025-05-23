@@ -8,6 +8,7 @@ import { processWebhook } from './controllers/webhook.js';
 import { processRepository, getRepositoryStatus, getQueueStatus } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
 import { dbService } from './services/database.js';
+import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 
 dotenv.config();
 
@@ -20,7 +21,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
@@ -36,6 +37,17 @@ app.get('/api/queue/status', apiAuth, getQueueStatus);
 // Code search API
 app.post('/api/search', apiAuth, searchCode);
 app.get('/api/projects', apiAuth, listProjects);
+
+// Webhook processing statistics API
+app.get('/api/webhook/stats', apiAuth, async (_req, res) => {
+  try {
+    const stats = await webhookDeduplicationService.getProcessingStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting webhook stats:', error);
+    res.status(500).json({ error: 'Failed to get webhook statistics' });
+  }
+});
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -67,12 +79,14 @@ async function startServer() {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('Shutting down server...');
+  webhookDeduplicationService.stopPeriodicCleanup();
   await dbService.disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('Shutting down server...');
+  webhookDeduplicationService.stopPeriodicCleanup();
   await dbService.disconnect();
   process.exit(0);
 });
