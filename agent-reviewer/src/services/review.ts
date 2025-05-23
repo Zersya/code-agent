@@ -2,6 +2,8 @@ import { MergeRequestChange, MergeRequestComment, /* MergeRequestReview, */ Merg
 import { gitlabService } from './gitlab.js';
 import { contextService, ProjectContext } from './context.js';
 import { dbService } from './database.js';
+import { notionService } from './notion.js';
+import { CombinedNotionContext } from '../types/notion.js';
 
 import dotenv from 'dotenv';
 import axios from 'axios';
@@ -61,24 +63,27 @@ export class ReviewService {
    * @param mergeRequestTitle The title of the merge request
    * @param mergeRequestDescription The description of the merge request
    * @param projectContext Optional project context to enhance the review
+   * @param notionContext Optional Notion task context to enhance the review
    * @returns The review result
    */
   private async reviewCodeWithLLM(
     codeChanges: string,
     mergeRequestTitle: string,
     mergeRequestDescription: string,
-    projectContext?: ProjectContext
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     try {
       // Generate the system prompt
       const systemPrompt = this.generateSystemPrompt();
 
-      // Generate the user prompt with code changes and project context
+      // Generate the user prompt with code changes, project context, and Notion context
       const userPrompt = this.generateUserPrompt(
         codeChanges,
         mergeRequestTitle,
         mergeRequestDescription,
-        projectContext
+        projectContext,
+        notionContext
       );
 
       // Initialize the conversation
@@ -156,6 +161,12 @@ Aspek yang dipertimbangkan:
         * Gunakan informasi konteks proyek (struktur, arsitektur, pola, konvensi yang ada) untuk memahami kode secara lebih komprehensif. **Ini krusial untuk menilai keselarasan**.
         * Evaluasi apakah perubahan konsisten dengan kode yang ada.
         * Deteksi potensi konflik atau masalah integrasi.
+    * Konteks Tugas dari Notion (Jika Disediakan):
+        * **PRIORITAS UTAMA**: Verifikasi bahwa perubahan kode selaras dengan requirement, acceptance criteria, dan spesifikasi teknis yang ditetapkan dalam tugas Notion.
+        * Periksa apakah implementasi memenuhi semua requirement yang disebutkan.
+        * Pastikan acceptance criteria terpenuhi atau akan terpenuhi dengan perubahan ini.
+        * Identifikasi jika ada requirement yang terlewat atau tidak diimplementasikan.
+        * Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan.
     * Hal yang Diabaikan:
         * Abaikan hasil dari SonarQube.
         * Perlu diingat bahwa proyek ini tidak menggunakan unit test atau integration test saat ini, jadi fokus pada kualitas kode intrinsik.
@@ -180,6 +191,12 @@ Format Hasil Review:
 
 **Konsistensi & Arsitektur (Tinjauan Ringkas merujuk struktur proyek saat ini & standar Nuxt):**
 * [Berikan ringkasan atau 1-2 poin paling menonjol terkait keselarasan. Contoh: "Kode baru ini umumnya selaras dengan struktur proyek, namun ada satu komponen yang mungkin lebih cocok ditempatkan di direktori 'shared' (detail di saran). Ketaatan pada standar Nuxt sudah baik."]
+
+**Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
+* [Verifikasi apakah implementasi memenuhi requirement yang ditetapkan dalam tugas Notion]
+* [Periksa apakah acceptance criteria terpenuhi atau akan terpenuhi]
+* [Identifikasi requirement yang mungkin terlewat atau belum diimplementasikan]
+* [Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan]
 
 **Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
 * [Poin analisis detail 1: Misal, "Iterasi di dalam iterasi pada fungsi 'calculateTotals' (baris X) memiliki kompleksitas O(n^2) dan akan menyebabkan masalah performa signifikan pada dataset lebih dari 1000 item. Pertimbangkan untuk menggunakan Map untuk lookup agar menjadi O(n)."]
@@ -206,15 +223,22 @@ Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjut
   }
 
   /**
-   * Generate the user prompt with code changes and project context
+   * Generate the user prompt with code changes, project context, and Notion context
    */
   private generateUserPrompt(
     codeChanges: string,
     mergeRequestTitle: string,
     mergeRequestDescription: string,
-    projectContext?: ProjectContext
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
   ): string {
     let prompt = `Tolong review perubahan kode berikut dari merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".`;
+
+    // Add Notion task context if available
+    if (notionContext && notionContext.contexts.length > 0) {
+      prompt += `\n\n**KONTEKS TUGAS DARI NOTION:**
+${this.formatNotionContext(notionContext)}`;
+    }
 
     // Add project context if available
     if (projectContext && projectContext.relevantFiles.length > 0) {
@@ -228,12 +252,67 @@ ${projectContext.contextSummary}`;
 ${codeChanges}
 \`\`\``;
 
-    // If we have project context, add a reminder to use it
+    // Add reminders to use available contexts
+    const contextReminders = [];
+
+    if (notionContext && notionContext.contexts.length > 0) {
+      contextReminders.push('konteks tugas dari Notion untuk memverifikasi bahwa perubahan kode selaras dengan requirement dan acceptance criteria yang ditetapkan');
+    }
+
     if (projectContext && projectContext.relevantFiles.length > 0) {
-      prompt += `\n\nGunakan konteks proyek yang diberikan untuk memahami kode lebih baik dan memberikan review yang lebih relevan dan mendalam.`;
+      contextReminders.push('konteks proyek untuk memahami struktur dan arsitektur kode yang ada');
+    }
+
+    if (contextReminders.length > 0) {
+      prompt += `\n\nPenting: Gunakan ${contextReminders.join(' dan ')} untuk memberikan review yang lebih relevan, mendalam, dan selaras dengan tujuan bisnis.`;
     }
 
     return prompt;
+  }
+
+  /**
+   * Format Notion context for inclusion in the user prompt
+   */
+  private formatNotionContext(notionContext: CombinedNotionContext): string {
+    if (!notionContext || notionContext.contexts.length === 0) {
+      return 'Tidak ada konteks tugas yang tersedia.';
+    }
+
+    let formatted = `${notionContext.summary}\n\n`;
+
+    notionContext.contexts.forEach((context, index) => {
+      formatted += `**Tugas ${index + 1}: ${context.title}**\n`;
+
+      if (context.description) {
+        formatted += `Deskripsi: ${context.description.substring(0, 300)}${context.description.length > 300 ? '...' : ''}\n`;
+      }
+
+      if (context.requirements.length > 0) {
+        formatted += `Requirements:\n`;
+        context.requirements.forEach(req => {
+          formatted += `- ${req}\n`;
+        });
+      }
+
+      if (context.acceptanceCriteria.length > 0) {
+        formatted += `Acceptance Criteria:\n`;
+        context.acceptanceCriteria.forEach(criteria => {
+          formatted += `- ${criteria}\n`;
+        });
+      }
+
+      if (context.technicalSpecs) {
+        formatted += `Technical Specifications: ${context.technicalSpecs.substring(0, 200)}${context.technicalSpecs.length > 200 ? '...' : ''}\n`;
+      }
+
+      formatted += `URL: ${context.url}\n\n`;
+    });
+
+    if (notionContext.errors.length > 0) {
+      formatted += `**Catatan:** Beberapa tugas tidak dapat diakses (${notionContext.errors.length} error).\n`;
+    }
+
+    return formatted;
   }
 
   /**
@@ -332,12 +411,32 @@ ${codeChanges}
         }
       }
 
+      // Get Notion task context if enabled
+      let notionContext = undefined;
+      if (notionService.isEnabled()) {
+        try {
+          console.log(`Getting Notion task context for merge request !${mergeRequestIid}`);
+          const extractionResult = notionService.extractNotionUrls(mergeRequest.description || '');
+
+          if (extractionResult.urls.length > 0) {
+            console.log(`Found ${extractionResult.urls.length} Notion URLs in merge request description`);
+            notionContext = await notionService.fetchMultipleTaskContexts(extractionResult.urls);
+            console.log(`Retrieved Notion context: ${notionContext.summary}`);
+          } else {
+            console.log('No Notion URLs found in merge request description');
+          }
+        } catch (notionError) {
+          console.warn(`Error getting Notion task context, continuing without it:`, notionError);
+        }
+      }
+
       // Perform the review using direct LLM call
       const { /* thoughts, */ reviewResult } = await this.reviewCodeWithLLM(
         formattedChanges,
         mergeRequest.title,
         mergeRequest.description || '',
-        projectContext
+        projectContext,
+        notionContext
       );
 
       console.log('Review result:', reviewResult);
@@ -545,12 +644,32 @@ ${codeChanges}
         }
       }
 
+      // Get Notion task context if enabled (for re-review)
+      let notionContext = undefined;
+      if (notionService.isEnabled()) {
+        try {
+          console.log(`Getting Notion task context for re-review of merge request !${mergeRequestIid}`);
+          const extractionResult = notionService.extractNotionUrls(mergeRequest.description || '');
+
+          if (extractionResult.urls.length > 0) {
+            console.log(`Found ${extractionResult.urls.length} Notion URLs for re-review`);
+            notionContext = await notionService.fetchMultipleTaskContexts(extractionResult.urls);
+            console.log(`Retrieved Notion context for re-review: ${notionContext.summary}`);
+          } else {
+            console.log('No Notion URLs found for re-review');
+          }
+        } catch (notionError) {
+          console.warn(`Error getting Notion task context for re-review, continuing without it:`, notionError);
+        }
+      }
+
       // Perform the re-review using direct LLM call
       const { reviewResult } = await this.reviewCodeWithLLM(
         formattedChanges,
         mergeRequest.title,
         mergeRequest.description || '',
-        projectContext
+        projectContext,
+        notionContext
       );
 
       // Determine if the merge request should be approved based on new changes
