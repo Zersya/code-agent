@@ -103,7 +103,7 @@ Following the specifications in the Notion page above.
 /**
  * Test Notion context formatting
  */
-function testNotionContextFormatting() {
+async function testNotionContextFormatting() {
   console.log('\nTesting Notion context formatting...');
 
   const mockNotionContext = {
