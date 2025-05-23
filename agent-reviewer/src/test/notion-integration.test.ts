@@ -70,6 +70,17 @@ Notion page: https://www.notion.so/abc123def456789012345678901234567890
 Following the specifications in the Notion page above.
       `,
       expectedUrls: 1
+    },
+    {
+      name: 'Long page ID format (real example)',
+      description: `
+## Task
+Stock Card FE Improvement: https://www.notion.so/transtrack/Stock-Card-FE-Improvement-Stock-Control-Per-Warehouse-1edccba5c5ad80b6b6e6ff914bcbbb2a
+
+## Implementation details
+Following the acceptance criteria in the Notion page.
+      `,
+      expectedUrls: 1
     }
   ];
 
@@ -78,13 +89,13 @@ Following the specifications in the Notion page above.
 
   testCases.forEach((testCase, index) => {
     console.log(`\nTest ${index + 1}: ${testCase.name}`);
-    
+
     try {
       const result = notionService.extractNotionUrls(testCase.description);
-      
+
       console.log(`  Found ${result.urls.length} URLs: ${result.urls.join(', ')}`);
       console.log(`  Extracted from: ${result.extractedFromSection || 'entire description'}`);
-      
+
       if (result.urls.length === testCase.expectedUrls) {
         console.log(`  ✅ PASS - Expected ${testCase.expectedUrls}, got ${result.urls.length}`);
         passedTests++;
@@ -138,16 +149,16 @@ async function testNotionContextFormatting() {
     // Access the private method through type assertion for testing
     const reviewService = (await import('../services/review.js')).reviewService;
     const formatted = (reviewService as any).formatNotionContext(mockNotionContext);
-    
+
     console.log('Formatted Notion context:');
     console.log(formatted);
-    
+
     // Check if formatting includes key elements
     const hasTitle = formatted.includes('User Authentication Feature');
     const hasRequirements = formatted.includes('Requirements:');
     const hasCriteria = formatted.includes('Acceptance Criteria:');
     const hasUrl = formatted.includes('https://www.notion.so/transtrack/User-Auth-abc123');
-    
+
     if (hasTitle && hasRequirements && hasCriteria && hasUrl) {
       console.log('✅ PASS - Formatting includes all expected elements');
       return true;
@@ -166,12 +177,12 @@ async function testNotionContextFormatting() {
  */
 async function runTests() {
   console.log('🧪 Running Notion Integration Tests\n');
-  
+
   const urlExtractionPassed = testNotionUrlExtraction();
   const contextFormattingPassed = await testNotionContextFormatting();
-  
+
   const allTestsPassed = urlExtractionPassed && contextFormattingPassed;
-  
+
   console.log('\n' + '='.repeat(50));
   if (allTestsPassed) {
     console.log('🎉 All tests passed! Notion integration is working correctly.');
@@ -179,7 +190,7 @@ async function runTests() {
     console.log('❌ Some tests failed. Please check the implementation.');
   }
   console.log('='.repeat(50));
-  
+
   return allTestsPassed;
 }
 

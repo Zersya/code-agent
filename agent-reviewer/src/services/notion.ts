@@ -1,12 +1,12 @@
 import { Client } from '@notionhq/client';
-import { 
-  NotionTaskContext, 
-  NotionPageContent, 
-  NotionConfiguration, 
-  NotionUrlExtractionResult, 
-  NotionApiError, 
+import {
+  NotionTaskContext,
+  NotionPageContent,
+  NotionConfiguration,
+  NotionUrlExtractionResult,
+  NotionApiError,
   CombinedNotionContext,
-  NotionBlock 
+  NotionBlock
 } from '../types/notion.js';
 import dotenv from 'dotenv';
 
@@ -51,14 +51,18 @@ export class NotionService {
 
     // Regex patterns for various Notion URL formats
     const notionUrlPatterns = [
-      // Standard Notion URLs
+      // Standard Notion URLs with workspace and page title
+      /https?:\/\/www\.notion\.so\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+[a-f0-9]{32,}/g,
+      /https?:\/\/notion\.so\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+[a-f0-9]{32,}/g,
+      // Standard Notion URLs (shorter format)
       /https?:\/\/www\.notion\.so\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+/g,
       /https?:\/\/notion\.so\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+/g,
       // Custom domain Notion URLs
+      /https?:\/\/[a-zA-Z0-9-]+\.notion\.site\/[a-zA-Z0-9-]+[a-f0-9]{32,}/g,
       /https?:\/\/[a-zA-Z0-9-]+\.notion\.site\/[a-zA-Z0-9-]+/g,
       // Direct page URLs with page IDs
-      /https?:\/\/www\.notion\.so\/[a-f0-9]{32}/g,
-      /https?:\/\/notion\.so\/[a-f0-9]{32}/g,
+      /https?:\/\/www\.notion\.so\/[a-f0-9]{32,}/g,
+      /https?:\/\/notion\.so\/[a-f0-9]{32,}/g,
     ];
 
     const urls: string[] = [];
@@ -69,7 +73,7 @@ export class NotionService {
     if (relatedLinksMatch) {
       extractedFromSection = 'Related Links';
       const relatedLinksSection = relatedLinksMatch[1];
-      
+
       for (const pattern of notionUrlPatterns) {
         const matches = relatedLinksSection.match(pattern);
         if (matches) {
@@ -121,7 +125,7 @@ export class NotionService {
 
       // Fetch page content
       const pageContent = await this.fetchPageContent(pageId);
-      
+
       // Parse the content to extract task context
       const taskContext = this.parseNotionPage(pageContent, notionUrl);
 
@@ -130,7 +134,7 @@ export class NotionService {
 
     } catch (error) {
       console.error(`Error fetching Notion task context from ${notionUrl}:`, error);
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         pageId: '',
@@ -211,25 +215,40 @@ export class NotionService {
   private extractPageIdFromUrl(url: string): string | null {
     // Remove query parameters and fragments
     const cleanUrl = url.split('?')[0].split('#')[0];
-    
+
+    console.log(`Extracting page ID from URL: ${cleanUrl}`);
+
     // Extract page ID from various URL formats
     const patterns = [
+      // Long format with title: https://www.notion.so/workspace/page-title-longpageid
+      /\/([a-f0-9]{32,})$/,
       // Standard format: https://www.notion.so/workspace/page-title-32charId
       /\/([a-f0-9]{32})$/,
       // Direct page ID: https://www.notion.so/32charId
-      /notion\.so\/([a-f0-9]{32})/,
+      /notion\.so\/([a-f0-9]{32,})/,
       // With dashes: https://www.notion.so/workspace/page-title-8char-4char-4char-4char-12char
       /([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/,
+      // Any hex string at the end (32+ characters)
+      /([a-f0-9]{32,})$/,
     ];
 
     for (const pattern of patterns) {
       const match = cleanUrl.match(pattern);
       if (match) {
-        // Remove dashes if present to get clean 32-character ID
-        return match[1].replace(/-/g, '');
+        const pageId = match[1].replace(/-/g, '');
+        console.log(`Extracted page ID: ${pageId}`);
+
+        // Ensure we have at least 32 characters for a valid Notion page ID
+        if (pageId.length >= 32) {
+          // Take the last 32 characters if longer
+          const finalPageId = pageId.length > 32 ? pageId.slice(-32) : pageId;
+          console.log(`Final page ID: ${finalPageId}`);
+          return finalPageId;
+        }
       }
     }
 
+    console.log('No valid page ID found in URL');
     return null;
   }
 
@@ -244,7 +263,7 @@ export class NotionService {
     try {
       // Fetch page properties
       const page = await this.client.pages.retrieve({ page_id: pageId });
-      
+
       // Fetch page blocks (content)
       const blocks = await this.client.blocks.children.list({
         block_id: pageId,
@@ -257,7 +276,7 @@ export class NotionService {
         const titleProperty = Object.values(page.properties).find(
           (prop: any) => prop.type === 'title'
         ) as any;
-        
+
         if (titleProperty && titleProperty.title && titleProperty.title.length > 0) {
           title = titleProperty.title[0].plain_text || 'Untitled';
         }
@@ -284,11 +303,11 @@ export class NotionService {
   private parseBlocks(blocks: any[]): NotionBlock[] {
     return blocks.map(block => {
       let content = '';
-      
+
       // Extract text content based on block type
       if (block.type && block[block.type]) {
         const blockData = block[block.type];
-        
+
         if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
           content = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
         } else if (blockData.text && Array.isArray(blockData.text)) {
