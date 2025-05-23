@@ -216,7 +216,7 @@ export class NotionService {
     // Remove query parameters and fragments
     const cleanUrl = url.split('?')[0].split('#')[0];
 
-    console.log(`Extracting page ID from URL: ${cleanUrl}`);
+    // console.log(`Extracting page ID from URL: ${cleanUrl}`);
 
     // Extract page ID from various URL formats
     const patterns = [
@@ -236,19 +236,19 @@ export class NotionService {
       const match = cleanUrl.match(pattern);
       if (match) {
         const pageId = match[1].replace(/-/g, '');
-        console.log(`Extracted page ID: ${pageId}`);
+        // console.log(`Extracted page ID: ${pageId}`);
 
         // Ensure we have at least 32 characters for a valid Notion page ID
         if (pageId.length >= 32) {
           // Take the last 32 characters if longer
           const finalPageId = pageId.length > 32 ? pageId.slice(-32) : pageId;
-          console.log(`Final page ID: ${finalPageId}`);
+          // console.log(`Final page ID: ${finalPageId}`);
           return finalPageId;
         }
       }
     }
 
-    console.log('No valid page ID found in URL');
+    // console.log('No valid page ID found in URL');
     return null;
   }
 
@@ -304,23 +304,72 @@ export class NotionService {
     return blocks.map(block => {
       let content = '';
 
+      // console.log(`Processing block type: ${block.type}, block data:`, JSON.stringify(block, null, 2));
+
       // Extract text content based on block type
       if (block.type && block[block.type]) {
         const blockData = block[block.type];
 
-        if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
-          content = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
-        } else if (blockData.text && Array.isArray(blockData.text)) {
-          content = blockData.text.map((text: any) => text.plain_text || '').join('');
+        // Handle specific block types with special formatting
+        switch (block.type) {
+          case 'heading_1':
+          case 'heading_2':
+          case 'heading_3':
+            // For headings, add the # prefix to make it clear it's a heading
+            if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
+              const headingText = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
+              const prefix = '#'.repeat(parseInt(block.type.split('_')[1]));
+              content = `${prefix} ${headingText}`;
+            }
+            break;
+          case 'to_do':
+            // For to-do items, include checkbox status
+            if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
+              const todoText = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
+              const checked = blockData.checked ? '[x]' : '[ ]';
+              content = `- ${checked} ${todoText}`;
+            }
+            break;
+          case 'bulleted_list_item':
+            if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
+              const bulletText = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
+              content = `- ${bulletText}`;
+            }
+            break;
+          case 'numbered_list_item':
+            if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
+              const numberedText = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
+              content = `1. ${numberedText}`;
+            }
+            break;
+          default:
+            // Handle generic rich_text property (most common)
+            if (blockData.rich_text && Array.isArray(blockData.rich_text)) {
+              content = blockData.rich_text.map((text: any) => text.plain_text || '').join('');
+            }
+            // Handle text property (legacy)
+            else if (blockData.text && Array.isArray(blockData.text)) {
+              content = blockData.text.map((text: any) => text.plain_text || '').join('');
+            }
+            // Handle title property (for some block types)
+            else if (blockData.title && Array.isArray(blockData.title)) {
+              content = blockData.title.map((text: any) => text.plain_text || '').join('');
+            }
+            break;
         }
       }
+
+      // console.log(`Extracted content for ${block.type}: "${content}"`);
 
       return {
         id: block.id,
         type: block.type || 'unknown',
         content: content.trim(),
       };
-    }).filter(block => block.content.length > 0);
+    }).filter(block => {
+      // Keep blocks with content or important structural blocks
+      return block.content.length > 0 || ['heading_1', 'heading_2', 'heading_3'].includes(block.type);
+    });
   }
 
   /**
