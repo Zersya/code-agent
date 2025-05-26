@@ -9,7 +9,10 @@
     "start": "node dist/index.js",
     "start:webhook": "node dist/webhook-server.js",
     "dev": "bun --watch src/index.ts",
-    "dev:webhook": "bun --watch src/webhook-server.ts"
+    "dev:webhook": "bun --watch src/webhook-server.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "@notionhq/client": "^2.3.0",
