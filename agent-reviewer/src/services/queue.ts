@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { EmbeddingJob, JobStatus, JobResult, QueueConfig } from '../models/queue.js';
+import { EmbeddingJob, DocumentationJob, JobStatus, JobResult, QueueConfig } from '../models/queue.js';
 import { dbService } from './database.js';
 import { repositoryService } from './repository.js';
 import { embeddingService } from './embedding.js';
@@ -28,12 +28,14 @@ const DEFAULT_QUEUE_CONFIG: QueueConfig = {
  */
 export class QueueService {
   private activeJobs: Map<string, EmbeddingJob>;
+  private activeDocumentationJobs: Map<string, DocumentationJob>;
   private isProcessing: boolean;
   private config: QueueConfig;
   private processingPromise: Promise<void> | null;
 
   constructor(config: Partial<QueueConfig> = {}) {
     this.activeJobs = new Map();
+    this.activeDocumentationJobs = new Map();
     this.isProcessing = false;
     this.config = { ...DEFAULT_QUEUE_CONFIG, ...config };
     this.processingPromise = null;
@@ -388,21 +390,26 @@ export class QueueService {
   private async processQueue(): Promise<void> {
     try {
       while (this.isProcessing) {
+        const totalActiveJobs = this.activeJobs.size + this.activeDocumentationJobs.size;
+
         // Check if we can process more jobs
-        if (this.activeJobs.size < this.config.concurrency) {
-          // Get next pending jobs
+        if (totalActiveJobs < this.config.concurrency) {
+          // Get next pending embedding jobs
           const pendingJobs = await this.getNextPendingJobs();
 
-          if (pendingJobs.length === 0) {
+          // Get next pending documentation jobs
+          const pendingDocJobs = await this.getNextPendingDocumentationJobs();
+
+          if (pendingJobs.length === 0 && pendingDocJobs.length === 0) {
             // No pending jobs, wait a bit before checking again
             await new Promise(resolve => setTimeout(resolve, 1000));
             continue;
           }
 
-          // Process each pending job
+          // Process embedding jobs
           for (const job of pendingJobs) {
             // Skip if we've reached concurrency limit
-            if (this.activeJobs.size >= this.config.concurrency) {
+            if (this.activeJobs.size + this.activeDocumentationJobs.size >= this.config.concurrency) {
               break;
             }
 
@@ -412,6 +419,22 @@ export class QueueService {
             // Process the job
             this.processJob(job).catch(error => {
               console.error(`Error processing job ${job.id}:`, error);
+            });
+          }
+
+          // Process documentation jobs
+          for (const job of pendingDocJobs) {
+            // Skip if we've reached concurrency limit
+            if (this.activeJobs.size + this.activeDocumentationJobs.size >= this.config.concurrency) {
+              break;
+            }
+
+            // Add to active documentation jobs
+            this.activeDocumentationJobs.set(job.id, job);
+
+            // Process the documentation job
+            this.processDocumentationJob(job).catch(error => {
+              console.error(`Error processing documentation job ${job.id}:`, error);
             });
           }
         }
@@ -624,7 +647,238 @@ export class QueueService {
     throw lastError || new Error('Failed to generate embeddings');
   }
 
+  /**
+   * Add a documentation job to the queue
+   */
+  async addDocumentationJob(
+    sourceId: string,
+    sourceUrl: string,
+    processingId: string,
+    priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL
+  ): Promise<DocumentationJob> {
+    try {
+      const job: DocumentationJob = {
+        id: uuidv4(),
+        sourceId,
+        sourceUrl,
+        processingId,
+        status: JobStatus.PENDING,
+        attempts: 0,
+        maxAttempts: this.config.maxAttempts,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        priority
+      };
 
+      // Save the job to the database
+      await this.saveDocumentationJob(job);
+
+      console.log(`Added documentation job ${job.id} to the queue for source ${sourceId}`);
+
+      // Start processing if not already processing
+      if (!this.isProcessing) {
+        this.startProcessing();
+      }
+
+      return job;
+    } catch (error) {
+      console.error('Error adding documentation job to queue:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save a documentation job to the database
+   */
+  private async saveDocumentationJob(job: DocumentationJob): Promise<void> {
+    const client = await dbService.getClient();
+
+    try {
+      // Create documentation_jobs table if it doesn't exist
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS documentation_jobs (
+          id TEXT PRIMARY KEY,
+          source_id TEXT NOT NULL,
+          source_url TEXT NOT NULL,
+          processing_id TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          max_attempts INTEGER NOT NULL,
+          error TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          started_at TIMESTAMP WITH TIME ZONE,
+          completed_at TIMESTAMP WITH TIME ZONE,
+          priority INTEGER NOT NULL DEFAULT 5
+        )
+      `);
+
+      // Create indexes if they don't exist
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_status ON documentation_jobs(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_processing_id ON documentation_jobs(processing_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_source_id ON documentation_jobs(source_id)');
+
+      await client.query(`
+        INSERT INTO documentation_jobs (
+          id, source_id, source_url, processing_id, status, attempts, max_attempts,
+          error, created_at, updated_at, started_at, completed_at, priority
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          attempts = EXCLUDED.attempts,
+          error = EXCLUDED.error,
+          updated_at = EXCLUDED.updated_at,
+          started_at = EXCLUDED.started_at,
+          completed_at = EXCLUDED.completed_at
+      `, [
+        job.id,
+        job.sourceId,
+        job.sourceUrl,
+        job.processingId,
+        job.status,
+        job.attempts,
+        job.maxAttempts,
+        job.error,
+        job.createdAt,
+        job.updatedAt,
+        job.startedAt,
+        job.completedAt,
+        job.priority
+      ]);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get a documentation job by processing ID
+   */
+  async getDocumentationJobByProcessingId(processingId: string): Promise<DocumentationJob | null> {
+    const client = await dbService.getClient();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id, source_id as "sourceId", source_url as "sourceUrl", processing_id as "processingId",
+          status, attempts, max_attempts as "maxAttempts", error,
+          created_at as "createdAt", updated_at as "updatedAt",
+          started_at as "startedAt", completed_at as "completedAt", priority
+        FROM documentation_jobs
+        WHERE processing_id = $1
+      `, [processingId]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0] as DocumentationJob;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get next pending documentation jobs up to concurrency limit
+   */
+  private async getNextPendingDocumentationJobs(): Promise<DocumentationJob[]> {
+    const client = await dbService.getClient();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id, source_id as "sourceId", source_url as "sourceUrl", processing_id as "processingId",
+          status, attempts, max_attempts as "maxAttempts", error,
+          created_at as "createdAt", updated_at as "updatedAt",
+          started_at as "startedAt", completed_at as "completedAt", priority
+        FROM documentation_jobs
+        WHERE status = $1 OR (status = $2 AND updated_at < NOW() - INTERVAL '1 minute' * attempts)
+        ORDER BY priority DESC, created_at ASC
+        LIMIT $3
+      `, [JobStatus.PENDING, JobStatus.RETRYING, this.config.concurrency - this.activeJobs.size - this.activeDocumentationJobs.size]);
+
+      return result.rows as DocumentationJob[];
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Process a single documentation job
+   */
+  private async processDocumentationJob(job: DocumentationJob): Promise<void> {
+    try {
+      console.log(`Processing documentation job ${job.id} for source ${job.sourceId}`);
+
+      // Update job status
+      job.status = JobStatus.PROCESSING;
+      job.attempts += 1;
+      job.startedAt = job.startedAt || new Date();
+      job.updatedAt = new Date();
+      await this.saveDocumentationJob(job);
+
+      // Process the documentation source
+      const result = await this.processDocumentationSource(job.sourceId, job.sourceUrl, job.processingId);
+
+      if (result.success) {
+        // Job completed successfully
+        job.status = JobStatus.COMPLETED;
+        job.completedAt = new Date();
+      } else {
+        // Job failed
+        if (job.attempts >= job.maxAttempts) {
+          job.status = JobStatus.FAILED;
+          job.error = result.error;
+        } else {
+          job.status = JobStatus.RETRYING;
+          job.error = result.error;
+        }
+      }
+
+      job.updatedAt = new Date();
+      await this.saveDocumentationJob(job);
+    } catch (error) {
+      console.error(`Error processing documentation job ${job.id}:`, error);
+
+      // Update job status
+      job.status = job.attempts >= job.maxAttempts ? JobStatus.FAILED : JobStatus.RETRYING;
+      job.error = error instanceof Error ? error.message : String(error);
+      job.updatedAt = new Date();
+      await this.saveDocumentationJob(job);
+    } finally {
+      // Remove from active documentation jobs
+      this.activeDocumentationJobs.delete(job.id);
+    }
+  }
+
+  /**
+   * Process a documentation source
+   */
+  private async processDocumentationSource(sourceId: string, sourceUrl: string, processingId: string): Promise<JobResult> {
+    try {
+      console.log(`Processing documentation source ${sourceUrl} (ID: ${processingId})`);
+
+      // Import documentation service here to avoid circular dependency
+      const { documentationService } = await import('./documentation.js');
+
+      // Fetch and process documentation
+      const batch = await documentationService.fetchAndProcessDocumentation(sourceId);
+
+      console.log(`Successfully processed documentation source ${sourceId}: ${batch.embeddings.length} embeddings generated`);
+
+      return {
+        success: true,
+        data: batch
+      };
+    } catch (error) {
+      console.error(`Error processing documentation source ${sourceId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
 
   /**
    * Stop processing the queue

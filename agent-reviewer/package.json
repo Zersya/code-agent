@@ -12,7 +12,8 @@
     "dev:webhook": "bun --watch src/webhook-server.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "setup:documentation": "ts-node scripts/setup-documentation.ts"
   },
   "dependencies": {
     "@notionhq/client": "^2.3.0",

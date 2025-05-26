@@ -32,6 +32,25 @@ export interface EmbeddingJob {
 }
 
 /**
+ * Interface for documentation job
+ */
+export interface DocumentationJob {
+  id: string;
+  sourceId: string;
+  sourceUrl: string;
+  processingId: string;
+  status: JobStatus;
+  attempts: number;
+  maxAttempts: number;
+  error?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  priority: number;
+}
+
+/**
  * Interface for job result
  */
 export interface JobResult {

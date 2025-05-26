@@ -12,7 +12,7 @@ if (!API_KEY) {
 /**
  * Middleware to authenticate API requests
  * 
- * Clients should send an X-API-Key header with the API key
+ * Clients should send an Authorization header with the API key
  * This middleware verifies that the token matches our configured API key
  */
 export const apiAuth = (req: Request, res: Response, next: NextFunction): void => {
@@ -23,15 +23,15 @@ export const apiAuth = (req: Request, res: Response, next: NextFunction): void =
     return;
   }
 
-  const apiKey = req.headers['x-api-key'];
+  const apiKey = req.headers['Authorization'];
 
   if (!apiKey) {
-    console.error('API authentication failed: Missing X-API-Key header');
+    console.error('API authentication failed: Missing Authorization header');
     res.status(401).json({ error: 'Unauthorized: Missing API key' });
     return;
   }
 
-  if (apiKey !== API_KEY) {
+  if (apiKey !== `Bearer ${API_KEY}`) {
     console.error('API authentication failed: Invalid API key');
     res.status(401).json({ error: 'Unauthorized: Invalid API key' });
     return;

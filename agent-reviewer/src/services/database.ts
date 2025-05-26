@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
-import { CodeEmbedding, ProjectMetadata, EmbeddingBatch } from '../models/embedding.js';
+import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
 
 dotenv.config();
@@ -83,6 +83,20 @@ class DatabaseService {
   async disconnect(): Promise<void> {
     await this.pool.end();
     console.log('Disconnected from PostgreSQL');
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      await this.initializeSchema();
+      this.initialized = true;
+    } catch (error) {
+      console.error('Failed to initialize database schema:', error);
+      throw error;
+    }
   }
 
   private async initializeSchema(): Promise<void> {
@@ -235,6 +249,76 @@ class DatabaseService {
         )
       `);
 
+      // Create documentation sources table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS documentation_sources (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          url TEXT NOT NULL,
+          framework TEXT NOT NULL,
+          version TEXT,
+          is_active BOOLEAN DEFAULT true,
+          refresh_interval_days INTEGER DEFAULT 7,
+          last_fetched_at TIMESTAMP WITH TIME ZONE,
+          last_embedded_at TIMESTAMP WITH TIME ZONE,
+          fetch_status TEXT DEFAULT 'pending',
+          fetch_error TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
+      // Create documentation embeddings table
+      if (vectorExtensionAvailable) {
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS documentation_embeddings (
+            id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL REFERENCES documentation_sources(id) ON DELETE CASCADE,
+            section TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            embedding vector(1536),
+            url TEXT,
+            framework TEXT NOT NULL,
+            version TEXT,
+            keywords TEXT[],
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+      } else {
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS documentation_embeddings (
+            id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL REFERENCES documentation_sources(id) ON DELETE CASCADE,
+            section TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            embedding JSONB,
+            url TEXT,
+            framework TEXT NOT NULL,
+            version TEXT,
+            keywords TEXT[],
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+      }
+
+      // Create project documentation mappings table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS project_documentation_mappings (
+          project_id INTEGER NOT NULL,
+          source_id TEXT NOT NULL REFERENCES documentation_sources(id) ON DELETE CASCADE,
+          is_enabled BOOLEAN DEFAULT true,
+          priority INTEGER DEFAULT 1,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          PRIMARY KEY (project_id, source_id)
+        )
+      `);
+
       // Create indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_project_id ON embeddings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_commit_id ON embeddings(commit_id)');
@@ -242,6 +326,14 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_webhook_key ON webhook_processing(webhook_key)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_status ON webhook_processing(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_started_at ON webhook_processing(started_at)');
+
+      // Documentation indexes
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_sources_framework ON documentation_sources(framework)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_sources_active ON documentation_sources(is_active)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_embeddings_source_id ON documentation_embeddings(source_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_embeddings_framework ON documentation_embeddings(framework)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_project_id ON project_documentation_mappings(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_enabled ON project_documentation_mappings(is_enabled)');
 
       console.log('Database schema initialized');
     } catch (error) {
@@ -1229,6 +1321,539 @@ class DatabaseService {
       return stats;
     } catch (error) {
       console.error('Error getting webhook processing stats:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Documentation-related methods
+
+  /**
+   * Save or update a documentation source
+   */
+  async saveDocumentationSource(source: DocumentationSource): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO documentation_sources (
+          id, name, description, url, framework, version, is_active,
+          refresh_interval_days, last_fetched_at, last_embedded_at,
+          fetch_status, fetch_error, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          url = EXCLUDED.url,
+          framework = EXCLUDED.framework,
+          version = EXCLUDED.version,
+          is_active = EXCLUDED.is_active,
+          refresh_interval_days = EXCLUDED.refresh_interval_days,
+          last_fetched_at = EXCLUDED.last_fetched_at,
+          last_embedded_at = EXCLUDED.last_embedded_at,
+          fetch_status = EXCLUDED.fetch_status,
+          fetch_error = EXCLUDED.fetch_error,
+          updated_at = EXCLUDED.updated_at
+      `, [
+        source.id,
+        source.name,
+        source.description,
+        source.url,
+        source.framework,
+        source.version,
+        source.isActive,
+        source.refreshIntervalDays,
+        source.lastFetchedAt,
+        source.lastEmbeddedAt,
+        source.fetchStatus,
+        source.fetchError,
+        source.createdAt,
+        source.updatedAt
+      ]);
+    } catch (error) {
+      console.error('Error saving documentation source:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get a documentation source by ID
+   */
+  async getDocumentationSource(id: string): Promise<DocumentationSource | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          name,
+          description,
+          url,
+          framework,
+          version,
+          is_active as "isActive",
+          refresh_interval_days as "refreshIntervalDays",
+          last_fetched_at as "lastFetchedAt",
+          last_embedded_at as "lastEmbeddedAt",
+          fetch_status as "fetchStatus",
+          fetch_error as "fetchError",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documentation_sources
+        WHERE id = $1
+      `, [id]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0] as DocumentationSource;
+    } catch (error) {
+      console.error('Error getting documentation source:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get documentation sources by frameworks
+   */
+  async getDocumentationSourcesByFrameworks(frameworks: string[]): Promise<DocumentationSource[]> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          name,
+          description,
+          url,
+          framework,
+          version,
+          is_active as "isActive",
+          refresh_interval_days as "refreshIntervalDays",
+          last_fetched_at as "lastFetchedAt",
+          last_embedded_at as "lastEmbeddedAt",
+          fetch_status as "fetchStatus",
+          fetch_error as "fetchError",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documentation_sources
+        WHERE framework = ANY($1) AND is_active = true
+        ORDER BY framework, name
+      `, [frameworks]);
+
+      return result.rows as DocumentationSource[];
+    } catch (error) {
+      console.error('Error getting documentation sources by frameworks:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update documentation source status
+   */
+  async updateDocumentationSourceStatus(
+    id: string,
+    status: 'pending' | 'success' | 'failed',
+    error?: string,
+    lastFetchedAt?: Date
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE documentation_sources
+        SET fetch_status = $2, fetch_error = $3, last_fetched_at = $4, updated_at = NOW()
+        WHERE id = $1
+      `, [id, status, error, lastFetchedAt]);
+    } catch (dbError) {
+      console.error('Error updating documentation source status:', dbError);
+      throw dbError;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Delete a documentation source
+   */
+  async deleteDocumentationSource(id: string): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        DELETE FROM documentation_sources
+        WHERE id = $1
+      `, [id]);
+    } catch (error) {
+      console.error('Error deleting documentation source:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save documentation embeddings in batch
+   */
+  async saveDocumentationEmbeddings(embeddings: DocumentationEmbedding[]): Promise<void> {
+    if (embeddings.length === 0) {
+      return;
+    }
+
+    const client = await this.pool.connect();
+
+    try {
+      // Check if vector extension is available
+      const typeRes = await client.query(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_name = 'documentation_embeddings' AND column_name = 'embedding'
+      `);
+
+      const isVector = typeRes.rows.length > 0 && typeRes.rows[0].data_type === 'vector';
+
+      // Start transaction
+      await client.query('BEGIN');
+
+      for (const embedding of embeddings) {
+        if (isVector) {
+          await client.query(`
+            INSERT INTO documentation_embeddings (
+              id, source_id, section, title, content, embedding,
+              url, framework, version, keywords, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (id)
+            DO UPDATE SET
+              section = EXCLUDED.section,
+              title = EXCLUDED.title,
+              content = EXCLUDED.content,
+              embedding = EXCLUDED.embedding,
+              url = EXCLUDED.url,
+              framework = EXCLUDED.framework,
+              version = EXCLUDED.version,
+              keywords = EXCLUDED.keywords,
+              updated_at = EXCLUDED.updated_at
+          `, [
+            embedding.id,
+            embedding.sourceId,
+            embedding.section,
+            embedding.title,
+            embedding.content,
+            embedding.embedding,
+            embedding.url,
+            embedding.framework,
+            embedding.version,
+            embedding.keywords,
+            embedding.createdAt,
+            embedding.updatedAt
+          ]);
+        } else {
+          await client.query(`
+            INSERT INTO documentation_embeddings (
+              id, source_id, section, title, content, embedding,
+              url, framework, version, keywords, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (id)
+            DO UPDATE SET
+              section = EXCLUDED.section,
+              title = EXCLUDED.title,
+              content = EXCLUDED.content,
+              embedding = EXCLUDED.embedding,
+              url = EXCLUDED.url,
+              framework = EXCLUDED.framework,
+              version = EXCLUDED.version,
+              keywords = EXCLUDED.keywords,
+              updated_at = EXCLUDED.updated_at
+          `, [
+            embedding.id,
+            embedding.sourceId,
+            embedding.section,
+            embedding.title,
+            embedding.content,
+            JSON.stringify(embedding.embedding),
+            embedding.url,
+            embedding.framework,
+            embedding.version,
+            embedding.keywords,
+            embedding.createdAt,
+            embedding.updatedAt
+          ]);
+        }
+      }
+
+      await client.query('COMMIT');
+      console.log(`Saved ${embeddings.length} documentation embeddings`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error saving documentation embeddings:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Delete documentation embeddings for a source
+   */
+  async deleteDocumentationEmbeddings(sourceId: string): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        DELETE FROM documentation_embeddings
+        WHERE source_id = $1
+      `, [sourceId]);
+    } catch (error) {
+      console.error('Error deleting documentation embeddings:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Search similar documentation sections
+   */
+  async searchSimilarDocumentation(
+    frameworks: string[],
+    embedding: number[],
+    limit: number = 5
+  ): Promise<DocumentationEmbedding[]> {
+    const client = await this.pool.connect();
+
+    try {
+      // Check if vector extension is available
+      const typeRes = await client.query(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_name = 'documentation_embeddings' AND column_name = 'embedding'
+      `);
+
+      const isVector = typeRes.rows.length > 0 && typeRes.rows[0].data_type === 'vector';
+
+      if (isVector) {
+        try {
+          const result = await client.query(`
+            SELECT
+              id,
+              source_id as "sourceId",
+              section,
+              title,
+              content,
+              embedding,
+              url,
+              framework,
+              version,
+              keywords,
+              created_at as "createdAt",
+              updated_at as "updatedAt",
+              1 - (embedding <=> $1) as similarity
+            FROM documentation_embeddings
+            WHERE framework = ANY($2)
+            ORDER BY embedding <=> $1
+            LIMIT $3
+          `, [embedding, frameworks, limit]);
+
+          return result.rows as DocumentationEmbedding[];
+        } catch (error) {
+          console.warn('Vector similarity search failed for documentation, falling back to basic filtering:', error);
+        }
+      }
+
+      // Fallback to basic filtering
+      const result = await client.query(`
+        SELECT
+          id,
+          source_id as "sourceId",
+          section,
+          title,
+          content,
+          embedding,
+          url,
+          framework,
+          version,
+          keywords,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documentation_embeddings
+        WHERE framework = ANY($1)
+        ORDER BY updated_at DESC
+        LIMIT $2
+      `, [frameworks, limit]);
+
+      // Convert embedding from JSONB to array if needed
+      return result.rows.map((row: any) => {
+        if (!isVector && typeof row.embedding === 'string') {
+          row.embedding = JSON.parse(row.embedding);
+        }
+        return row as DocumentationEmbedding;
+      });
+    } catch (error) {
+      console.error('Error searching similar documentation:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save project documentation mapping
+   */
+  async saveProjectDocumentationMapping(mapping: ProjectDocumentationMapping): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO project_documentation_mappings (
+          project_id, source_id, is_enabled, priority, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (project_id, source_id)
+        DO UPDATE SET
+          is_enabled = EXCLUDED.is_enabled,
+          priority = EXCLUDED.priority,
+          updated_at = EXCLUDED.updated_at
+      `, [
+        mapping.projectId,
+        mapping.sourceId,
+        mapping.isEnabled,
+        mapping.priority,
+        mapping.createdAt,
+        mapping.updatedAt
+      ]);
+    } catch (error) {
+      console.error('Error saving project documentation mapping:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get project documentation mapping
+   */
+  async getProjectDocumentationMapping(
+    projectId: number,
+    sourceId: string
+  ): Promise<ProjectDocumentationMapping | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          project_id as "projectId",
+          source_id as "sourceId",
+          is_enabled as "isEnabled",
+          priority,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM project_documentation_mappings
+        WHERE project_id = $1 AND source_id = $2
+      `, [projectId, sourceId]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0] as ProjectDocumentationMapping;
+    } catch (error) {
+      console.error('Error getting project documentation mapping:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get project documentation mappings
+   */
+  async getProjectDocumentationMappings(projectId: number): Promise<ProjectDocumentationMapping[]> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          project_id as "projectId",
+          source_id as "sourceId",
+          is_enabled as "isEnabled",
+          priority,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM project_documentation_mappings
+        WHERE project_id = $1 AND is_enabled = true
+        ORDER BY priority DESC, created_at ASC
+      `, [projectId]);
+
+      return result.rows as ProjectDocumentationMapping[];
+    } catch (error) {
+      console.error('Error getting project documentation mappings:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Delete project documentation mappings for a source
+   */
+  async deleteProjectDocumentationMappings(sourceId: string): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        DELETE FROM project_documentation_mappings
+        WHERE source_id = $1
+      `, [sourceId]);
+    } catch (error) {
+      console.error('Error deleting project documentation mappings:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get all documentation sources
+   */
+  async getAllDocumentationSources(): Promise<DocumentationSource[]> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          id,
+          name,
+          description,
+          url,
+          framework,
+          version,
+          is_active as "isActive",
+          refresh_interval_days as "refreshIntervalDays",
+          last_fetched_at as "lastFetchedAt",
+          last_embedded_at as "lastEmbeddedAt",
+          fetch_status as "fetchStatus",
+          fetch_error as "fetchError",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documentation_sources
+        ORDER BY framework, name
+      `);
+
+      return result.rows as DocumentationSource[];
+    } catch (error) {
+      console.error('Error getting all documentation sources:', error);
       throw error;
     } finally {
       client.release();
