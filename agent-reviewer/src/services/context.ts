@@ -3,8 +3,10 @@ import { embeddingService } from './embedding.js';
 import { repositoryService } from './repository.js';
 import { gitlabService } from './gitlab.js';
 import { queueService } from './queue.js';
+import { enhancedContextService } from './enhanced-context.js';
 import { CodeEmbedding, CodeFile, ProjectMetadata } from '../models/embedding.js';
 import { MergeRequestChange } from '../types/review.js';
+import { EnhancedContextResult } from '../types/context.js';
 import { JobStatus } from '../models/queue.js';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,6 +25,7 @@ export interface ProjectContext {
   projectMetadata: ProjectMetadata | null;
   relevantFiles: CodeEmbedding[];
   contextSummary: string;
+  enhancedContext?: EnhancedContextResult;
 }
 
 /**
@@ -151,14 +154,27 @@ export class ContextService {
       // Get relevant files based on the changes
       const relevantFiles = await this.findRelevantFiles(projectId, changes);
 
-      // Generate a summary of the context
-      const contextSummary = this.generateContextSummary(relevantFiles);
+      // Check if we should use enhanced context for small changesets
+      let enhancedContext: EnhancedContextResult | undefined;
+      if (enhancedContextService.shouldUseEnhancedContext(changes)) {
+        try {
+          console.log(`Getting enhanced context for small changeset in project ${projectId}`);
+          enhancedContext = await enhancedContextService.getEnhancedContext(changes);
+          console.log(`Enhanced context gathering completed: ${enhancedContext.success ? 'success' : 'failed'}`);
+        } catch (error) {
+          console.warn(`Error getting enhanced context, continuing with standard context:`, error);
+        }
+      }
+
+      // Generate a summary of the context (including enhanced context if available)
+      const contextSummary = this.generateContextSummary(relevantFiles, enhancedContext);
 
       return {
         projectId: projectId,
         projectMetadata,
         relevantFiles,
-        contextSummary
+        contextSummary,
+        enhancedContext
       };
     } catch (error) {
       console.error(`Error getting project context for ${projectId}:`, error);
@@ -299,11 +315,24 @@ export class ContextService {
   /**
    * Generate a summary of the context
    * @param relevantFiles The relevant files
+   * @param enhancedContext Optional enhanced context for small changesets
    * @returns A summary of the context
    */
-  private generateContextSummary(relevantFiles: CodeEmbedding[]): string {
+  private generateContextSummary(
+    relevantFiles: CodeEmbedding[],
+    enhancedContext?: EnhancedContextResult
+  ): string {
+    let summary = '';
+
+    // Add enhanced context summary if available
+    if (enhancedContext && enhancedContext.success) {
+      summary += enhancedContext.contextSummary + '\n\n';
+      summary += '---\n\n';
+    }
+
     if (relevantFiles.length === 0) {
-      return 'No relevant context files found.';
+      summary += 'No relevant context files found from semantic search.';
+      return summary;
     }
 
     // Generate a summary of the relevant files
@@ -321,11 +350,13 @@ ${truncatedContent}
 `;
     }).join('\n');
 
-    return `
-Project Context (${relevantFiles.length} relevant files):
+    summary += `
+Standard Project Context (${relevantFiles.length} relevant files from semantic search):
 
 ${filesSummary}
 `;
+
+    return summary;
   }
 }
 

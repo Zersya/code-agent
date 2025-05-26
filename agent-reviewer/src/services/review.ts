@@ -246,6 +246,12 @@ ${this.formatNotionContext(notionContext)}`;
 ${projectContext.contextSummary}`;
     }
 
+    // Add enhanced context information if available
+    if (projectContext?.enhancedContext?.success) {
+      prompt += `\n\n**KONTEKS TAMBAHAN UNTUK CHANGESET KECIL:**
+Sistem telah menganalisis bahwa ini adalah changeset kecil (${projectContext.enhancedContext.changesetStats.totalFiles} file, ${projectContext.enhancedContext.changesetStats.totalLinesModified} baris) dan mengumpulkan konteks tambahan yang relevan untuk review yang lebih mendalam.`;
+    }
+
     prompt += `\n\nPerubahan kode yang perlu direview:
 
 \`\`\`diff
@@ -263,8 +269,12 @@ ${codeChanges}
       contextReminders.push('konteks proyek untuk memahami struktur dan arsitektur kode yang ada');
     }
 
+    if (projectContext?.enhancedContext?.success) {
+      contextReminders.push('konteks tambahan yang dikumpulkan khusus untuk changeset kecil ini (termasuk parent classes, caller functions, related tests, dan configuration files)');
+    }
+
     if (contextReminders.length > 0) {
-      prompt += `\n\nPenting: Gunakan ${contextReminders.join(' dan ')} untuk memberikan review yang lebih relevan, mendalam, dan selaras dengan tujuan bisnis.`;
+      prompt += `\n\nPenting: Gunakan ${contextReminders.join(', ')} untuk memberikan review yang lebih relevan, mendalam, dan selaras dengan tujuan bisnis.`;
     }
 
     return prompt;
