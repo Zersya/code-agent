@@ -188,34 +188,34 @@ describe('Database Service', () => {
       const mockMetadata: ProjectMetadata = {
         projectId: 123,
         name: 'Test Project',
+        description: 'A test project for validation',
         url: 'https://gitlab.com/test/project',
         defaultBranch: 'main',
-        lastEmbeddingAt: new Date(),
-        lastReembeddingAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        lastProcessedCommit: 'abc123',
+        lastProcessedAt: new Date(),
+        lastReembeddingAt: new Date()
       };
 
       expect(mockMetadata.projectId).toBe(123);
       expect(mockMetadata.name).toBe('Test Project');
+      expect(mockMetadata.description).toBe('A test project for validation');
       expect(mockMetadata.url).toBe('https://gitlab.com/test/project');
       expect(mockMetadata.defaultBranch).toBe('main');
-      expect(mockMetadata.lastEmbeddingAt).toBeInstanceOf(Date);
+      expect(mockMetadata.lastProcessedCommit).toBe('abc123');
+      expect(mockMetadata.lastProcessedAt).toBeInstanceOf(Date);
       expect(mockMetadata.lastReembeddingAt).toBeInstanceOf(Date);
-      expect(mockMetadata.createdAt).toBeInstanceOf(Date);
-      expect(mockMetadata.updatedAt).toBeInstanceOf(Date);
     });
 
     test('should handle project metadata with special characters', () => {
       const mockMetadata: ProjectMetadata = {
         projectId: 456,
         name: 'Project with Special Chars: @#$%^&*()',
+        description: 'Project with special characters in name',
         url: 'https://gitlab.com/group/project-with-dashes_and_underscores',
         defaultBranch: 'feature/special-branch-name',
-        lastEmbeddingAt: new Date(),
-        lastReembeddingAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        lastProcessedCommit: 'def456',
+        lastProcessedAt: new Date(),
+        lastReembeddingAt: new Date()
       };
 
       expect(mockMetadata.name).toContain('@#$%^&*()');
@@ -227,12 +227,12 @@ describe('Database Service', () => {
       const mockMetadata: ProjectMetadata = {
         projectId: 789,
         name: 'Проект с Unicode 中文 🚀',
+        description: 'Project with unicode characters',
         url: 'https://gitlab.com/unicode/project',
         defaultBranch: 'main',
-        lastEmbeddingAt: new Date(),
-        lastReembeddingAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        lastProcessedCommit: 'ghi789',
+        lastProcessedAt: new Date(),
+        lastReembeddingAt: new Date()
       };
 
       expect(mockMetadata.name).toContain('Проект');

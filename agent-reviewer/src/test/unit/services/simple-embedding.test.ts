@@ -30,20 +30,24 @@ describe('Embedding Service', () => {
     expect(allowedFiles.length).toBeLessThan(testFiles.length);
   });
 
-  test('should detect binary content', () => {
-    const textContent = 'This is normal text content';
-    const binaryContent = '\x00\x01\x02\x03\x04\x05';
+  test('should detect binary content through file filtering', () => {
+    // Test binary content detection indirectly through file filtering
+    const textFile = { path: 'test.txt', content: 'This is normal text content', language: 'text', lastModified: new Date() };
+    const binaryFile = { path: 'test.bin', content: '\x00\x01\x02\x03\x04\x05', language: 'binary', lastModified: new Date() };
 
-    expect(embeddingService.isBinaryContent(textContent)).toBe(false);
-    expect(embeddingService.isBinaryContent(binaryContent)).toBe(true);
+    const allowedFiles = embeddingService.filterAllowedFiles([textFile, binaryFile]);
+
+    // Binary files should be filtered out
+    expect(allowedFiles.some(f => f.path === 'test.txt')).toBe(true);
+    expect(allowedFiles.some(f => f.path === 'test.bin')).toBe(false);
   });
 
   test('should get file extension statistics', () => {
     const mockFiles = [
-      { path: 'test.ts', content: 'test', language: 'typescript' },
-      { path: 'test.js', content: 'test', language: 'javascript' },
-      { path: 'test.py', content: 'test', language: 'python' },
-      { path: 'test.md', content: 'test', language: 'markdown' }
+      { path: 'test.ts', content: 'test', language: 'typescript', lastModified: new Date() },
+      { path: 'test.js', content: 'test', language: 'javascript', lastModified: new Date() },
+      { path: 'test.py', content: 'test', language: 'python', lastModified: new Date() },
+      { path: 'test.md', content: 'test', language: 'markdown', lastModified: new Date() }
     ];
 
     const stats = embeddingService.getFileExtensionStats(mockFiles);
