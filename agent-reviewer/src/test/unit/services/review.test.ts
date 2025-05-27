@@ -267,4 +267,150 @@ describe('Review Service', () => {
       expect(typeof reviewService.reviewMergeRequest).toBe('function');
     });
   });
+
+  describe('Review Configuration', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      // Reset environment variables
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    test('should use default review mode when not specified', () => {
+      delete process.env.REVIEW_MODE;
+
+      // Access the private method to test system prompt generation
+      const systemPrompt = (reviewService as any).generateSystemPrompt();
+
+      expect(systemPrompt).toContain('STANDARD');
+    });
+
+    test('should generate quick mode prompt correctly', () => {
+      process.env.REVIEW_MODE = 'quick';
+      process.env.REVIEW_MAX_SUGGESTIONS = '3';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('quick');
+
+      expect(systemPrompt).toContain('QUICK');
+      expect(systemPrompt).toContain('Fokus pada isu kritis saja');
+      expect(systemPrompt).toContain('maksimal 3');
+    });
+
+    test('should generate standard mode prompt correctly', () => {
+      process.env.REVIEW_MODE = 'standard';
+      process.env.REVIEW_MAX_SUGGESTIONS = '5';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toContain('STANDARD');
+      expect(systemPrompt).toContain('Pendekatan seimbang');
+      expect(systemPrompt).toContain('maksimal 5');
+    });
+
+    test('should generate detailed mode prompt correctly', () => {
+      process.env.REVIEW_MODE = 'detailed';
+      process.env.REVIEW_MAX_SUGGESTIONS = '10';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('detailed');
+
+      expect(systemPrompt).toContain('DETAILED');
+      expect(systemPrompt).toContain('Analisis komprehensif');
+      expect(systemPrompt).toContain('maksimal 10');
+    });
+
+    test('should handle conservative mode configuration', () => {
+      process.env.REVIEW_CONSERVATIVE_MODE = 'true';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toContain('Mode Konservatif Aktif');
+      expect(systemPrompt).toContain('Hindari menyarankan perubahan struktural besar');
+    });
+
+    test('should handle non-conservative mode configuration', () => {
+      process.env.REVIEW_CONSERVATIVE_MODE = 'false';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toContain('Mode Standar');
+      expect(systemPrompt).toContain('seimbang antara kualitas kode');
+    });
+
+    test('should parse focus areas correctly', () => {
+      process.env.REVIEW_FOCUS_AREAS = 'bugs,performance,security';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toContain('bugs, performance, security');
+    });
+
+    test('should handle custom focus areas', () => {
+      process.env.REVIEW_FOCUS_AREAS = 'bugs,style,documentation';
+
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toContain('bugs, style, documentation');
+    });
+
+    test('should generate final step format for quick mode', () => {
+      const format = (reviewService as any).getFinalStepFormatByMode('quick');
+
+      expect(format).toContain('Quick Mode');
+      expect(format).toContain('Isu Kritis');
+      expect(format).toContain('Siap merge');
+      expect(format).toContain('ringkas dan langsung to the point');
+    });
+
+    test('should generate final step format for standard mode', () => {
+      const format = (reviewService as any).getFinalStepFormatByMode('standard');
+
+      expect(format).toContain('Standard Mode');
+      expect(format).toContain('🔴 Kritis');
+      expect(format).toContain('🟡 Penting');
+      expect(format).toContain('🔵 Opsional');
+    });
+
+    test('should generate final step format for detailed mode', () => {
+      const format = (reviewService as any).getFinalStepFormatByMode('detailed');
+
+      expect(format).toContain('Detailed Analysis');
+      expect(format).toContain('Kualitas Kode & Kejelasan');
+      expect(format).toContain('Alur Logika & Fungsionalitas');
+      expect(format).toContain('Konsistensi & Arsitektur');
+    });
+
+    test('should default to standard mode for unknown mode', () => {
+      const format = (reviewService as any).getFinalStepFormatByMode('unknown');
+
+      expect(format).toContain('Standard Mode');
+    });
+
+    test('should handle invalid max suggestions value', () => {
+      process.env.REVIEW_MAX_SUGGESTIONS = 'invalid';
+
+      // Should not throw error and use default
+      const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+      expect(systemPrompt).toBeDefined();
+      expect(typeof systemPrompt).toBe('string');
+    });
+
+    test('should include configuration in sequential thinking prompt', () => {
+      process.env.REVIEW_MODE = 'quick';
+      process.env.REVIEW_CONSERVATIVE_MODE = 'true';
+      process.env.REVIEW_MAX_SUGGESTIONS = '3';
+      process.env.REVIEW_FOCUS_AREAS = 'bugs,security';
+
+      const sequentialPrompt = (reviewService as any).generateSequentialThinkingSystemPrompt();
+
+      expect(sequentialPrompt).toContain('QUICK');
+      expect(sequentialPrompt).toContain('Mode Konservatif Aktif');
+      expect(sequentialPrompt).toContain('Maksimal 3 saran');
+      expect(sequentialPrompt).toContain('bugs, security');
+    });
+  });
 });

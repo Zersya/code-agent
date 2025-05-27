@@ -194,6 +194,96 @@ The system can automatically review merge requests from Repopo using a sequentia
 
 To enable or disable this feature, set `ENABLE_MR_REVIEW=true` or `ENABLE_MR_REVIEW=false` in your `.env` file.
 
+## Review Quality Configuration
+
+The system provides configurable review modes to balance thoroughness with developer productivity. Based on developer feedback, the review system has been optimized to provide more focused, actionable feedback while reducing review length and complexity.
+
+### Review Modes
+
+Configure the review depth and focus using the `REVIEW_MODE` environment variable:
+
+#### Quick Mode (`REVIEW_MODE=quick`)
+- **Focus**: Critical issues only (bugs, security vulnerabilities, performance bottlenecks)
+- **Output**: Concise, bullet-point format with immediate action items
+- **Use Case**: Fast-moving teams, hotfixes, or when you need rapid feedback
+- **Example Output**:
+  ```
+  ## Review Kode (Quick Mode)
+
+  **Ringkasan**: Perubahan pada authentication middleware, tidak ada isu kritis ditemukan.
+
+  **Isu Kritis**: Tidak ada
+
+  **Kesimpulan**: ✅ Siap merge
+  ```
+
+#### Standard Mode (`REVIEW_MODE=standard`) - Default
+- **Focus**: Balanced approach covering code quality, bugs, performance, and consistency
+- **Output**: Structured format with priority-based suggestions (Critical, Important, Optional)
+- **Use Case**: Regular development workflow, most merge requests
+- **Example Output**:
+  ```
+  ## Review Kode
+
+  **Ringkasan**: Implementasi fitur login dengan validasi yang baik.
+
+  **🔴 Kritis**: Tidak ada
+  **🟡 Penting**:
+  • Tambahkan rate limiting untuk endpoint login
+  **🔵 Opsional**:
+  • Pertimbangkan menggunakan TypeScript untuk type safety
+
+  **Kesimpulan**: ⚠️ Perlu perbaikan minor
+  ```
+
+#### Detailed Mode (`REVIEW_MODE=detailed`)
+- **Focus**: Comprehensive analysis including maintainability, scalability, and best practices
+- **Output**: In-depth analysis with detailed explanations and examples
+- **Use Case**: Critical features, architecture changes, or learning-focused reviews
+
+### Configuration Options
+
+```bash
+# Review mode: 'quick', 'standard', or 'detailed'
+REVIEW_MODE='standard'
+
+# Maximum number of suggestions per review (default: 5)
+REVIEW_MAX_SUGGESTIONS=5
+
+# Conservative mode: avoid suggesting major structural changes
+REVIEW_CONSERVATIVE_MODE='false'
+
+# Focus areas: comma-separated list
+REVIEW_FOCUS_AREAS='bugs,performance,security,style'
+```
+
+### Conservative Mode
+
+When `REVIEW_CONSERVATIVE_MODE=true`:
+- Avoids suggesting major architectural changes
+- Focuses on bug fixes and minor optimizations
+- Respects existing project patterns and structures
+- Reduces suggestions that might require significant refactoring
+
+### Focus Areas
+
+Customize which aspects the review should prioritize:
+- **bugs**: Logic errors, null pointer exceptions, edge cases
+- **performance**: Bottlenecks, inefficient algorithms, resource usage
+- **security**: Vulnerabilities, input validation, data exposure
+- **style**: Code formatting, naming conventions, documentation
+
+### Benefits
+
+- **Reduced Review Length**: Configurable suggestion limits prevent overwhelming feedback
+- **Focused Feedback**: Priority-based categorization helps developers focus on what matters most
+- **Team Alignment**: Conservative mode ensures suggestions align with existing project standards
+- **Productivity**: Quick mode enables rapid iteration while detailed mode supports learning
+
+### Migration from Previous Version
+
+Existing installations will automatically use the standard mode with default settings, maintaining backward compatibility. No configuration changes are required unless you want to customize the review behavior.
+
 ## Documentation Embedding
 
 The system includes documentation embedding capability that enhances code reviews with authoritative framework knowledge. This feature automatically detects frameworks used in merge requests and provides relevant documentation context during reviews.

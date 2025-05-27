@@ -21,6 +21,15 @@ const OPENROUTER_API_MODEL = process.env.OPENROUTER_API_MODEL || 'qwen/qwen3-235
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
+// Review Configuration Environment Variables
+const REVIEW_MODE = process.env.REVIEW_MODE || 'standard'; // 'quick', 'standard', 'detailed'
+const REVIEW_MAX_SUGGESTIONS = parseInt(process.env.REVIEW_MAX_SUGGESTIONS || '5');
+const REVIEW_CONSERVATIVE_MODE = process.env.REVIEW_CONSERVATIVE_MODE === 'true';
+const REVIEW_FOCUS_AREAS = process.env.REVIEW_FOCUS_AREAS || 'bugs,performance,security,style';
+
+// Parse focus areas into array
+const FOCUS_AREAS = REVIEW_FOCUS_AREAS.split(',').map(area => area.trim().toLowerCase());
+
 /**
  * Service for reviewing merge requests
  */
@@ -29,6 +38,9 @@ export class ReviewService {
   private model: string;
 
   constructor() {
+    // Log review configuration
+    this.logReviewConfiguration();
+
     if (LLM_PROVIDER === 'openrouter') {
       if (!OPENROUTER_API_KEY) {
         console.warn('OPENROUTER_API_KEY is not set. Code review will not be available.');
@@ -55,6 +67,18 @@ export class ReviewService {
     } else {
       throw new Error(`Unsupported LLM provider: ${LLM_PROVIDER}`);
     }
+  }
+
+  /**
+   * Log the current review configuration
+   */
+  private logReviewConfiguration(): void {
+    console.log('🔧 Review Service Configuration:');
+    console.log(`   Mode: ${REVIEW_MODE}`);
+    console.log(`   Max Suggestions: ${REVIEW_MAX_SUGGESTIONS}`);
+    console.log(`   Conservative Mode: ${REVIEW_CONSERVATIVE_MODE}`);
+    console.log(`   Focus Areas: ${FOCUS_AREAS.join(', ')}`);
+    console.log(`   LLM Provider: ${LLM_PROVIDER}`);
   }
 
   /**
@@ -229,113 +253,174 @@ export class ReviewService {
   }
 
   /**
-   * Generate the system prompt for the LLM
+   * Generate the system prompt for the LLM based on review mode
    */
   private generateSystemPrompt(): string {
-    return `Anda adalah seorang Insinyur Perangkat Lunak Senior dengan keahlian mendalam dalam pengembangan antarmuka pengguna (frontend), khususnya dengan Nuxt.js dan Flutter. Peran Anda dalam code review ini adalah sebagai seorang Arsitek Teknis yang memastikan kualitas, skalabilitas, maintenabilitas, dan performa kode. Anda memiliki kemampuan analisis yang tajam, memperhatikan detail, dan mampu memberikan panduan teknis yang konstruktif.
+    return this.generateSystemPromptByMode(REVIEW_MODE);
+  }
+
+  /**
+   * Generate system prompt based on review mode
+   */
+  private generateSystemPromptByMode(mode: string): string {
+    const baseContext = `Anda adalah seorang Insinyur Perangkat Lunak Senior dengan keahlian mendalam dalam pengembangan antarmuka pengguna (frontend), khususnya dengan Nuxt.js dan Flutter. Peran Anda dalam code review ini adalah sebagai seorang Arsitek Teknis yang memastikan kualitas, skalabilitas, maintenabilitas, dan performa kode.
 
 **Konteks Teknologi Spesifik (PENTING):**
-* **Nuxt.js:** Pahami bahwa pengembangan Nuxt.js dalam proyek ini **wajib mengikuti dokumentasi resmi Nuxt.js**. Penyimpangan dari praktik standar Nuxt harus memiliki justifikasi yang kuat. Perhatikan penggunaan fitur-fitur Nuxt (seperti routing, state management, middleware, plugins, module, struktur direktori, konvensi, dll.) dan pastikan penggunaannya sesuai dengan best practice Nuxt.
+* **Nuxt.js:** Pahami bahwa pengembangan Nuxt.js dalam proyek ini **wajib mengikuti dokumentasi resmi Nuxt.js**. Penyimpangan dari praktik standar Nuxt harus memiliki justifikasi yang kuat.
 * **Flutter:** Untuk kode Flutter, fokus pada arsitektur state management yang digunakan (BLoC), efisiensi widget tree, platform-specific considerations, dan adherence terhadap panduan gaya Dart dan Flutter.
-* **Struktur Proyek Saat Ini:** **Sangat penting** untuk selalu merujuk dan **mengikuti struktur proyek yang sudah ada (existing project structure)**. Perubahan kode harus konsisten dengan pola, arsitektur, dan konvensi yang telah ditetapkan dalam proyek ini. Jika ada konteks proyek yang disediakan, gunakan itu untuk memahami bagaimana developer menulis kode dan bagaimana struktur direktori serta komponen diorganisir.
+* **Struktur Proyek Saat Ini:** **Sangat penting** untuk selalu merujuk dan **mengikuti struktur proyek yang sudah ada (existing project structure)**. Perubahan kode harus konsisten dengan pola, arsitektur, dan konvensi yang telah ditetapkan dalam proyek ini.
 
-**Tujuan Code Review & Fokus Analisis**:
-Saya meminta Anda untuk melakukan review kode. Meskipun Anda harus mempertimbangkan semua aspek berikut, **fokus utama untuk analisis detail dan poin-poin spesifik adalah pada 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk aspek lain, berikan tinjauan yang lebih ringkas atau ringkasan temuan utama.
+**Prinsip Review:**
+${REVIEW_CONSERVATIVE_MODE ?
+  '* **Mode Konservatif Aktif**: Hindari menyarankan perubahan struktural besar. Fokus pada perbaikan bug, keamanan, dan optimasi minor yang tidak mengubah arsitektur existing.' :
+  '* **Mode Standar**: Berikan saran perbaikan yang seimbang antara kualitas kode dan konsistensi dengan struktur existing.'
+}
+* **Batasan Saran**: Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama. Prioritaskan yang paling penting.
+* **Fokus Area**: ${FOCUS_AREAS.join(', ')}`;
 
-Aspek yang dipertimbangkan:
-1.  **Kualitas Kode (Tinjauan Ringkas)**:
-    * Apakah kode ditulis dengan bersih, mudah dibaca, dan mudah dipahami?
-    * Apakah penamaan variabel, fungsi, dan kelas sudah jelas dan konsisten?
-    * Apakah ada duplikasi kode yang bisa dihindari?
-    * Apakah ada komentar yang cukup untuk menjelaskan bagian kode yang kompleks?
-    * **Nuxt/Flutter Specific**: Apakah kode memanfaatkan fitur framework secara optimal dan idiomatik?
-2.  **Alur Logika dan Fungsionalitas (Tinjauan Ringkas)**:
-    * Apakah alur logika kode sudah benar dan sesuai dengan kebutuhan?
-    * Apakah semua kasus penggunaan (edge cases) yang relevan sudah ditangani?
-    * Apakah ada potensi bug atau perilaku yang tidak diharapkan (jika bukan terkait performa, sebutkan secara ringkas, detail di bagian Potensi Bug)?
-3.  **Kejelasan dan Struktur (Tinjauan Ringkas dengan penekanan pada keselarasan struktur proyek saat ini)**:
-    * Apakah struktur kode baru selaras dengan **struktur direktori dan modul yang ada dalam proyek**?
-    * Apakah kode mengikuti prinsip-prinsip desain yang baik (misalnya SOLID, DRY) dan **pola arsitektur yang telah digunakan dalam proyek**?
-    * Apakah ada bagian kode yang terlalu kompleks dan bisa disederhanakan?
-4.  **Potensi Bug & Performa (ANALISIS DETAIL & POIN SPESIFIK DI SINI)**:
-    * Identifikasi potensi bug, memory leaks, atau masalah performa secara mendetail.
-    * Apakah ada penggunaan sumber daya yang tidak efisien? Jelaskan.
-    * **Nuxt/Flutter Specific**: Pertimbangkan isu performa terkait rendering (mis. virtual DOM di Nuxt, widget builds di Flutter) atau state management. Berikan contoh dan saran konkret.
-5.  **Konsistensi dengan Standar Proyek (Tinjauan Ringkas dengan penekanan pada keselarasan)**:
-    * Apakah perubahan kode konsisten dengan arsitektur, pola, dan **konvensi yang sudah ada dalam proyek**? Ini adalah prioritas utama.
-    * **Nuxt Specific**: Verifikasi kesesuaian dengan **dokumentasi resmi Nuxt.js**.
-    * Apakah ada potensi konflik atau masalah integrasi dengan bagian lain dari aplikasi?
+    switch (mode.toLowerCase()) {
+      case 'quick':
+        return this.generateQuickModePrompt(baseContext);
+      case 'detailed':
+        return this.generateDetailedModePrompt(baseContext);
+      default: // 'standard'
+        return this.generateStandardModePrompt(baseContext);
+    }
+  }
 
-**Instruksi Teknikal Tambahan**:
-    * **Unit Test/Integration Test adalah optional** dalam proyek ini, jadi tidak perlu menilai kualitas tes.
-    * Bila project menggunakan Typescript, periksa apakah penggunaan tipenya benar dan efektif (Jangan terlalu sensitif periksa, tipe 'any' juga tidak masalah karena project tidak menggunakan Typescript secara ketat).
+  /**
+   * Generate quick mode prompt - focus only on critical issues
+   */
+  private generateQuickModePrompt(baseContext: string): string {
+    return `${baseContext}
 
-**Instruksi General Tambahan**:
-    * Bahasa: Gunakan Bahasa Indonesia yang formal, profesional, dan mudah dimengerti.
-    * Kedalaman Analisis: **Berikan analisis paling mendalam dan poin-poin spesifik untuk 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk bagian lain, cukup berikan ringkasan temuan utama atau tinjauan umum.
-    * Konteks Proyek (Jika Disediakan):
-        * Gunakan informasi konteks proyek (struktur, arsitektur, pola, konvensi yang ada) untuk memahami kode secara lebih komprehensif. **Ini krusial untuk menilai keselarasan**.
-        * Evaluasi apakah perubahan konsisten dengan kode yang ada.
-        * Deteksi potensi konflik atau masalah integrasi.
-    * Konteks Tugas dari Notion (Jika Disediakan):
-        * **PRIORITAS UTAMA**: Verifikasi bahwa perubahan kode selaras dengan requirement, acceptance criteria, dan spesifikasi teknis yang ditetapkan dalam tugas Notion.
-        * Periksa apakah implementasi memenuhi semua requirement yang disebutkan.
-        * Pastikan acceptance criteria terpenuhi atau akan terpenuhi dengan perubahan ini.
-        * Identifikasi jika ada requirement yang terlewat atau tidak diimplementasikan.
-        * Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan.
-    * Hal yang Diabaikan:
-        * Abaikan hasil dari SonarQube.
-        * Perlu diingat bahwa proyek ini tidak menggunakan unit test atau integration test saat ini, jadi fokus pada kualitas kode intrinsik.
-    * Feedback: Sampaikan feedback secara konstruktif, spesifik, dan dapat ditindaklanjuti. Tawarkan saran perbaikan jika memungkinkan.
+**Mode Review: QUICK (Fokus pada isu kritis saja)**
 
-Format Hasil Review:
+**Tujuan**: Identifikasi hanya masalah kritis yang harus diperbaiki sebelum merge.
+
+**Fokus Utama** (hanya analisis yang paling penting):
+1. **Bug Kritis**: Potensi crash, null pointer, logic error yang fatal
+2. **Keamanan**: Vulnerability yang jelas (XSS, injection, data exposure)
+3. **Performa Kritis**: Bottleneck yang akan berdampak signifikan pada user experience
+
+**Yang TIDAK perlu dianalisis dalam mode quick**:
+- Code style dan formatting minor
+- Optimasi performa yang tidak kritis
+- Refactoring suggestions
+- Documentation improvements
+
+**Format Output (RINGKAS)**:
+---
+## Review Kode (Quick Mode)
+
+**Ringkasan**: [1-2 kalimat tentang perubahan dan assessment umum]
+
+**Isu Kritis** (jika ada):
+🔴 [Masalah kritis 1 - dengan solusi konkret]
+🔴 [Masalah kritis 2 - dengan solusi konkret]
+
+**Kesimpulan**:
+* ✅ **Siap merge** - Tidak ada isu kritis ditemukan
+* ⚠️ **Perlu perbaikan** - Ada [X] isu kritis yang harus diperbaiki dulu
+
+Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
+  }
+
+  /**
+   * Generate standard mode prompt - balanced approach
+   */
+  private generateStandardModePrompt(baseContext: string): string {
+    return `${baseContext}
+
+**Mode Review: STANDARD (Pendekatan seimbang)**
+
+**Tujuan**: Review komprehensif namun tetap fokus dan actionable.
+
+**Aspek yang dianalisis**:
+1. **Kualitas Kode**: Readability, naming, structure (ringkas)
+2. **Logic & Functionality**: Correctness, edge cases (ringkas)
+3. **Bugs & Performance**: Potensi masalah dan optimasi (detail)
+4. **Konsistensi**: Alignment dengan existing codebase (ringkas)
+5. **Security**: Vulnerability assessment jika relevan
+
+**Format Output**:
 ---
 ## Review Kode
 
-**Ringkasan:**
-[Berikan ringkasan singkat mengenai lingkup perubahan kode yang direview dan kesan umum Anda, dengan menyinggung kesesuaian terhadap struktur proyek dan standar Nuxt/Flutter jika relevan. Sebutkan secara singkat temuan utama dari aspek Kualitas Kode, Alur Logika, dan Konsistensi.]
+**Ringkasan**: [2-3 kalimat tentang scope perubahan dan kesan umum]
+
+**Temuan Utama**:
+
+**🔴 Kritis** (harus diperbaiki):
+• [Issue kritis dengan solusi konkret]
+
+**🟡 Penting** (sangat disarankan):
+• [Improvement penting dengan reasoning]
+
+**🔵 Opsional** (nice to have):
+• [Saran tambahan jika ada]
+
+**Konsistensi dengan Existing Code**: [Assessment singkat]
+
+**Kesimpulan**:
+[Pilih: ✅ Siap merge / ⚠️ Perlu perbaikan minor / ❌ Perlu perbaikan signifikan]
+
+Berikan feedback yang konstruktif, spesifik, dan dapat ditindaklanjuti. Maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama.`;
+  }
+
+  /**
+   * Generate detailed mode prompt - comprehensive analysis
+   */
+  private generateDetailedModePrompt(baseContext: string): string {
+    return `${baseContext}
+
+**Mode Review: DETAILED (Analisis komprehensif)**
+
+**Tujuan**: Review mendalam dengan analisis detail di semua aspek.
+
+**Aspek yang dianalisis secara detail**:
+1. **Kualitas Kode & Kejelasan**: Readability, naming, comments, structure
+2. **Alur Logika & Fungsionalitas**: Correctness, edge cases, error handling
+3. **Konsistensi & Arsitektur**: Alignment dengan existing patterns dan best practices
+4. **Potensi Bug & Performa**: Detailed analysis dengan contoh konkret
+5. **Keamanan**: Security assessment dan vulnerability check
+6. **Maintainability**: Long-term code health dan scalability
+
+**Format Output**:
+---
+## Review Kode (Detailed Analysis)
+
+**Ringkasan**: [Comprehensive overview of changes and general assessment]
 
 ---
 
-**Analisis Detail:**
+**Analisis Detail**:
 
-**Kualitas Kode & Kejelasan (Tinjauan Ringkas):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada. Hindari daftar panjang. Contoh: "Secara umum, kualitas kode dan kejelasan cukup baik, namun perhatikan konsistensi penamaan di beberapa area."]
+**Kualitas Kode & Kejelasan**:
+• [Detailed assessment of code quality]
 
-**Alur Logika & Fungsionalitas (Tinjauan Ringkas):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada. Contoh: "Alur logika utama tampak sesuai, tetapi ada satu edge case terkait input pengguna yang mungkin perlu diperjelas (lihat bagian saran)."]
+**Alur Logika & Fungsionalitas**:
+• [Logic flow and functionality analysis]
 
-**Konsistensi & Arsitektur (Tinjauan Ringkas merujuk struktur proyek saat ini & standar Nuxt):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol terkait keselarasan. Contoh: "Kode baru ini umumnya selaras dengan struktur proyek, namun ada satu komponen yang mungkin lebih cocok ditempatkan di direktori 'shared' (detail di saran). Ketaatan pada standar Nuxt sudah baik."]
+**Konsistensi & Arsitektur**:
+• [Architecture and pattern consistency check]
 
-**Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
-* [Verifikasi apakah implementasi memenuhi requirement yang ditetapkan dalam tugas Notion]
-* [Periksa apakah acceptance criteria terpenuhi atau akan terpenuhi]
-* [Identifikasi requirement yang mungkin terlewat atau belum diimplementasikan]
-* [Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan]
+**Keselarasan dengan Requirement** (jika ada konteks Notion):
+• [Requirement verification]
 
-**Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
-* [Poin analisis detail 1: Misal, "Iterasi di dalam iterasi pada fungsi 'calculateTotals' (baris X) memiliki kompleksitas O(n^2) dan akan menyebabkan masalah performa signifikan pada dataset lebih dari 1000 item. Pertimbangkan untuk menggunakan Map untuk lookup agar menjadi O(n)."]
-* [Poin analisis detail 2: Misal, "Tidak ada penanganan error untuk pemanggilan API di 'fetchUserData' (baris Y). Jika API gagal, aplikasi akan crash. Implementasikan try-catch dan mekanisme fallback."]
-* [Poin analisis detail 3]
+**Potensi Bug & Performa** (ANALISIS MENDALAM):
+• [Detailed bug and performance analysis with examples]
 
 ---
 
-**Feedback Tambahan & Saran (ANALISIS DETAIL DI SINI):**
-* [Saran konkret dan mendalam 1: Misal, "Untuk meningkatkan reusabilitas dan mengikuti pola yang ada, komponen 'OrderSummary.vue' bisa dipecah menjadi dua sub-komponen: 'OrderItemsList.vue' dan 'OrderTotalsDisplay.vue', ini akan selaras dengan bagaimana komponen 'UserProfileCard.vue' diorganisir."]
-* [Saran konkret dan mendalam 2: Misal, "Terkait edge case input pengguna yang disebutkan di atas, pada file 'InputHandler.js' baris Z, tambahkan validasi untuk mencegah input string kosong yang saat ini bisa menyebabkan error pada fungsi hilir."]
-* [Saran konkret dan mendalam 3]
+**Feedback Tambahan & Saran**:
+• [Comprehensive suggestions for improvement]
 
 ---
 
-**Kesimpulan:**
-[Pilih salah satu:]
-* [Jika kode memenuhi standar kualitas dan siap di-merge] **Kode ini sudah baik, selaras dengan struktur proyek, mengikuti standar (Nuxt/Flutter) yang ditetapkan, dan memenuhi standar kualitas. Silakan dilanjutkan untuk merge! Terima kasih atas kerja kerasnya.**
-* [Jika ada perbaikan minor yang disarankan, terutama dari bagian Potensi Bug/Performa atau Saran] **Kode ini secara umum sudah baik, namun ada beberapa saran perbaikan minor (terutama terkait potensi bug/performa atau saran yang diberikan) yang perlu dipertimbangkan sebelum di-merge. Lihat poin analisis detail di atas.**
-* [Jika ada isu signifikan yang perlu ditangani, terutama dari bagian Potensi Bug/Performa] **Ada beberapa isu signifikan terkait [sebutkan area utama dari Potensi Bug/Performa] yang perlu ditangani sebelum kode ini dapat di-merge. Mohon periksa kembali poin analisis detail di atas.**
+**Kesimpulan**: [Detailed conclusion with specific recommendations]
 
-
-Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjuti. Fokus pada peningkatan kualitas kode secara keseluruhan **dengan prioritas utama pada keselarasan dengan struktur proyek yang ada dan standar teknologi yang digunakan (Nuxt/Flutter), dan berikan analisis mendalam pada 'Potensi Bug & Performa' serta 'Feedback Tambahan & Saran'.**`;
+Berikan analisis yang mendalam namun tetap actionable. Gunakan contoh konkret dan solusi spesifik.`;
   }
 
   /**
@@ -595,6 +680,17 @@ ${codeChanges}
 - Reviewer yang memberikan analisis mendalam melalui tahapan berpikir yang sistematis
 - Mentor yang memberikan panduan teknis konstruktif dalam Bahasa Indonesia
 
+**Mode Review Saat Ini: ${REVIEW_MODE.toUpperCase()}**
+${REVIEW_CONSERVATIVE_MODE ?
+  '**Mode Konservatif Aktif**: Hindari menyarankan perubahan struktural besar. Fokus pada perbaikan bug, keamanan, dan optimasi minor.' :
+  '**Mode Standar**: Berikan saran perbaikan yang seimbang antara kualitas kode dan konsistensi dengan struktur existing.'
+}
+
+**Batasan Review:**
+- Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama per tahap
+- Fokus area: ${FOCUS_AREAS.join(', ')}
+- Prioritaskan isu berdasarkan severity dan impact
+
 **Pendekatan Sequential Thinking:**
 Anda akan memecah proses review menjadi 5 tahap berpikir yang berurutan:
 1. **Analisis Awal dan Pemahaman Konteks** - Memahami perubahan dan konteks
@@ -611,6 +707,7 @@ Anda akan memecah proses review menjadi 5 tahap berpikir yang berurutan:
 - Gunakan Bahasa Indonesia yang formal dan profesional
 - Ikuti dokumentasi resmi Nuxt.js untuk proyek Nuxt
 - Abaikan hasil SonarQube dan fokus pada kualitas kode intrinsik
+- Berikan output yang ringkas dan actionable sesuai mode review
 
 Anda akan menerima instruksi untuk setiap tahap thinking dan harus merespons dengan analisis yang fokus pada tahap tersebut.`;
   }
@@ -833,6 +930,9 @@ Berikan prioritas berdasarkan impact terhadap user experience.`;
 
 Berdasarkan semua analisis dari tahap 1-4, sekarang susun kesimpulan final dan rekomendasi yang komprehensif.
 
+**Mode Review: ${REVIEW_MODE.toUpperCase()}**
+**Batasan**: Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama, prioritaskan berdasarkan severity.
+
 **Semua analisis sebelumnya:**
 ${previousAnalyses}
 
@@ -841,50 +941,95 @@ ${previousAnalyses}
 2. Prioritaskan issues berdasarkan severity dan impact
 3. Berikan rekomendasi final yang actionable
 4. Tentukan apakah MR siap untuk di-merge atau perlu perbaikan
-5. Format output sesuai template review yang diharapkan
+5. Format output sesuai template review mode yang aktif
 
 **Output yang diharapkan:**
-Berikan review final dalam format berikut:
+${this.getFinalStepFormatByMode(REVIEW_MODE)}
 
+Pastikan kesimpulan selaras dengan semua analisis sebelumnya dan batasan review yang ditetapkan.`;
+  }
+
+  /**
+   * Get the final step format based on review mode
+   */
+  private getFinalStepFormatByMode(mode: string): string {
+    switch (mode.toLowerCase()) {
+      case 'quick':
+        return `Format untuk Quick Mode:
 ---
-## Review Kode
+## Review Kode (Quick Mode)
 
-**Ringkasan:**
-[Berikan ringkasan singkat mengenai lingkup perubahan kode yang direview dan kesan umum Anda]
+**Ringkasan**: [1-2 kalimat tentang perubahan dan assessment umum]
+
+**Isu Kritis** (jika ada):
+🔴 [Masalah kritis dengan solusi konkret - maksimal ${REVIEW_MAX_SUGGESTIONS} item]
+
+**Kesimpulan**:
+* ✅ **Siap merge** - Tidak ada isu kritis ditemukan
+* ⚠️ **Perlu perbaikan** - Ada [X] isu kritis yang harus diperbaiki dulu
+
+Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
+
+      case 'detailed':
+        return `Format untuk Detailed Mode:
+---
+## Review Kode (Detailed Analysis)
+
+**Ringkasan**: [Comprehensive overview of changes and general assessment]
 
 ---
 
 **Analisis Detail:**
 
-**Kualitas Kode & Kejelasan (Tinjauan Ringkas):**
-* [Ringkasan temuan dari tahap 2]
+**Kualitas Kode & Kejelasan**:
+• [Detailed assessment of code quality]
 
-**Alur Logika & Fungsionalitas (Tinjauan Ringkas):**
-* [Ringkasan temuan dari tahap 1 dan 3]
+**Alur Logika & Fungsionalitas**:
+• [Logic flow and functionality analysis]
 
-**Konsistensi & Arsitektur (Tinjauan Ringkas):**
-* [Ringkasan temuan dari tahap 2]
+**Konsistensi & Arsitektur**:
+• [Architecture and pattern consistency check]
 
-**Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
-* [Verifikasi requirement dari tahap 1]
+**Keselarasan dengan Requirement** (jika ada konteks Notion):
+• [Requirement verification]
 
-**Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
-* [Detail temuan dari tahap 3 dan 4]
-
----
-
-**Feedback Tambahan & Saran (ANALISIS DETAIL DI SINI):**
-* [Saran konkret dan mendalam dari semua tahap]
+**Potensi Bug & Performa** (ANALISIS MENDALAM):
+• [Detailed bug and performance analysis with examples]
 
 ---
 
-**Kesimpulan:**
-[Pilih salah satu berdasarkan analisis:]
-* **Kode ini sudah baik...** (jika siap merge)
-* **Kode ini secara umum sudah baik, namun ada beberapa saran perbaikan minor...** (jika ada perbaikan minor)
-* **Ada beberapa isu signifikan...** (jika ada masalah serius)
+**Feedback Tambahan & Saran**:
+• [Comprehensive suggestions for improvement - maksimal ${REVIEW_MAX_SUGGESTIONS} item utama]
 
-Pastikan kesimpulan selaras dengan semua analisis sebelumnya.`;
+---
+
+**Kesimpulan**: [Detailed conclusion with specific recommendations]`;
+
+      default: // 'standard'
+        return `Format untuk Standard Mode:
+---
+## Review Kode
+
+**Ringkasan**: [2-3 kalimat tentang scope perubahan dan kesan umum]
+
+**Temuan Utama**:
+
+**🔴 Kritis** (harus diperbaiki):
+• [Issue kritis dengan solusi konkret]
+
+**🟡 Penting** (sangat disarankan):
+• [Improvement penting dengan reasoning]
+
+**🔵 Opsional** (nice to have):
+• [Saran tambahan jika ada]
+
+**Konsistensi dengan Existing Code**: [Assessment singkat]
+
+**Kesimpulan**:
+[Pilih: ✅ Siap merge / ⚠️ Perlu perbaikan minor / ❌ Perlu perbaikan signifikan]
+
+Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori.`;
+    }
   }
 
   /**
