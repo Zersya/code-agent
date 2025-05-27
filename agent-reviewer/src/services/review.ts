@@ -266,7 +266,11 @@ Aspek yang dipertimbangkan:
     * **Nuxt Specific**: Verifikasi kesesuaian dengan **dokumentasi resmi Nuxt.js**.
     * Apakah ada potensi konflik atau masalah integrasi dengan bagian lain dari aplikasi?
 
-**Instruksi Tambahan**:
+**Instruksi Teknikal Tambahan**:
+    * **Unit Test/Integration Test adalah optional** dalam proyek ini, jadi tidak perlu menilai kualitas tes.
+    * Bila project menggunakan Typescript, periksa apakah penggunaan tipenya benar dan efektif (Jangan terlalu sensitif periksa, tipe 'any' juga tidak masalah karena project tidak menggunakan Typescript secara ketat).
+
+**Instruksi General Tambahan**:
     * Bahasa: Gunakan Bahasa Indonesia yang formal, profesional, dan mudah dimengerti.
     * Kedalaman Analisis: **Berikan analisis paling mendalam dan poin-poin spesifik untuk 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk bagian lain, cukup berikan ringkasan temuan utama atau tinjauan umum.
     * Konteks Proyek (Jika Disediakan):
@@ -405,40 +409,48 @@ ${codeChanges}
     notionContext.contexts.forEach((context, index) => {
       formatted += `**Tugas ${index + 1}: ${context.title}**\n`;
 
-      // User Story section
-      if (context.description) {
-        const lines = context.description.split('\n');
-        const userStoryLines = lines.filter(line =>
-          line.trim() &&
-          !line.toLowerCase().includes('acceptance criteria') &&
-          !line.toLowerCase().includes('screenshots') &&
-          !line.toLowerCase().includes('to-do list')
-        );
+      // Use structured content if available, otherwise fall back to legacy formatting
+      if (context.structuredContent && context.structuredContent.hasStructuredContent) {
+        // Format structured content using the new service method
+        const structuredFormatted = this.formatStructuredNotionContent(context.structuredContent);
+        formatted += structuredFormatted;
+      } else {
+        // Legacy formatting for backward compatibility
+        // User Story section
+        if (context.description) {
+          const lines = context.description.split('\n');
+          const userStoryLines = lines.filter(line =>
+            line.trim() &&
+            !line.toLowerCase().includes('acceptance criteria') &&
+            !line.toLowerCase().includes('screenshots') &&
+            !line.toLowerCase().includes('to-do list')
+          );
 
-        if (userStoryLines.length > 0) {
-          formatted += `User Story: ${userStoryLines.join(' ').substring(0, 300)}${userStoryLines.join(' ').length > 300 ? '...' : ''}\n`;
+          if (userStoryLines.length > 0) {
+            formatted += `User Story: ${userStoryLines.join(' ').substring(0, 300)}${userStoryLines.join(' ').length > 300 ? '...' : ''}\n`;
+          }
         }
-      }
 
-      // To-do List (Requirements)
-      if (context.requirements.length > 0) {
-        formatted += `To-do List:\n`;
-        context.requirements.forEach(req => {
-          formatted += `- ${req}\n`;
-        });
-      }
+        // To-do List (Requirements)
+        if (context.requirements.length > 0) {
+          formatted += `To-do List:\n`;
+          context.requirements.forEach(req => {
+            formatted += `- ${req}\n`;
+          });
+        }
 
-      // Acceptance Criteria
-      if (context.acceptanceCriteria.length > 0) {
-        formatted += `Acceptance Criteria:\n`;
-        context.acceptanceCriteria.forEach(criteria => {
-          formatted += `- ${criteria}\n`;
-        });
-      }
+        // Acceptance Criteria
+        if (context.acceptanceCriteria.length > 0) {
+          formatted += `Acceptance Criteria:\n`;
+          context.acceptanceCriteria.forEach(criteria => {
+            formatted += `- ${criteria}\n`;
+          });
+        }
 
-      // Technical Specifications
-      if (context.technicalSpecs) {
-        formatted += `Technical Specifications: ${context.technicalSpecs.substring(0, 200)}${context.technicalSpecs.length > 200 ? '...' : ''}\n`;
+        // Technical Specifications
+        if (context.technicalSpecs) {
+          formatted += `Technical Specifications: ${context.technicalSpecs.substring(0, 200)}${context.technicalSpecs.length > 200 ? '...' : ''}\n`;
+        }
       }
 
       formatted += `Notion URL: ${context.url}\n\n`;
@@ -446,6 +458,78 @@ ${codeChanges}
 
     if (notionContext.errors.length > 0) {
       formatted += `**Catatan:** Beberapa tugas tidak dapat diakses (${notionContext.errors.length} error).\n`;
+    }
+
+    return formatted;
+  }
+
+  /**
+   * Format structured Notion content for review prompts
+   */
+  private formatStructuredNotionContent(structuredContent: any): string {
+    let formatted = '';
+
+    // User Story
+    if (structuredContent.userStory) {
+      formatted += `**User Story:** ${structuredContent.userStory.summary}\n`;
+      if (structuredContent.userStory.description !== structuredContent.userStory.summary) {
+        formatted += `Detail: ${structuredContent.userStory.description.substring(0, 200)}${structuredContent.userStory.description.length > 200 ? '...' : ''}\n`;
+      }
+    }
+
+    // Acceptance Criteria with progress
+    if (structuredContent.acceptanceCriteria) {
+      const { items, totalItems, completedItems } = structuredContent.acceptanceCriteria;
+      formatted += `**Acceptance Criteria** (${completedItems}/${totalItems} selesai):\n`;
+
+      items.slice(0, 10).forEach((item: any, index: number) => { // Limit to first 10 items
+        const status = item.completed ? '✅' : '⏳';
+        const priority = item.priority ? ` [${item.priority.toUpperCase()}]` : '';
+        formatted += `${index + 1}. ${status} ${item.text}${priority}\n`;
+
+        // Add nested items (limit to 3 per main item)
+        item.nested.slice(0, 3).forEach((nested: any, nestedIndex: number) => {
+          const nestedStatus = nested.completed ? '✅' : '⏳';
+          const nestedPriority = nested.priority ? ` [${nested.priority.toUpperCase()}]` : '';
+          formatted += `   ${nestedIndex + 1}.${index + 1}. ${nestedStatus} ${nested.text}${nestedPriority}\n`;
+        });
+      });
+
+      if (items.length > 10) {
+        formatted += `... dan ${items.length - 10} kriteria lainnya\n`;
+      }
+    }
+
+    // Screenshots and assets
+    if (structuredContent.screenshots && structuredContent.screenshots.totalImages > 0) {
+      formatted += `**Screenshots/Assets:** ${structuredContent.screenshots.totalImages} item(s)\n`;
+      structuredContent.screenshots.images.slice(0, 3).forEach((image: any, index: number) => {
+        formatted += `${index + 1}. ${image.type.toUpperCase()}`;
+        if (image.caption) {
+          formatted += `: ${image.caption}`;
+        }
+        formatted += '\n';
+      });
+      if (structuredContent.screenshots.images.length > 3) {
+        formatted += `... dan ${structuredContent.screenshots.images.length - 3} asset lainnya\n`;
+      }
+    }
+
+    // Todo List with progress
+    if (structuredContent.todoList) {
+      const { items, totalItems, completedItems, pendingItems } = structuredContent.todoList;
+      formatted += `**To-do List** (${completedItems}/${totalItems} selesai, ${pendingItems} pending):\n`;
+
+      items.slice(0, 8).forEach((item: any, index: number) => { // Limit to first 8 items
+        const status = item.completed ? '✅' : '⏳';
+        const priority = item.priority ? ` [${item.priority.toUpperCase()}]` : '';
+        const assignee = item.assignee ? ` (@${item.assignee})` : '';
+        formatted += `${index + 1}. ${status} ${item.text}${priority}${assignee}\n`;
+      });
+
+      if (items.length > 8) {
+        formatted += `... dan ${items.length - 8} tugas lainnya\n`;
+      }
     }
 
     return formatted;

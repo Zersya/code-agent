@@ -1,6 +1,78 @@
 // Types for Notion integration functionality
 
 /**
+ * Interface for User Story block content
+ */
+export interface UserStoryBlock {
+  content: string;
+  description: string;
+  summary: string;
+}
+
+/**
+ * Interface for Acceptance Criteria item
+ */
+export interface AcceptanceCriteriaItem {
+  text: string;
+  completed: boolean;
+  nested: AcceptanceCriteriaItem[];
+  priority?: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Interface for Acceptance Criteria block content
+ */
+export interface AcceptanceCriteriaBlock {
+  items: AcceptanceCriteriaItem[];
+  totalItems: number;
+  completedItems: number;
+}
+
+/**
+ * Interface for Screenshot/Image block content
+ */
+export interface ScreenshotBlock {
+  images: {
+    id: string;
+    caption?: string;
+    url?: string;
+    type: 'image' | 'file' | 'embed';
+  }[];
+  totalImages: number;
+}
+
+/**
+ * Interface for Todo List item
+ */
+export interface TodoListItem {
+  text: string;
+  completed: boolean;
+  priority?: 'high' | 'medium' | 'low';
+  assignee?: string;
+}
+
+/**
+ * Interface for Todo List block content
+ */
+export interface TodoListBlock {
+  items: TodoListItem[];
+  totalItems: number;
+  completedItems: number;
+  pendingItems: number;
+}
+
+/**
+ * Interface for structured Notion content
+ */
+export interface StructuredNotionContent {
+  userStory?: UserStoryBlock;
+  acceptanceCriteria?: AcceptanceCriteriaBlock;
+  screenshots?: ScreenshotBlock;
+  todoList?: TodoListBlock;
+  hasStructuredContent: boolean;
+}
+
+/**
  * Interface for Notion task context extracted from a Notion page
  */
 export interface NotionTaskContext {
@@ -14,6 +86,7 @@ export interface NotionTaskContext {
   url: string;
   lastModified: Date;
   error?: string;
+  structuredContent?: StructuredNotionContent;
 }
 
 /**
