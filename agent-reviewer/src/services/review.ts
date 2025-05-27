@@ -1188,9 +1188,155 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori.`;
 
   /**
    * Determine if a merge request should be approved based on the review result
+   * Primary logic: Approve if NO critical issues are found, regardless of review mode
    */
   private shouldApproveMergeRequest(reviewResult: string): boolean {
-    // Check if the review contains approval language
+    console.log('🔍 Analyzing review result for auto-approval decision...');
+
+    // Primary approval logic: Check for critical issues based on review mode
+    const hasCriticalIssues = this.hasCriticalIssues(reviewResult);
+
+    if (hasCriticalIssues) {
+      console.log('❌ Auto-approval denied: Critical issues found in review');
+      return false;
+    }
+
+    // Check for explicit approval/rejection conclusions
+    const conclusionApproval = this.checkConclusionApproval(reviewResult);
+
+    if (conclusionApproval !== null) {
+      console.log(`📋 Conclusion-based decision: ${conclusionApproval ? 'Approve' : 'Reject'}`);
+      return conclusionApproval;
+    }
+
+    // Fallback: Check for traditional Indonesian approval phrases
+    const phraseApproval = this.checkTraditionalApprovalPhrases(reviewResult);
+
+    if (phraseApproval) {
+      console.log('✅ Auto-approval granted: Traditional approval phrases found');
+      return true;
+    }
+
+    // Default: If no critical issues and no explicit rejection, approve
+    console.log('✅ Auto-approval granted: No critical issues detected');
+    return true;
+  }
+
+  /**
+   * Check if the review contains critical issues based on the review mode format
+   */
+  private hasCriticalIssues(reviewResult: string): boolean {
+    // Check for critical issues in different review mode formats
+
+    // Quick Mode: Check for "Isu Kritis" section with content
+    if (reviewResult.includes('Quick Mode')) {
+      const criticalSectionMatch = reviewResult.match(/\*\*Isu Kritis\*\*[^:]*:(.*?)(?=\*\*|$)/s);
+      if (criticalSectionMatch) {
+        const criticalContent = criticalSectionMatch[1].trim();
+        // If there's content after "Isu Kritis:" other than "Tidak ada"
+        return criticalContent.length > 0 &&
+               !criticalContent.toLowerCase().includes('tidak ada') &&
+               !criticalContent.toLowerCase().includes('none') &&
+               criticalContent.length > 10; // More than just whitespace/minimal text
+      }
+    }
+
+    // Standard/Detailed Mode: Check for 🔴 Critical issues
+    const criticalIssuePattern = /🔴.*?(?=🟡|🔵|\*\*|$)/gs;
+    const criticalMatches = reviewResult.match(criticalIssuePattern);
+
+    if (criticalMatches) {
+      // Check if there are actual critical issues (not just empty sections)
+      const hasRealCriticalIssues = criticalMatches.some(match => {
+        const content = match.replace(/🔴.*?:/, '').trim();
+        return content.length > 0 &&
+               !content.toLowerCase().includes('tidak ada') &&
+               !content.toLowerCase().includes('none') &&
+               content.length > 10;
+      });
+
+      if (hasRealCriticalIssues) {
+        return true;
+      }
+    }
+
+    // Check for explicit critical issue indicators
+    const criticalIndicators = [
+      '🔴',
+      'Isu Kritis',
+      'Critical',
+      'harus diperbaiki',
+      'wajib diperbaiki',
+      'perlu diperbaiki sebelum merge',
+      'blocking issue',
+      'fatal error'
+    ];
+
+    // Look for critical indicators followed by actual content
+    for (const indicator of criticalIndicators) {
+      const indicatorIndex = reviewResult.indexOf(indicator);
+      if (indicatorIndex !== -1) {
+        // Get text after the indicator (next 200 characters)
+        const followingText = reviewResult.substring(indicatorIndex, indicatorIndex + 200);
+        // Check if there's substantial content after the indicator
+        if (followingText.length > indicator.length + 20 &&
+            !followingText.toLowerCase().includes('tidak ada') &&
+            !followingText.toLowerCase().includes('none')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check for explicit approval/rejection conclusions in the review
+   */
+  private checkConclusionApproval(reviewResult: string): boolean | null {
+    // Check for explicit rejection conclusions
+    const rejectionIndicators = [
+      '❌ Perlu perbaikan signifikan',
+      '❌ **Perlu perbaikan signifikan**',
+      'Ada beberapa isu signifikan',
+      'perlu ditangani sebelum kode ini dapat di-merge',
+      'tidak dapat di-merge',
+      'tidak bisa di-merge'
+    ];
+
+    for (const indicator of rejectionIndicators) {
+      if (reviewResult.includes(indicator)) {
+        return false;
+      }
+    }
+
+    // Check for explicit approval conclusions
+    const approvalIndicators = [
+      '✅ Siap merge',
+      '✅ **Siap merge**',
+      'Siap merge',
+      '⚠️ Perlu perbaikan minor',
+      '⚠️ **Perlu perbaikan minor**',
+      'Kode ini sudah baik',
+      'dapat di-merge',
+      'bisa di-merge',
+      'siap untuk di-merge',
+      'layak untuk di-merge'
+    ];
+
+    for (const indicator of approvalIndicators) {
+      if (reviewResult.includes(indicator)) {
+        return true;
+      }
+    }
+
+    return null; // No explicit conclusion found
+  }
+
+  /**
+   * Check for traditional Indonesian approval phrases (fallback method)
+   */
+  private checkTraditionalApprovalPhrases(reviewResult: string): boolean {
     const approvalIndicators = [
       'Silahkan merge',
       'Silakan merge',

@@ -71,6 +71,33 @@ Enhanced review output with:
 - More scannable format with bullet points
 - Concise language focused on actionable feedback
 
+### 6. Enhanced Auto-Approval System
+
+Completely redesigned the automatic merge request approval logic to work intelligently with the new review modes:
+
+#### Primary Approval Logic
+- **Critical Issue Detection**: Automatically approves when NO critical issues are found
+- **Mode-Aware Analysis**: Works consistently across quick, standard, and detailed modes
+- **Structured Parsing**: Analyzes review structure rather than relying solely on phrase matching
+
+#### Multi-Layer Approval Process
+1. **Primary Check**: Structured analysis of critical issue sections
+2. **Conclusion Check**: Explicit approval/rejection statement detection
+3. **Fallback Check**: Traditional Indonesian approval phrases
+4. **Default Behavior**: Approve if no critical issues detected
+
+#### Critical Issue Detection Methods
+- **Quick Mode**: Analyzes "Isu Kritis" section content
+- **Standard/Detailed Mode**: Detects 🔴 critical issue indicators with substantial content
+- **Smart Filtering**: Ignores empty sections or "Tidak ada" responses
+- **Content Validation**: Ensures critical indicators have meaningful content
+
+#### Approval Criteria
+- ✅ No critical (🔴) issues detected
+- ✅ Conclusion indicates "✅ Siap merge" or "⚠️ Perlu perbaikan minor"
+- ✅ Only important (🟡) or optional (🔵) suggestions present
+- ❌ Rejects when "❌ Perlu perbaikan signifikan" found
+
 ## Configuration Options
 
 ```bash
@@ -96,6 +123,11 @@ REVIEW_FOCUS_AREAS='bugs,performance,security,style'
 3. **Sequential Thinking Integration**: Updated sequential thinking prompts to respect new configurations
 4. **Output Formatting**: Implemented mode-specific output templates
 5. **Configuration Logging**: Added startup logging to show active configuration
+6. **Auto-Approval Logic**: Completely redesigned `shouldApproveMergeRequest()` method with:
+   - `hasCriticalIssues()`: Structured critical issue detection
+   - `checkConclusionApproval()`: Explicit conclusion analysis
+   - `checkTraditionalApprovalPhrases()`: Fallback phrase detection
+   - Multi-layer decision process with detailed logging
 
 ### Files Modified
 

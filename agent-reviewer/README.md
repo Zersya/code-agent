@@ -280,9 +280,52 @@ Customize which aspects the review should prioritize:
 - **Team Alignment**: Conservative mode ensures suggestions align with existing project standards
 - **Productivity**: Quick mode enables rapid iteration while detailed mode supports learning
 
+### Enhanced Auto-Approval System
+
+The auto-approval system has been enhanced to work intelligently with all review modes:
+
+#### Primary Approval Logic
+- **Automatically approves** merge requests when NO critical issues are found
+- **Works across all review modes** (quick, standard, detailed)
+- **Prioritizes structured issue detection** over traditional phrase matching
+
+#### Critical Issue Detection
+The system detects critical issues by analyzing:
+
+**Quick Mode:**
+- Content under "**Isu Kritis**" section
+- Presence of actual issues (not just "Tidak ada")
+
+**Standard/Detailed Mode:**
+- 🔴 Critical issue indicators with substantial content
+- Explicit rejection conclusions like "❌ Perlu perbaikan signifikan"
+
+#### Approval Criteria
+A merge request is automatically approved when:
+- ✅ No critical (🔴) issues are detected
+- ✅ Review conclusion indicates "✅ Siap merge" or "⚠️ Perlu perbaikan minor"
+- ✅ Only important (🟡) or optional (🔵) suggestions are present
+
+#### Approval Process
+1. **Primary Check**: Analyze review structure for critical issues
+2. **Conclusion Check**: Look for explicit approval/rejection statements
+3. **Fallback Check**: Traditional Indonesian approval phrases
+4. **Default Behavior**: Approve if no critical issues found
+
+#### Auto-Approval Messages
+When auto-approving, the system adds:
+```
+Silahkan merge!
+Terima kasih
+```
+
+This ensures consistent approval messaging while maintaining the intelligent detection system.
+
 ### Migration from Previous Version
 
 Existing installations will automatically use the standard mode with default settings, maintaining backward compatibility. No configuration changes are required unless you want to customize the review behavior.
+
+The enhanced auto-approval system is backward compatible and will continue to work with existing review formats while providing improved accuracy for the new structured review modes.
 
 ## Documentation Embedding
 

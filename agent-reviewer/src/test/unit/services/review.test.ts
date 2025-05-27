@@ -1,5 +1,5 @@
 // Test file for review service functionality
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { reviewService } from '../../../services/review.js';
 
 describe('Review Service', () => {
@@ -411,6 +411,234 @@ describe('Review Service', () => {
       expect(sequentialPrompt).toContain('Mode Konservatif Aktif');
       expect(sequentialPrompt).toContain('Maksimal 3 saran');
       expect(sequentialPrompt).toContain('bugs, security');
+    });
+  });
+
+  describe('Auto-Approval Logic', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    describe('shouldApproveMergeRequest', () => {
+      test('should approve when no critical issues are found in quick mode', () => {
+        const reviewResult = `
+## Review Kode (Quick Mode)
+
+**Ringkasan**: Perubahan pada authentication middleware, tidak ada isu kritis ditemukan.
+
+**Isu Kritis**: Tidak ada
+
+**Kesimpulan**: ✅ Siap merge
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(true);
+      });
+
+      test('should reject when critical issues are found in quick mode', () => {
+        const reviewResult = `
+## Review Kode (Quick Mode)
+
+**Ringkasan**: Perubahan pada authentication middleware dengan beberapa masalah.
+
+**Isu Kritis**:
+🔴 Null pointer exception pada line 45 ketika user tidak terautentikasi
+🔴 SQL injection vulnerability pada query parameter
+
+**Kesimpulan**: ⚠️ Perlu perbaikan
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(false);
+      });
+
+      test('should approve when no critical issues in standard mode', () => {
+        const reviewResult = `
+## Review Kode
+
+**Ringkasan**: Implementasi fitur login dengan validasi yang baik.
+
+**🔴 Kritis**: Tidak ada
+
+**🟡 Penting**:
+• Tambahkan rate limiting untuk endpoint login
+
+**🔵 Opsional**:
+• Pertimbangkan menggunakan TypeScript untuk type safety
+
+**Kesimpulan**: ⚠️ Perlu perbaikan minor
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(true);
+      });
+
+      test('should reject when critical issues found in standard mode', () => {
+        const reviewResult = `
+## Review Kode
+
+**Ringkasan**: Implementasi fitur login dengan beberapa masalah serius.
+
+**🔴 Kritis**:
+• Password disimpan dalam plain text tanpa hashing
+• Tidak ada validasi input yang dapat menyebabkan XSS
+
+**🟡 Penting**:
+• Tambahkan rate limiting untuk endpoint login
+
+**Kesimpulan**: ❌ Perlu perbaikan signifikan
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(false);
+      });
+
+      test('should approve when only important and optional issues in detailed mode', () => {
+        const reviewResult = `
+## Review Kode (Detailed Analysis)
+
+**Ringkasan**: Comprehensive analysis of authentication changes.
+
+**🔴 Kritis**: Tidak ada
+
+**🟡 Penting**:
+• Consider adding input validation for better security
+• Optimize database query performance
+
+**🔵 Opsional**:
+• Add more comprehensive logging
+• Consider using dependency injection
+
+**Kesimpulan**: ✅ Siap merge
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(true);
+      });
+
+      test('should handle traditional approval phrases as fallback', () => {
+        const reviewResult = `
+Kode ini sudah baik dan dapat di-merge. Silahkan merge!
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(true);
+      });
+
+      test('should handle explicit rejection conclusions', () => {
+        const reviewResult = `
+Ada beberapa isu signifikan yang perlu ditangani sebelum kode ini dapat di-merge.
+        `;
+
+        const shouldApprove = (reviewService as any).shouldApproveMergeRequest(reviewResult);
+        expect(shouldApprove).toBe(false);
+      });
+    });
+
+    describe('hasCriticalIssues', () => {
+      test('should detect critical issues in quick mode format', () => {
+        const reviewResult = `
+**Isu Kritis**:
+🔴 Memory leak pada component lifecycle
+🔴 Race condition dalam async operations
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+
+      test('should not detect critical issues when section is empty in quick mode', () => {
+        const reviewResult = `
+**Isu Kritis**: Tidak ada
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(false);
+      });
+
+      test('should detect critical issues with emoji indicators', () => {
+        const reviewResult = `
+**🔴 Kritis**:
+• Buffer overflow vulnerability pada input processing
+• Unhandled exception yang dapat crash aplikasi
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+
+      test('should not detect critical issues when section is empty with emoji', () => {
+        const reviewResult = `
+**🔴 Kritis**: Tidak ada
+**🟡 Penting**: Ada beberapa saran
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(false);
+      });
+
+      test('should detect critical indicators with substantial content', () => {
+        const reviewResult = `
+Ditemukan beberapa masalah yang harus diperbaiki sebelum merge:
+- Authentication bypass vulnerability
+- Data corruption risk in concurrent access
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+    });
+
+    describe('checkConclusionApproval', () => {
+      test('should return true for explicit approval conclusions', () => {
+        const reviewResult = '✅ Siap merge - kode sudah memenuhi standar';
+        const result = (reviewService as any).checkConclusionApproval(reviewResult);
+        expect(result).toBe(true);
+      });
+
+      test('should return true for minor issues conclusion', () => {
+        const reviewResult = '⚠️ Perlu perbaikan minor sebelum merge';
+        const result = (reviewService as any).checkConclusionApproval(reviewResult);
+        expect(result).toBe(true);
+      });
+
+      test('should return false for significant issues conclusion', () => {
+        const reviewResult = '❌ Perlu perbaikan signifikan sebelum dapat di-merge';
+        const result = (reviewService as any).checkConclusionApproval(reviewResult);
+        expect(result).toBe(false);
+      });
+
+      test('should return null when no explicit conclusion found', () => {
+        const reviewResult = 'Some general review comments without explicit conclusion';
+        const result = (reviewService as any).checkConclusionApproval(reviewResult);
+        expect(result).toBe(null);
+      });
+    });
+
+    describe('checkTraditionalApprovalPhrases', () => {
+      test('should detect traditional approval phrases', () => {
+        const reviewResult = 'Kode ini sudah baik dan dapat di-merge';
+        const result = (reviewService as any).checkTraditionalApprovalPhrases(reviewResult);
+        expect(result).toBe(true);
+      });
+
+      test('should detect Silahkan merge phrase', () => {
+        const reviewResult = 'Silahkan merge! Terima kasih';
+        const result = (reviewService as any).checkTraditionalApprovalPhrases(reviewResult);
+        expect(result).toBe(true);
+      });
+
+      test('should not detect when no approval phrases present', () => {
+        const reviewResult = 'Ada beberapa masalah yang perlu diperbaiki';
+        const result = (reviewService as any).checkTraditionalApprovalPhrases(reviewResult);
+        expect(result).toBe(false);
+      });
     });
   });
 });
