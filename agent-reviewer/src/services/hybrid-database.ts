@@ -30,7 +30,7 @@ export class HybridDatabaseService {
   async initialize(): Promise<void> {
     try {
       // Always initialize the database service
-      await dbService.initializeSchema();
+      await dbService.initialize();
 
       if (this.useQdrant) {
         // Check QDrant health and initialize if needed
@@ -259,7 +259,7 @@ export class HybridDatabaseService {
 
     // Delete from database
     try {
-      await dbService.deleteEmbeddingsByProject(projectId);
+      await dbService.clearProjectEmbeddingData(projectId);
     } catch (error) {
       console.error('Error deleting embeddings from database:', error);
       errors.push(error instanceof Error ? error : new Error(String(error)));
@@ -341,7 +341,7 @@ export class HybridDatabaseService {
     }
 
     // Fallback to database search
-    return await dbService.searchDocumentationEmbeddings(embedding, frameworks, limit);
+    return await dbService.searchSimilarDocumentation(frameworks, embedding, limit);
   }
 
   /**
@@ -382,15 +382,20 @@ export class HybridDatabaseService {
     qdrant: { available: boolean; enabled: boolean; error?: string };
     mode: 'database-only' | 'qdrant-primary' | 'hybrid';
   }> {
-    const status = {
+    const status: {
+      database: { available: boolean; error?: string };
+      qdrant: { available: boolean; enabled: boolean; error?: string };
+      mode: 'database-only' | 'qdrant-primary' | 'hybrid';
+    } = {
       database: { available: false },
       qdrant: { available: false, enabled: this.useQdrant },
-      mode: 'database-only' as 'database-only' | 'qdrant-primary' | 'hybrid'
+      mode: 'database-only'
     };
 
     // Check database
     try {
-      await dbService.healthCheck();
+      const client = await dbService.getClient();
+      client.release();
       status.database.available = true;
     } catch (error) {
       status.database.error = error instanceof Error ? error.message : String(error);
@@ -461,7 +466,41 @@ export class HybridDatabaseService {
   }
 
   async getDocumentationEmbeddingsBySource(sourceId: string) {
-    return await dbService.getDocumentationEmbeddingsBySource(sourceId);
+    // This method doesn't exist in dbService, let's implement it
+    try {
+      const client = await dbService.getClient();
+      try {
+        const result = await client.query(`
+          SELECT
+            id,
+            source_id as "sourceId",
+            section,
+            title,
+            content,
+            embedding,
+            url,
+            framework,
+            version,
+            keywords,
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+          FROM documentation_embeddings
+          WHERE source_id = $1
+        `, [sourceId]);
+
+        return result.rows.map((row: any) => {
+          if (typeof row.embedding === 'string') {
+            row.embedding = JSON.parse(row.embedding);
+          }
+          return row;
+        });
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Error getting documentation embeddings by source:', error);
+      throw error;
+    }
   }
 
   async saveDocumentationSource(source: any) {
@@ -472,28 +511,24 @@ export class HybridDatabaseService {
     return await dbService.getProjectDocumentationMappings(projectId);
   }
 
-  async saveWebhookProcessingRecord(record: any) {
-    return await dbService.saveWebhookProcessingRecord(record);
+  async createWebhookProcessing(record: any) {
+    return await dbService.createWebhookProcessing(record);
   }
 
-  async getWebhookProcessingRecord(key: string) {
-    return await dbService.getWebhookProcessingRecord(key);
+  async getActiveWebhookProcessing(key: string) {
+    return await dbService.getActiveWebhookProcessing(key);
   }
 
-  async updateWebhookProcessingRecord(key: string, updates: any) {
-    return await dbService.updateWebhookProcessingRecord(key, updates);
+  async updateWebhookProcessingStatus(processingId: string, status: any, completedAt?: Date, error?: string) {
+    return await dbService.updateWebhookProcessingStatus(processingId, status, completedAt, error);
   }
 
-  async deleteWebhookProcessingRecord(key: string) {
-    return await dbService.deleteWebhookProcessingRecord(key);
+  async cleanupStaleWebhookProcessing(cutoffTime: Date) {
+    return await dbService.cleanupStaleWebhookProcessing(cutoffTime);
   }
 
-  async cleanupOldWebhookRecords(olderThanHours: number = 24) {
-    return await dbService.cleanupOldWebhookRecords(olderThanHours);
-  }
-
-  async healthCheck() {
-    return await dbService.healthCheck();
+  async getWebhookProcessingStats() {
+    return await dbService.getWebhookProcessingStats();
   }
 
   // Additional methods that might be needed by services
@@ -505,7 +540,7 @@ export class HybridDatabaseService {
     return await dbService.getDocumentationSource(sourceId);
   }
 
-  async updateDocumentationSourceStatus(sourceId: string, status: string, error?: string, timestamp?: Date) {
+  async updateDocumentationSourceStatus(sourceId: string, status: 'pending' | 'success' | 'failed', error?: string, timestamp?: Date) {
     return await dbService.updateDocumentationSourceStatus(sourceId, status, error, timestamp);
   }
 
@@ -521,30 +556,15 @@ export class HybridDatabaseService {
     return await dbService.saveProjectDocumentationMapping(mapping);
   }
 
-  async deleteEmbeddingsByProject(projectId: number) {
-    const errors: Error[] = [];
-
-    // Delete from database
+  async healthCheck() {
     try {
-      await dbService.deleteEmbeddingsByProject(projectId);
+      // Check database connection by getting a client
+      const client = await dbService.getClient();
+      client.release();
+      return true;
     } catch (error) {
-      console.error('Error deleting embeddings from database:', error);
-      errors.push(error instanceof Error ? error : new Error(String(error)));
-    }
-
-    // Delete from QDrant if enabled
-    if (this.useQdrant) {
-      try {
-        await qdrantService.deleteCodeEmbeddingsByProject(projectId);
-      } catch (error) {
-        console.error('Error deleting embeddings from QDrant:', error);
-        errors.push(error instanceof Error ? error : new Error(String(error)));
-      }
-    }
-
-    // If any errors occurred, throw the first one
-    if (errors.length > 0) {
-      throw errors[0];
+      console.error('Database health check failed:', error);
+      return false;
     }
   }
 }

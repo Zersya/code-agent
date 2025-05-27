@@ -1,11 +1,12 @@
 import { hybridDbService } from './hybrid-database.js';
+import { dbService } from './database.js';
 import { embeddingService } from './embedding.js';
 import { repositoryService } from './repository.js';
 import { gitlabService } from './gitlab.js';
 import { queueService } from './queue.js';
 import { enhancedContextService } from './enhanced-context.js';
 import { documentationService } from './documentation.js';
-import { CodeEmbedding, CodeFile, ProjectMetadata, DocumentationContext, DocumentationEmbedding } from '../models/embedding.js';
+import { CodeEmbedding, CodeFile, ProjectMetadata, DocumentationContext, DocumentationEmbedding, DocumentationSource } from '../models/embedding.js';
 import { MergeRequestChange } from '../types/review.js';
 import { EnhancedContextResult } from '../types/context.js';
 import { JobStatus } from '../models/queue.js';
@@ -355,7 +356,7 @@ export class ContextService {
       const sources = await Promise.all(
         sourceIds.map(id => hybridDbService.getDocumentationSource(id))
       );
-      const validSources = sources.filter(s => s !== null);
+      const validSources = sources.filter(s => s !== null) as DocumentationSource[];
 
       if (validSources.length === 0) {
         console.log(`No valid documentation sources found for project ${projectId}`);

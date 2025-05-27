@@ -113,7 +113,7 @@ export class QdrantService {
       await this.client.createCollection(params.name, {
         vectors: {
           size: params.vectorSize,
-          distance: params.distance
+          distance: params.distance === 'Euclidean' ? 'Euclid' : params.distance
         },
         on_disk_payload: params.onDiskPayload,
         optimizers_config: params.optimizersConfig,
@@ -134,12 +134,25 @@ export class QdrantService {
   async getCollectionInfo(collectionName: string): Promise<QdrantCollectionInfo | null> {
     try {
       const info = await this.client.getCollection(collectionName);
+      const vectorConfig = info.config?.params?.vectors;
+      let vectorSize = 0;
+      let distance: 'Cosine' | 'Euclidean' | 'Dot' = 'Cosine';
+
+      if (typeof vectorConfig === 'object' && vectorConfig !== null) {
+        if (typeof vectorConfig.size === 'number') {
+          vectorSize = vectorConfig.size;
+        }
+        if (vectorConfig.distance) {
+          distance = vectorConfig.distance === 'Euclid' ? 'Euclidean' : vectorConfig.distance as 'Cosine' | 'Euclidean' | 'Dot';
+        }
+      }
+
       return {
         name: collectionName,
-        vectorSize: info.config?.params?.vectors?.size || 0,
-        distance: info.config?.params?.vectors?.distance || 'Cosine',
+        vectorSize,
+        distance,
         status: info.status || 'unknown',
-        pointsCount: info.points_count
+        pointsCount: info.points_count || 0
       };
     } catch (error) {
       console.error(`Error getting collection info for ${collectionName}:`, error);
@@ -542,9 +555,10 @@ export class QdrantService {
 
       const embeddings = scrollResult.points.map(point => this.mapQdrantResultToCodeEmbedding(point));
 
+      const nextOffset = scrollResult.next_page_offset;
       return {
         embeddings,
-        nextOffset: scrollResult.next_page_offset
+        nextOffset: (typeof nextOffset === 'string' || typeof nextOffset === 'number') ? nextOffset : undefined
       };
     } catch (error) {
       console.error('Error getting code embeddings by project:', error);

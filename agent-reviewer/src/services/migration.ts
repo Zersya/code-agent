@@ -1,4 +1,5 @@
 import { dbService } from './database.js';
+import { hybridDbService } from './hybrid-database.js';
 import { qdrantService } from './qdrant.js';
 import { CodeEmbedding, DocumentationEmbedding } from '../models/embedding.js';
 import { MigrationProgress, MigrationOptions } from '../models/qdrant.js';
@@ -33,7 +34,7 @@ export class MigrationService {
 
     // Migrate code embeddings
     const codeProgress = await this.migrateCodeEmbeddings(options);
-    
+
     // Migrate documentation embeddings
     const docsProgress = await this.migrateDocumentationEmbeddings(options);
 
@@ -62,7 +63,7 @@ export class MigrationService {
    */
   async migrateCodeEmbeddings(options: MigrationOptions): Promise<MigrationProgress> {
     console.log('Migrating code embeddings...');
-    
+
     const startTime = new Date();
     let migratedRecords = 0;
     let failedRecords = 0;
@@ -97,7 +98,7 @@ export class MigrationService {
       // Migrate each project
       for (const project of projects) {
         console.log(`Migrating project ${project.projectId}: ${project.name}`);
-        
+
         try {
           const embeddings = await dbService.getEmbeddingsByProject(project.projectId);
           console.log(`Found ${embeddings.length} embeddings for project ${project.projectId}`);
@@ -106,7 +107,7 @@ export class MigrationService {
           for (let i = 0; i < embeddings.length; i += options.batchSize) {
             currentBatch++;
             const batch = embeddings.slice(i, i + options.batchSize);
-            
+
             console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} embeddings)`);
 
             try {
@@ -118,7 +119,7 @@ export class MigrationService {
                   console.warn(`Skipping ${invalidCount} invalid embeddings in batch ${currentBatch}`);
                   failedRecords += invalidCount;
                 }
-                
+
                 if (validEmbeddings.length === 0) {
                   continue;
                 }
@@ -187,7 +188,7 @@ export class MigrationService {
    */
   async migrateDocumentationEmbeddings(options: MigrationOptions): Promise<MigrationProgress> {
     console.log('Migrating documentation embeddings...');
-    
+
     const startTime = new Date();
     let migratedRecords = 0;
     let failedRecords = 0;
@@ -203,7 +204,7 @@ export class MigrationService {
 
       // Count total records first
       for (const source of sources) {
-        const embeddings = await dbService.getDocumentationEmbeddingsBySource(source.id);
+        const embeddings = await hybridDbService.getDocumentationEmbeddingsBySource(source.id);
         totalRecords += embeddings.length;
       }
 
@@ -212,16 +213,16 @@ export class MigrationService {
       // Migrate each source
       for (const source of sources) {
         console.log(`Migrating documentation source ${source.id}: ${source.name}`);
-        
+
         try {
-          const embeddings = await dbService.getDocumentationEmbeddingsBySource(source.id);
+          const embeddings = await hybridDbService.getDocumentationEmbeddingsBySource(source.id);
           console.log(`Found ${embeddings.length} embeddings for source ${source.id}`);
 
           // Process in batches
           for (let i = 0; i < embeddings.length; i += options.batchSize) {
             currentBatch++;
             const batch = embeddings.slice(i, i + options.batchSize);
-            
+
             console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} embeddings)`);
 
             try {
@@ -233,7 +234,7 @@ export class MigrationService {
                   console.warn(`Skipping ${invalidCount} invalid embeddings in batch ${currentBatch}`);
                   failedRecords += invalidCount;
                 }
-                
+
                 if (validEmbeddings.length === 0) {
                   continue;
                 }
@@ -403,12 +404,12 @@ export class MigrationService {
     // For now, we'll estimate based on projects
     const projects = await dbService.getAllProjects();
     let total = 0;
-    
+
     for (const project of projects) {
       const embeddings = await dbService.getEmbeddingsByProject(project.projectId);
       total += embeddings.length;
     }
-    
+
     return total;
   }
 
@@ -419,12 +420,12 @@ export class MigrationService {
     // This method would need to be implemented in the database service
     const sources = await dbService.getAllDocumentationSources();
     let total = 0;
-    
+
     for (const source of sources) {
-      const embeddings = await dbService.getDocumentationEmbeddingsBySource(source.id);
+      const embeddings = await hybridDbService.getDocumentationEmbeddingsBySource(source.id);
       total += embeddings.length;
     }
-    
+
     return total;
   }
 }

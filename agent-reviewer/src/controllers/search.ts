@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { embeddingService } from '../services/embedding.js';
 import { hybridDbService } from '../services/hybrid-database.js';
+import { dbService } from '../services/database.js';
 import { repositoryService } from '../services/repository.js';
 import { llmService } from '../services/llm.js';
 import { CodeEmbedding } from '../models/embedding.js';
