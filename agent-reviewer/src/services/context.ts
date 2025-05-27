@@ -1,4 +1,4 @@
-import { dbService } from './database.js';
+import { hybridDbService } from './hybrid-database.js';
 import { embeddingService } from './embedding.js';
 import { repositoryService } from './repository.js';
 import { gitlabService } from './gitlab.js';
@@ -48,7 +48,7 @@ export class ContextService {
 
 
       // Get project metadata
-      const projectMetadata = await dbService.getProjectMetadata(projectId);
+      const projectMetadata = await hybridDbService.getProjectMetadata(projectId);
 
       // Check if project exists in the database
       if (!projectMetadata) {
@@ -117,7 +117,7 @@ export class ContextService {
       }
 
       // Check if the project has any embeddings
-      const hasEmbeddings = await dbService.hasEmbeddings(projectId);
+      const hasEmbeddings = await hybridDbService.hasEmbeddings(projectId);
 
       if (!hasEmbeddings) {
         console.log(`Project ${projectId} exists but has no embeddings, triggering embedding process`);
@@ -211,7 +211,7 @@ export class ContextService {
   private async findRelevantFiles(projectId: number, changes: MergeRequestChange[]): Promise<CodeEmbedding[]> {
     try {
       // Get all embeddings for the project
-      const allEmbeddings = await dbService.getEmbeddingsByProject(projectId);
+      const allEmbeddings = await hybridDbService.getEmbeddingsByProject(projectId);
 
       if (allEmbeddings.length === 0) {
         console.log(`No embeddings found for project ${projectId}`);
@@ -260,7 +260,7 @@ export class ContextService {
           const embedding = await embeddingService.generateEmbedding(change.newContent);
 
           // Search for similar code
-          const similarFiles = await dbService.searchSimilarCode(projectId, embedding, 3);
+          const similarFiles = await hybridDbService.searchSimilarCode(projectId, embedding, 3);
 
           // Add to semantically related files if not already included
           for (const file of similarFiles) {
@@ -297,7 +297,7 @@ export class ContextService {
     try {
 
       // Get project metadata to get the URL
-      const projectMetadata = await dbService.getProjectMetadata(projectId);
+      const projectMetadata = await hybridDbService.getProjectMetadata(projectId);
 
       if (!projectMetadata || !projectMetadata.url) {
         return false;
@@ -337,7 +337,7 @@ export class ContextService {
       await documentationService.autoMapProjectDocumentation(projectId, changes);
 
       // Get project documentation mappings
-      const mappings = await dbService.getProjectDocumentationMappings(projectId);
+      const mappings = await hybridDbService.getProjectDocumentationMappings(projectId);
 
       if (mappings.length === 0) {
         console.log(`No documentation mappings found for project ${projectId}`);
@@ -353,7 +353,7 @@ export class ContextService {
       // Get documentation sources
       const sourceIds = mappings.map(m => m.sourceId);
       const sources = await Promise.all(
-        sourceIds.map(id => dbService.getDocumentationSource(id))
+        sourceIds.map(id => hybridDbService.getDocumentationSource(id))
       );
       const validSources = sources.filter(s => s !== null);
 
@@ -385,7 +385,7 @@ export class ContextService {
 
         try {
           const embedding = await embeddingService.generateEmbedding(change.newContent);
-          const similarDocs = await dbService.searchSimilarDocumentation(frameworks, embedding, 3);
+          const similarDocs = await hybridDbService.searchDocumentationEmbeddings(embedding, frameworks, 3);
 
           for (const doc of similarDocs) {
             if (!relevantSections.some(s => s.id === doc.id)) {

@@ -2,7 +2,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import path from 'path';
 import { gitlabService } from './gitlab.js';
-import { dbService } from './database.js';
+import { hybridDbService } from './hybrid-database.js';
 import { queueService } from './queue.js';
 import { repositoryService } from './repository.js';
 import { JobStatus } from '../models/queue.js';
@@ -134,7 +134,7 @@ export class EmbeddingService {
       try {
 
         // Check if the project has embeddings
-        const hasEmbeddings = await dbService.hasEmbeddings(projectId);
+        const hasEmbeddings = await hybridDbService.hasEmbeddings(projectId);
 
         if (hasEmbeddings) {
           console.log(`Project ${projectId} already has embeddings`);
@@ -214,7 +214,7 @@ export class EmbeddingService {
 
       // Update the last re-embedding timestamp before queuing the job
       const reembeddingTimestamp = new Date();
-      await dbService.updateLastReembeddingTimestamp(projectId, reembeddingTimestamp);
+      await hybridDbService.updateLastReembeddingTimestamp(projectId, reembeddingTimestamp);
 
       // Queue the project for re-embedding with high priority
       const processingId = uuidv4();
@@ -236,7 +236,7 @@ export class EmbeddingService {
    */
   private async shouldSkipReembeddingDueToWeeklyLimit(projectId: number): Promise<boolean> {
     try {
-      const projectMetadata = await dbService.getProjectMetadata(projectId);
+      const projectMetadata = await hybridDbService.getProjectMetadata(projectId);
 
       if (!projectMetadata || !projectMetadata.lastReembeddingAt) {
         // No previous re-embedding recorded, allow re-embedding

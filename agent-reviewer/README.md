@@ -20,6 +20,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 
 - Node.js 18+
 - PostgreSQL database (with pgvector extension for vector search)
+- QDrant vector database (optional, for improved performance)
 - GitLab account with API access
 - Qodo-Embed-1 API access
 - OpenRouter API key (if using OpenRouter as LLM provider)
@@ -56,6 +57,12 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 
    # Database Configuration
    DATABASE_URL='postgresql://postgres:postgres@localhost:5432/repopo_reviewer'
+
+   # QDrant Vector Database (Optional)
+   QDRANT_URL='http://localhost:6333'
+   QDRANT_API_KEY=''
+   USE_QDRANT='false'  # Set to true to use QDrant instead of PostgreSQL for embeddings
+   QDRANT_FALLBACK_TO_DB='true'  # Fallback to database if QDrant fails
 
    # Embedding Configuration
    QODO_EMBED_API_KEY='your-qodo-embed-api-key'
@@ -168,7 +175,38 @@ CREATE TABLE batches (
 
 ### Vector Search
 
-The system uses the `pgvector` extension for PostgreSQL to enable efficient similarity search of code embeddings. If the extension is not available, it will fall back to storing embeddings as JSONB and using basic filtering.
+The system supports two vector storage options:
+
+1. **PostgreSQL with pgvector** (default): Uses the `pgvector` extension for efficient similarity search. Falls back to JSONB storage if the extension is unavailable.
+
+2. **QDrant Vector Database** (optional): A dedicated vector database optimized for similarity search operations, offering better performance and scalability.
+
+### QDrant Migration
+
+To migrate from PostgreSQL to QDrant for improved performance:
+
+1. **Start QDrant server**:
+   ```bash
+   docker-compose -f docker-compose.qdrant.yml up -d qdrant
+   ```
+
+2. **Run migration**:
+   ```bash
+   # Dry run first to test
+   npm run migrate:qdrant:dry-run
+
+   # Actual migration
+   npm run migrate:qdrant
+   ```
+
+3. **Enable QDrant**:
+   ```env
+   USE_QDRANT=true
+   ```
+
+4. **Restart the application**
+
+For detailed migration instructions, see [QDrant Migration Guide](docs/qdrant-migration.md).
 
 ### Merge Request Review
 

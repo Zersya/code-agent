@@ -17,7 +17,19 @@ import {
   mapProjectToDocumentation,
   getProjectDocumentationMappings
 } from './controllers/documentation.js';
-import { dbService } from './services/database.js';
+import {
+  getQdrantStatus,
+  getCollectionInfo,
+  enableQdrant,
+  disableQdrant,
+  startMigration,
+  getMigrationProgress,
+  verifyMigration,
+  clearCollection,
+  searchEmbeddings,
+  getQdrantHealth
+} from './controllers/qdrant.js';
+import { hybridDbService } from './services/hybrid-database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 
 dotenv.config();
@@ -60,6 +72,22 @@ app.post('/api/documentation/sources/:id/reembed', apiAuth, reembedDocumentation
 app.post('/api/projects/:projectId/documentation', apiAuth, mapProjectToDocumentation);
 app.get('/api/projects/:projectId/documentation', apiAuth, getProjectDocumentationMappings);
 
+// QDrant management API
+app.get('/api/qdrant/status', apiAuth, getQdrantStatus);
+app.get('/api/qdrant/health', apiAuth, getQdrantHealth);
+app.get('/api/qdrant/collections/:collection', apiAuth, getCollectionInfo);
+app.post('/api/qdrant/enable', apiAuth, enableQdrant);
+app.post('/api/qdrant/disable', apiAuth, disableQdrant);
+
+// Migration API
+app.post('/api/qdrant/migrate', apiAuth, startMigration);
+app.get('/api/qdrant/migrate/progress', apiAuth, getMigrationProgress);
+app.post('/api/qdrant/migrate/verify', apiAuth, verifyMigration);
+
+// Collection management API
+app.delete('/api/qdrant/collections/:collection', apiAuth, clearCollection);
+app.post('/api/qdrant/collections/:collection/search', apiAuth, searchEmbeddings);
+
 // Webhook processing statistics API
 app.get('/api/webhook/stats', apiAuth, async (_req, res) => {
   try {
@@ -80,12 +108,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start the server
 async function startServer() {
   try {
-    // Connect to the database
+    // Initialize the hybrid database service
     try {
-      await dbService.connect();
-      console.log('Database connection established');
+      await hybridDbService.initialize();
+      console.log('Hybrid database service initialized');
     } catch (dbError) {
-      console.error('Warning: Database connection failed, but continuing:', dbError);
+      console.error('Warning: Database initialization failed, but continuing:', dbError);
       console.warn('Some features may not work correctly without a database connection');
     }
 
@@ -102,14 +130,14 @@ async function startServer() {
 process.on('SIGINT', async () => {
   console.log('Shutting down server...');
   webhookDeduplicationService.stopPeriodicCleanup();
-  await dbService.disconnect();
+  await hybridDbService.healthCheck(); // Just check health, no explicit disconnect needed
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('Shutting down server...');
   webhookDeduplicationService.stopPeriodicCleanup();
-  await dbService.disconnect();
+  await hybridDbService.healthCheck(); // Just check health, no explicit disconnect needed
   process.exit(0);
 });
 

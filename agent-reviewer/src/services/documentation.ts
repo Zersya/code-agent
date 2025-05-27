@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { dbService } from './database.js';
+import { hybridDbService } from './hybrid-database.js';
 import { embeddingService } from './embedding.js';
 import { queueService } from './queue.js';
 import {
@@ -111,7 +111,7 @@ export class DocumentationService {
       updatedAt: new Date(),
     };
 
-    await dbService.saveProjectDocumentationMapping(mapping);
+    await hybridDbService.saveProjectDocumentationMapping(mapping);
     console.log(`Mapped project ${projectId} to documentation source ${sourceId}`);
 
     return mapping;
@@ -131,11 +131,11 @@ export class DocumentationService {
     console.log(`Detected frameworks for project ${projectId}: ${detectionResult.frameworks.join(', ')}`);
 
     // Get available documentation sources for detected frameworks
-    const availableSources = await dbService.getDocumentationSourcesByFrameworks(detectionResult.frameworks);
+    const availableSources = await hybridDbService.getDocumentationSourcesByFrameworks(detectionResult.frameworks);
 
     // Map project to relevant documentation sources
     for (const source of availableSources) {
-      const existingMapping = await dbService.getProjectDocumentationMapping(projectId, source.id);
+      const existingMapping = await hybridDbService.getProjectDocumentationMapping(projectId, source.id);
 
       if (!existingMapping) {
         // Priority based on framework confidence and source framework match
@@ -222,14 +222,14 @@ export class DocumentationService {
    * Queue documentation for embedding
    */
   async queueDocumentationEmbedding(sourceId: string): Promise<void> {
-    const source = await dbService.getDocumentationSource(sourceId);
+    const source = await hybridDbService.getDocumentationSource(sourceId);
     if (!source || !source.isActive) {
       console.log(`Documentation source ${sourceId} not found or inactive`);
       return;
     }
 
     // Update fetch status
-    await dbService.updateDocumentationSourceStatus(sourceId, 'pending');
+    await hybridDbService.updateDocumentationSourceStatus(sourceId, 'pending');
 
     // Add to queue with normal priority
     const processingId = uuidv4();
@@ -242,7 +242,7 @@ export class DocumentationService {
    * Fetch and process documentation from a URL
    */
   async fetchAndProcessDocumentation(sourceId: string): Promise<DocumentationBatch> {
-    const source = await dbService.getDocumentationSource(sourceId);
+    const source = await hybridDbService.getDocumentationSource(sourceId);
     if (!source) {
       throw new Error(`Documentation source ${sourceId} not found`);
     }
@@ -292,7 +292,7 @@ export class DocumentationService {
       }
 
       // Update source status
-      await dbService.updateDocumentationSourceStatus(sourceId, 'success', undefined, new Date());
+      await hybridDbService.updateDocumentationSourceStatus(sourceId, 'success', undefined, new Date());
 
       const batch: DocumentationBatch = {
         sourceId,
@@ -304,16 +304,16 @@ export class DocumentationService {
       console.log(`Processed ${sections.length} sections, generated ${embeddings.length} embeddings`);
 
       // Save embeddings to database
-      await dbService.saveDocumentationEmbeddings(embeddings);
+      await hybridDbService.saveDocumentationEmbeddings(embeddings);
 
       // Update source last embedded timestamp
-      await dbService.updateDocumentationSourceStatus(sourceId, 'success', undefined, new Date());
+      await hybridDbService.updateDocumentationSourceStatus(sourceId, 'success', undefined, new Date());
 
       return batch;
 
     } catch (error) {
       console.error(`Error fetching documentation from ${source.url}:`, error);
-      await dbService.updateDocumentationSourceStatus(sourceId, 'failed', error instanceof Error ? error.message : String(error));
+      await hybridDbService.updateDocumentationSourceStatus(sourceId, 'failed', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }

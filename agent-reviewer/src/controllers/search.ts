@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { embeddingService } from '../services/embedding.js';
-import { dbService } from '../services/database.js';
+import { hybridDbService } from '../services/hybrid-database.js';
 import { repositoryService } from '../services/repository.js';
 import { llmService } from '../services/llm.js';
 import { CodeEmbedding } from '../models/embedding.js';
@@ -30,11 +30,11 @@ export const searchCode = async (req: Request, res: Response): Promise<void> => 
     if (projectId) {
       // Search within a specific project
       console.log(`Searching for code similar to query in project ${projectId} (original input: ${projectId})`);
-      results = await dbService.searchSimilarCode(projectId, queryEmbedding, limit);
+      results = await hybridDbService.searchSimilarCode(projectId, queryEmbedding, limit);
     } else {
       // Search across all projects
       console.log(`Searching for code similar to query across all projects`);
-      results = await dbService.searchSimilarCodeAcrossProjects(queryEmbedding, limit);
+      results = await hybridDbService.searchSimilarCodeAcrossProjects(queryEmbedding, limit);
     }
 
     if (results.length === 0) {

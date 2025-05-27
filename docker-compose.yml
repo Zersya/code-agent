@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  # qdrant:
+  #   image: qdrant/qdrant:v1.7.4
+  #   container_name: qdrant
+  #   ports:
+  #     - "6333:6333"
+  #     - "6334:6334"
+  #   volumes:
+  #     - qdrant_storage:/qdrant/storage
+  #   environment:
+  #     - QDRANT__SERVICE__HTTP_PORT=6333
+  #     - QDRANT__SERVICE__GRPC_PORT=6334
+  #     - QDRANT__LOG_LEVEL=INFO
+  #   restart: unless-stopped
+  #   networks:
+  #     - qodo_network
+
   agent-reviewer:
     build:
       context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
@@ -115,12 +131,14 @@ services:
 networks:
   proxy:
     external: true
+  qodo_network:
+    external: true
   llm-network:
     name: llm-network # Explicitly names the network
     driver: bridge    # Default driver
-  qodo_network:
-    name: qodo_network # Explicitly names the network
-    driver: bridge    # Default driver
+  # qodo_network:
+  #   name: qodo_network # Explicitly names the network
+  #   driver: bridge    # Default driver
 
 # Define the named volumes
 volumes:
