@@ -2,6 +2,8 @@ import { MergeRequestChange, MergeRequestComment, /* MergeRequestReview, */ Merg
 import { gitlabService } from './gitlab.js';
 import { contextService, ProjectContext } from './context.js';
 import { dbService } from './database.js';
+import { notionService } from './notion.js';
+import { CombinedNotionContext } from '../types/notion.js';
 
 import dotenv from 'dotenv';
 import axios from 'axios';
@@ -56,29 +58,144 @@ export class ReviewService {
   }
 
   /**
-   * Call the LLM API to review code
+   * Review code using sequential thinking approach
    * @param codeChanges The code changes to review
    * @param mergeRequestTitle The title of the merge request
    * @param mergeRequestDescription The description of the merge request
    * @param projectContext Optional project context to enhance the review
-   * @returns The review result
+   * @param notionContext Optional Notion task context to enhance the review
+   * @returns The review result with sequential thoughts
    */
   private async reviewCodeWithLLM(
     codeChanges: string,
     mergeRequestTitle: string,
     mergeRequestDescription: string,
-    projectContext?: ProjectContext
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
+  ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
+    try {
+      console.log('Starting sequential thinking code review process');
+
+      // Use sequential thinking for comprehensive code review
+      const { thoughts, reviewResult } = await this.reviewCodeWithSequentialThinking(
+        codeChanges,
+        mergeRequestTitle,
+        mergeRequestDescription,
+        projectContext,
+        notionContext
+      );
+
+      return { thoughts, reviewResult };
+    } catch (error) {
+      console.error('Error in sequential thinking code review process:', error);
+
+      // Fallback to direct LLM call if sequential thinking fails
+      console.log('Falling back to direct LLM call');
+      return await this.reviewCodeWithDirectLLM(
+        codeChanges,
+        mergeRequestTitle,
+        mergeRequestDescription,
+        projectContext,
+        notionContext
+      );
+    }
+  }
+
+  /**
+   * Review code using sequential thinking approach
+   * This method breaks down the review process into structured thinking steps
+   */
+  private async reviewCodeWithSequentialThinking(
+    codeChanges: string,
+    mergeRequestTitle: string,
+    mergeRequestDescription: string,
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
+  ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
+    const thoughts: SequentialThought[] = [];
+    let conversationHistory: any[] = [];
+
+    // Initialize the system prompt for sequential thinking
+    const systemPrompt = this.generateSequentialThinkingSystemPrompt();
+    conversationHistory.push({ role: 'system', content: systemPrompt });
+
+    // Step 1: Initial Analysis and Context Understanding
+    const step1Result = await this.executeThinkingStep(
+      1,
+      'Analisis Awal dan Pemahaman Konteks',
+      this.generateStep1Prompt(codeChanges, mergeRequestTitle, mergeRequestDescription, projectContext, notionContext),
+      conversationHistory
+    );
+    thoughts.push(step1Result.thought);
+    conversationHistory = step1Result.conversationHistory;
+
+    // Step 2: Code Quality and Structure Assessment
+    const step2Result = await this.executeThinkingStep(
+      2,
+      'Evaluasi Kualitas Kode dan Struktur',
+      this.generateStep2Prompt(step1Result.thought.thought),
+      conversationHistory
+    );
+    thoughts.push(step2Result.thought);
+    conversationHistory = step2Result.conversationHistory;
+
+    // Step 3: Bug and Security Analysis
+    const step3Result = await this.executeThinkingStep(
+      3,
+      'Analisis Bug dan Keamanan',
+      this.generateStep3Prompt(step1Result.thought.thought, step2Result.thought.thought),
+      conversationHistory
+    );
+    thoughts.push(step3Result.thought);
+    conversationHistory = step3Result.conversationHistory;
+
+    // Step 4: Performance and Best Practices Review
+    const step4Result = await this.executeThinkingStep(
+      4,
+      'Review Performa dan Best Practices',
+      this.generateStep4Prompt(step1Result.thought.thought, step2Result.thought.thought, step3Result.thought.thought),
+      conversationHistory
+    );
+    thoughts.push(step4Result.thought);
+    conversationHistory = step4Result.conversationHistory;
+
+    // Step 5: Final Synthesis and Recommendation
+    const step5Result = await this.executeThinkingStep(
+      5,
+      'Sintesis Final dan Rekomendasi',
+      this.generateStep5Prompt(thoughts),
+      conversationHistory
+    );
+    thoughts.push(step5Result.thought);
+
+    // Extract the final review result from the last thought
+    const reviewResult = this.extractReviewFromFinalThought(step5Result.thought.thought);
+
+    console.log(`Sequential thinking completed with ${thoughts.length} thoughts`);
+    return { thoughts, reviewResult };
+  }
+
+  /**
+   * Fallback method for direct LLM call (original implementation)
+   */
+  private async reviewCodeWithDirectLLM(
+    codeChanges: string,
+    mergeRequestTitle: string,
+    mergeRequestDescription: string,
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     try {
       // Generate the system prompt
       const systemPrompt = this.generateSystemPrompt();
 
-      // Generate the user prompt with code changes and project context
+      // Generate the user prompt with code changes, project context, and Notion context
       const userPrompt = this.generateUserPrompt(
         codeChanges,
         mergeRequestTitle,
         mergeRequestDescription,
-        projectContext
+        projectContext,
+        notionContext
       );
 
       // Initialize the conversation
@@ -106,7 +223,7 @@ export class ReviewService {
         reviewResult
       };
     } catch (error) {
-      console.error('Error in code review process:', error);
+      console.error('Error in direct LLM code review process:', error);
       throw error;
     }
   }
@@ -156,6 +273,12 @@ Aspek yang dipertimbangkan:
         * Gunakan informasi konteks proyek (struktur, arsitektur, pola, konvensi yang ada) untuk memahami kode secara lebih komprehensif. **Ini krusial untuk menilai keselarasan**.
         * Evaluasi apakah perubahan konsisten dengan kode yang ada.
         * Deteksi potensi konflik atau masalah integrasi.
+    * Konteks Tugas dari Notion (Jika Disediakan):
+        * **PRIORITAS UTAMA**: Verifikasi bahwa perubahan kode selaras dengan requirement, acceptance criteria, dan spesifikasi teknis yang ditetapkan dalam tugas Notion.
+        * Periksa apakah implementasi memenuhi semua requirement yang disebutkan.
+        * Pastikan acceptance criteria terpenuhi atau akan terpenuhi dengan perubahan ini.
+        * Identifikasi jika ada requirement yang terlewat atau tidak diimplementasikan.
+        * Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan.
     * Hal yang Diabaikan:
         * Abaikan hasil dari SonarQube.
         * Perlu diingat bahwa proyek ini tidak menggunakan unit test atau integration test saat ini, jadi fokus pada kualitas kode intrinsik.
@@ -180,6 +303,12 @@ Format Hasil Review:
 
 **Konsistensi & Arsitektur (Tinjauan Ringkas merujuk struktur proyek saat ini & standar Nuxt):**
 * [Berikan ringkasan atau 1-2 poin paling menonjol terkait keselarasan. Contoh: "Kode baru ini umumnya selaras dengan struktur proyek, namun ada satu komponen yang mungkin lebih cocok ditempatkan di direktori 'shared' (detail di saran). Ketaatan pada standar Nuxt sudah baik."]
+
+**Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
+* [Verifikasi apakah implementasi memenuhi requirement yang ditetapkan dalam tugas Notion]
+* [Periksa apakah acceptance criteria terpenuhi atau akan terpenuhi]
+* [Identifikasi requirement yang mungkin terlewat atau belum diimplementasikan]
+* [Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan]
 
 **Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
 * [Poin analisis detail 1: Misal, "Iterasi di dalam iterasi pada fungsi 'calculateTotals' (baris X) memiliki kompleksitas O(n^2) dan akan menyebabkan masalah performa signifikan pada dataset lebih dari 1000 item. Pertimbangkan untuk menggunakan Map untuk lookup agar menjadi O(n)."]
@@ -206,20 +335,33 @@ Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjut
   }
 
   /**
-   * Generate the user prompt with code changes and project context
+   * Generate the user prompt with code changes, project context, and Notion context
    */
   private generateUserPrompt(
     codeChanges: string,
     mergeRequestTitle: string,
     mergeRequestDescription: string,
-    projectContext?: ProjectContext
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
   ): string {
     let prompt = `Tolong review perubahan kode berikut dari merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".`;
+
+    // Add Notion task context if available
+    if (notionContext && notionContext.contexts.length > 0) {
+      prompt += `\n\n**KONTEKS TUGAS DARI NOTION:**
+${this.formatNotionContext(notionContext)}`;
+    }
 
     // Add project context if available
     if (projectContext && projectContext.relevantFiles.length > 0) {
       prompt += `\n\nBerikut adalah konteks proyek yang relevan untuk membantu review kode:
 ${projectContext.contextSummary}`;
+    }
+
+    // Add enhanced context information if available
+    if (projectContext?.enhancedContext?.success) {
+      prompt += `\n\n**KONTEKS TAMBAHAN UNTUK CHANGESET KECIL:**
+Sistem telah menganalisis bahwa ini adalah changeset kecil (${projectContext.enhancedContext.changesetStats.totalFiles} file, ${projectContext.enhancedContext.changesetStats.totalLinesModified} baris) dan mengumpulkan konteks tambahan yang relevan untuk review yang lebih mendalam.`;
     }
 
     prompt += `\n\nPerubahan kode yang perlu direview:
@@ -228,12 +370,85 @@ ${projectContext.contextSummary}`;
 ${codeChanges}
 \`\`\``;
 
-    // If we have project context, add a reminder to use it
+    // Add reminders to use available contexts
+    const contextReminders = [];
+
+    if (notionContext && notionContext.contexts.length > 0) {
+      contextReminders.push('konteks tugas dari Notion untuk memverifikasi bahwa perubahan kode selaras dengan requirement dan acceptance criteria yang ditetapkan');
+    }
+
     if (projectContext && projectContext.relevantFiles.length > 0) {
-      prompt += `\n\nGunakan konteks proyek yang diberikan untuk memahami kode lebih baik dan memberikan review yang lebih relevan dan mendalam.`;
+      contextReminders.push('konteks proyek untuk memahami struktur dan arsitektur kode yang ada');
+    }
+
+    if (projectContext?.enhancedContext?.success) {
+      contextReminders.push('konteks tambahan yang dikumpulkan khusus untuk changeset kecil ini (termasuk parent classes, caller functions, related tests, dan configuration files)');
+    }
+
+    if (contextReminders.length > 0) {
+      prompt += `\n\nPenting: Gunakan ${contextReminders.join(', ')} untuk memberikan review yang lebih relevan, mendalam, dan selaras dengan tujuan bisnis.`;
     }
 
     return prompt;
+  }
+
+  /**
+   * Format Notion context for inclusion in the user prompt
+   */
+  private formatNotionContext(notionContext: CombinedNotionContext): string {
+    if (!notionContext || notionContext.contexts.length === 0) {
+      return 'Tidak ada konteks tugas yang tersedia.';
+    }
+
+    let formatted = `${notionContext.summary}\n\n`;
+
+    notionContext.contexts.forEach((context, index) => {
+      formatted += `**Tugas ${index + 1}: ${context.title}**\n`;
+
+      // User Story section
+      if (context.description) {
+        const lines = context.description.split('\n');
+        const userStoryLines = lines.filter(line =>
+          line.trim() &&
+          !line.toLowerCase().includes('acceptance criteria') &&
+          !line.toLowerCase().includes('screenshots') &&
+          !line.toLowerCase().includes('to-do list')
+        );
+
+        if (userStoryLines.length > 0) {
+          formatted += `User Story: ${userStoryLines.join(' ').substring(0, 300)}${userStoryLines.join(' ').length > 300 ? '...' : ''}\n`;
+        }
+      }
+
+      // To-do List (Requirements)
+      if (context.requirements.length > 0) {
+        formatted += `To-do List:\n`;
+        context.requirements.forEach(req => {
+          formatted += `- ${req}\n`;
+        });
+      }
+
+      // Acceptance Criteria
+      if (context.acceptanceCriteria.length > 0) {
+        formatted += `Acceptance Criteria:\n`;
+        context.acceptanceCriteria.forEach(criteria => {
+          formatted += `- ${criteria}\n`;
+        });
+      }
+
+      // Technical Specifications
+      if (context.technicalSpecs) {
+        formatted += `Technical Specifications: ${context.technicalSpecs.substring(0, 200)}${context.technicalSpecs.length > 200 ? '...' : ''}\n`;
+      }
+
+      formatted += `Notion URL: ${context.url}\n\n`;
+    });
+
+    if (notionContext.errors.length > 0) {
+      formatted += `**Catatan:** Beberapa tugas tidak dapat diakses (${notionContext.errors.length} error).\n`;
+    }
+
+    return formatted;
   }
 
   /**
@@ -286,6 +501,324 @@ ${codeChanges}
   }
 
   /**
+   * Generate the system prompt for sequential thinking
+   */
+  private generateSequentialThinkingSystemPrompt(): string {
+    return `Anda adalah seorang Insinyur Perangkat Lunak Senior dengan keahlian mendalam dalam pengembangan antarmuka pengguna (frontend), khususnya dengan Nuxt.js dan Flutter. Anda akan melakukan code review menggunakan pendekatan sequential thinking yang terstruktur.
+
+**Peran Anda:**
+- Arsitek Teknis yang memastikan kualitas, skalabilitas, maintenabilitas, dan performa kode
+- Reviewer yang memberikan analisis mendalam melalui tahapan berpikir yang sistematis
+- Mentor yang memberikan panduan teknis konstruktif dalam Bahasa Indonesia
+
+**Pendekatan Sequential Thinking:**
+Anda akan memecah proses review menjadi 5 tahap berpikir yang berurutan:
+1. **Analisis Awal dan Pemahaman Konteks** - Memahami perubahan dan konteks
+2. **Evaluasi Kualitas Kode dan Struktur** - Menilai kualitas dan arsitektur
+3. **Analisis Bug dan Keamanan** - Mengidentifikasi potensi masalah
+4. **Review Performa dan Best Practices** - Mengevaluasi efisiensi dan praktik terbaik
+5. **Sintesis Final dan Rekomendasi** - Menyusun kesimpulan dan rekomendasi
+
+**Prinsip Penting:**
+- Setiap tahap harus membangun dari pemahaman tahap sebelumnya
+- Fokus pada keselarasan dengan struktur proyek yang ada
+- Prioritaskan analisis mendalam pada aspek bug, performa, dan keamanan
+- Berikan feedback konstruktif dan dapat ditindaklanjuti
+- Gunakan Bahasa Indonesia yang formal dan profesional
+- Ikuti dokumentasi resmi Nuxt.js untuk proyek Nuxt
+- Abaikan hasil SonarQube dan fokus pada kualitas kode intrinsik
+
+Anda akan menerima instruksi untuk setiap tahap thinking dan harus merespons dengan analisis yang fokus pada tahap tersebut.`;
+  }
+
+  /**
+   * Execute a single thinking step
+   */
+  private async executeThinkingStep(
+    stepNumber: number,
+    stepTitle: string,
+    stepPrompt: string,
+    conversationHistory: any[]
+  ): Promise<{ thought: SequentialThought, conversationHistory: any[] }> {
+    try {
+      console.log(`Executing thinking step ${stepNumber}: ${stepTitle}`);
+
+      // Add the step prompt to conversation history
+      const updatedHistory = [...conversationHistory, { role: 'user', content: stepPrompt }];
+
+      // Call the LLM API with the conversation history
+      const response = await this.callLlmApi(updatedHistory);
+
+      // Add the response to conversation history
+      updatedHistory.push({ role: 'assistant', content: response });
+
+      // Create the thought object
+      const thought: SequentialThought = {
+        thought: response,
+        thoughtNumber: stepNumber,
+        totalThoughts: 5,
+        nextThoughtNeeded: stepNumber < 5,
+      };
+
+      console.log(`Completed thinking step ${stepNumber}`);
+      return { thought, conversationHistory: updatedHistory };
+    } catch (error) {
+      console.error(`Error in thinking step ${stepNumber}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate prompt for Step 1: Initial Analysis and Context Understanding
+   */
+  private generateStep1Prompt(
+    codeChanges: string,
+    mergeRequestTitle: string,
+    mergeRequestDescription: string,
+    projectContext?: ProjectContext,
+    notionContext?: CombinedNotionContext
+  ): string {
+    let prompt = `**TAHAP 1: ANALISIS AWAL DAN PEMAHAMAN KONTEKS**
+
+Tolong lakukan analisis awal untuk merge request dengan judul "${mergeRequestTitle}" dan deskripsi "${mergeRequestDescription}".
+
+**Tugas Anda pada tahap ini:**
+1. Pahami scope dan tujuan perubahan kode
+2. Identifikasi file-file yang diubah dan jenis perubahannya
+3. Analisis konteks proyek dan tugas (jika tersedia)
+4. Tentukan area fokus untuk tahap review selanjutnya
+
+**Perubahan kode yang perlu dianalisis:**
+\`\`\`diff
+${codeChanges}
+\`\`\``;
+
+    // Add Notion task context if available
+    if (notionContext && notionContext.contexts.length > 0) {
+      prompt += `\n\n**KONTEKS TUGAS DARI NOTION:**
+${this.formatNotionContext(notionContext)}`;
+    }
+
+    // Add project context if available
+    if (projectContext && projectContext.relevantFiles.length > 0) {
+      prompt += `\n\n**KONTEKS PROYEK:**
+${projectContext.contextSummary}`;
+    }
+
+    // Add enhanced context information if available
+    if (projectContext?.enhancedContext?.success) {
+      prompt += `\n\n**KONTEKS TAMBAHAN:**
+Sistem telah menganalisis bahwa ini adalah changeset kecil (${projectContext.enhancedContext.changesetStats.totalFiles} file, ${projectContext.enhancedContext.changesetStats.totalLinesModified} baris) dan mengumpulkan konteks tambahan yang relevan.`;
+    }
+
+    prompt += `\n\n**Output yang diharapkan:**
+Berikan analisis awal yang mencakup:
+- Ringkasan perubahan dan tujuannya
+- Identifikasi teknologi/framework yang terlibat (Nuxt.js, Flutter, dll)
+- Penilaian kompleksitas perubahan
+- Area yang perlu perhatian khusus di tahap selanjutnya
+- Keselarasan dengan konteks tugas (jika ada)
+
+Fokus pada pemahaman menyeluruh sebelum masuk ke analisis detail.`;
+
+    return prompt;
+  }
+
+  /**
+   * Generate prompt for Step 2: Code Quality and Structure Assessment
+   */
+  private generateStep2Prompt(step1Analysis: string): string {
+    return `**TAHAP 2: EVALUASI KUALITAS KODE DAN STRUKTUR**
+
+Berdasarkan analisis awal dari tahap 1, sekarang lakukan evaluasi mendalam terhadap kualitas kode dan struktur.
+
+**Analisis dari tahap sebelumnya:**
+${step1Analysis}
+
+**Tugas Anda pada tahap ini:**
+1. Evaluasi kualitas kode secara keseluruhan
+2. Analisis struktur dan arsitektur kode
+3. Periksa konsistensi dengan pola proyek yang ada
+4. Identifikasi pelanggaran prinsip desain (SOLID, DRY, dll)
+5. Evaluasi kejelasan dan maintainability
+
+**Fokus analisis:**
+- Penamaan variabel, fungsi, dan kelas
+- Struktur direktori dan organisasi file
+- Konsistensi dengan konvensi proyek
+- Kompleksitas kode dan kemudahan pemahaman
+- Adherence terhadap best practices framework (Nuxt.js/Flutter)
+
+**Output yang diharapkan:**
+Berikan evaluasi yang mencakup:
+- Penilaian kualitas kode secara umum
+- Identifikasi area yang perlu perbaikan struktur
+- Rekomendasi untuk meningkatkan maintainability
+- Keselarasan dengan arsitektur proyek yang ada
+
+Berikan analisis yang konstruktif dan spesifik.`;
+  }
+
+  /**
+   * Generate prompt for Step 3: Bug and Security Analysis
+   */
+  private generateStep3Prompt(step1Analysis: string, step2Analysis: string): string {
+    return `**TAHAP 3: ANALISIS BUG DAN KEAMANAN**
+
+Berdasarkan pemahaman dari tahap 1 dan 2, sekarang fokus pada identifikasi potensi bug dan masalah keamanan.
+
+**Analisis sebelumnya:**
+**Tahap 1:** ${step1Analysis}
+
+**Tahap 2:** ${step2Analysis}
+
+**Tugas Anda pada tahap ini:**
+1. Identifikasi potensi bug dan error handling yang kurang
+2. Analisis keamanan kode (input validation, XSS, CSRF, dll)
+3. Periksa edge cases yang mungkin tidak tertangani
+4. Evaluasi error handling dan exception management
+5. Identifikasi memory leaks atau resource management issues
+
+**Fokus analisis:**
+- Null pointer exceptions dan undefined values
+- Input validation dan sanitization
+- Authentication dan authorization issues
+- Data exposure dan privacy concerns
+- Race conditions dan concurrency issues
+- Resource leaks (memory, file handles, connections)
+
+**Output yang diharapkan:**
+Berikan analisis detail yang mencakup:
+- Daftar potensi bug dengan tingkat severity
+- Identifikasi masalah keamanan dan mitigasinya
+- Rekomendasi untuk memperbaiki error handling
+- Saran untuk meningkatkan robustness kode
+
+Prioritaskan masalah berdasarkan dampak dan kemungkinan terjadinya.`;
+  }
+
+  /**
+   * Generate prompt for Step 4: Performance and Best Practices Review
+   */
+  private generateStep4Prompt(step1Analysis: string, step2Analysis: string, step3Analysis: string): string {
+    return `**TAHAP 4: REVIEW PERFORMA DAN BEST PRACTICES**
+
+Berdasarkan analisis dari tahap 1-3, sekarang evaluasi aspek performa dan adherence terhadap best practices.
+
+**Analisis sebelumnya:**
+**Tahap 1:** ${step1Analysis}
+
+**Tahap 2:** ${step2Analysis}
+
+**Tahap 3:** ${step3Analysis}
+
+**Tugas Anda pada tahap ini:**
+1. Analisis performa kode dan optimasi yang mungkin
+2. Evaluasi efisiensi algoritma dan struktur data
+3. Periksa adherence terhadap best practices framework
+4. Identifikasi bottlenecks dan area optimasi
+5. Evaluasi scalability dan maintainability jangka panjang
+
+**Fokus analisis:**
+- Kompleksitas algoritma (Big O notation)
+- Database query optimization (jika ada)
+- Frontend performance (rendering, bundle size, lazy loading)
+- Memory usage dan garbage collection
+- Network requests dan caching strategies
+- Framework-specific optimizations (Nuxt.js SSR/SSG, Flutter widget optimization)
+
+**Output yang diharapkan:**
+Berikan evaluasi yang mencakup:
+- Identifikasi bottlenecks performa dengan solusi konkret
+- Rekomendasi optimasi yang spesifik dan actionable
+- Evaluasi scalability untuk growth masa depan
+- Best practices yang belum diimplementasikan
+
+Berikan prioritas berdasarkan impact terhadap user experience.`;
+  }
+
+  /**
+   * Generate prompt for Step 5: Final Synthesis and Recommendation
+   */
+  private generateStep5Prompt(thoughts: SequentialThought[]): string {
+    const previousAnalyses = thoughts.map((thought, index) =>
+      `**Tahap ${index + 1}:** ${thought.thought}`
+    ).join('\n\n');
+
+    return `**TAHAP 5: SINTESIS FINAL DAN REKOMENDASI**
+
+Berdasarkan semua analisis dari tahap 1-4, sekarang susun kesimpulan final dan rekomendasi yang komprehensif.
+
+**Semua analisis sebelumnya:**
+${previousAnalyses}
+
+**Tugas Anda pada tahap ini:**
+1. Sintesis semua temuan dari tahap sebelumnya
+2. Prioritaskan issues berdasarkan severity dan impact
+3. Berikan rekomendasi final yang actionable
+4. Tentukan apakah MR siap untuk di-merge atau perlu perbaikan
+5. Format output sesuai template review yang diharapkan
+
+**Output yang diharapkan:**
+Berikan review final dalam format berikut:
+
+---
+## Review Kode
+
+**Ringkasan:**
+[Berikan ringkasan singkat mengenai lingkup perubahan kode yang direview dan kesan umum Anda]
+
+---
+
+**Analisis Detail:**
+
+**Kualitas Kode & Kejelasan (Tinjauan Ringkas):**
+* [Ringkasan temuan dari tahap 2]
+
+**Alur Logika & Fungsionalitas (Tinjauan Ringkas):**
+* [Ringkasan temuan dari tahap 1 dan 3]
+
+**Konsistensi & Arsitektur (Tinjauan Ringkas):**
+* [Ringkasan temuan dari tahap 2]
+
+**Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
+* [Verifikasi requirement dari tahap 1]
+
+**Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
+* [Detail temuan dari tahap 3 dan 4]
+
+---
+
+**Feedback Tambahan & Saran (ANALISIS DETAIL DI SINI):**
+* [Saran konkret dan mendalam dari semua tahap]
+
+---
+
+**Kesimpulan:**
+[Pilih salah satu berdasarkan analisis:]
+* **Kode ini sudah baik...** (jika siap merge)
+* **Kode ini secara umum sudah baik, namun ada beberapa saran perbaikan minor...** (jika ada perbaikan minor)
+* **Ada beberapa isu signifikan...** (jika ada masalah serius)
+
+Pastikan kesimpulan selaras dengan semua analisis sebelumnya.`;
+  }
+
+  /**
+   * Extract the final review result from the last thought
+   */
+  private extractReviewFromFinalThought(finalThought: string): string {
+    // Try to extract the review section from the final thought
+    const reviewMatch = finalThought.match(/## Review Kode[\s\S]*$/);
+
+    if (reviewMatch) {
+      return reviewMatch[0];
+    }
+
+    // If no review section is found, return the entire final thought
+    return finalThought;
+  }
+
+  /**
    * Review a merge request
    * @param projectId The ID of the project
    * @param mergeRequestIid The IID of the merge request
@@ -332,12 +865,32 @@ ${codeChanges}
         }
       }
 
+      // Get Notion task context if enabled
+      let notionContext = undefined;
+      if (notionService.isEnabled()) {
+        try {
+          console.log(`Getting Notion task context for merge request !${mergeRequestIid}`);
+          const extractionResult = notionService.extractNotionUrls(mergeRequest.description || '');
+
+          if (extractionResult.urls.length > 0) {
+            console.log(`Found ${extractionResult.urls.length} Notion URLs in merge request description`);
+            notionContext = await notionService.fetchMultipleTaskContexts(extractionResult.urls);
+            console.log(`Retrieved Notion context: ${notionContext.summary}`);
+          } else {
+            console.log('No Notion URLs found in merge request description');
+          }
+        } catch (notionError) {
+          console.warn(`Error getting Notion task context, continuing without it:`, notionError);
+        }
+      }
+
       // Perform the review using direct LLM call
       const { /* thoughts, */ reviewResult } = await this.reviewCodeWithLLM(
         formattedChanges,
         mergeRequest.title,
         mergeRequest.description || '',
-        projectContext
+        projectContext,
+        notionContext
       );
 
       console.log('Review result:', reviewResult);
@@ -545,12 +1098,32 @@ ${codeChanges}
         }
       }
 
+      // Get Notion task context if enabled (for re-review)
+      let notionContext = undefined;
+      if (notionService.isEnabled()) {
+        try {
+          console.log(`Getting Notion task context for re-review of merge request !${mergeRequestIid}`);
+          const extractionResult = notionService.extractNotionUrls(mergeRequest.description || '');
+
+          if (extractionResult.urls.length > 0) {
+            console.log(`Found ${extractionResult.urls.length} Notion URLs for re-review`);
+            notionContext = await notionService.fetchMultipleTaskContexts(extractionResult.urls);
+            console.log(`Retrieved Notion context for re-review: ${notionContext.summary}`);
+          } else {
+            console.log('No Notion URLs found for re-review');
+          }
+        } catch (notionError) {
+          console.warn(`Error getting Notion task context for re-review, continuing without it:`, notionError);
+        }
+      }
+
       // Perform the re-review using direct LLM call
       const { reviewResult } = await this.reviewCodeWithLLM(
         formattedChanges,
         mergeRequest.title,
         mergeRequest.description || '',
-        projectContext
+        projectContext,
+        notionContext
       );
 
       // Determine if the merge request should be approved based on new changes

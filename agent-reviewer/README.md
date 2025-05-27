@@ -7,6 +7,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Webhook Integration**: Listens for GitLab push and merge request events
 - **Code Fetching**: Retrieves all code from the repository, not just diffs
 - **Embedding Generation**: Uses Qodo-Embed-1 model to generate embeddings for code
+- **Documentation Embedding**: Integrates framework documentation (Nuxt.js, Vue.js, React) into code reviews
 - **Database Storage**: Stores embeddings in PostgreSQL database for later retrieval and search
 - **LLM Analysis**: Analyzes code using either OpenRouter or Ollama (local) LLM providers
 - **Security**: Implements webhook authentication and validation
@@ -192,6 +193,54 @@ The system can automatically review merge requests from Repopo using a sequentia
    - An approval message if appropriate: "Silahkan merge! \nTerima kasih"
 
 To enable or disable this feature, set `ENABLE_MR_REVIEW=true` or `ENABLE_MR_REVIEW=false` in your `.env` file.
+
+## Documentation Embedding
+
+The system includes documentation embedding capability that enhances code reviews with authoritative framework knowledge. This feature automatically detects frameworks used in merge requests and provides relevant documentation context during reviews.
+
+### Features
+
+- **Automatic Framework Detection**: Detects Nuxt.js, Vue.js, React, and other frameworks from file extensions, imports, and configuration files
+- **Documentation Integration**: Retrieves relevant documentation sections based on code changes
+- **Context Enhancement**: Integrates documentation knowledge into AI code reviews for better guidance
+- **Multiple Sources**: Support for multiple documentation sources per framework
+- **Queue Processing**: Documentation embedding jobs are processed through the existing queue system
+
+### Setup
+
+1. **Initialize Documentation Sources**:
+   ```bash
+   npm run setup:documentation
+   ```
+
+2. **Default Sources**: The setup script adds Nuxt.js documentation by default (using their LLM-optimized format)
+
+3. **API Management**: Use the documentation API endpoints to manage sources:
+   ```bash
+   # List documentation sources
+   curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:3000/api/documentation/sources"
+
+   # Add custom documentation source
+   curl -X POST "http://localhost:3000/api/documentation/sources" \
+     -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Custom Framework Docs",
+       "url": "https://docs.example.com/llm-optimized.txt",
+       "framework": "custom",
+       "isActive": true
+     }'
+   ```
+
+### How It Works
+
+1. **Framework Detection**: When processing merge requests, the system analyzes file extensions, imports, and content to detect frameworks
+2. **Auto-Mapping**: Projects are automatically mapped to relevant documentation sources
+3. **Context Retrieval**: During reviews, relevant documentation sections are retrieved based on code changes
+4. **Enhanced Reviews**: Documentation context is integrated into the sequential thinking review process
+
+For detailed information, see [Documentation Embedding Guide](docs/documentation-embedding.md).
 
 ## Automatic Project Re-embedding
 

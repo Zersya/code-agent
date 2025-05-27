@@ -5,43 +5,80 @@ import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
-import { repositoryService } from '../services/repository.js';
-import { CodeFile, EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
+import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
+import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 
 /**
  * Process a GitLab webhook event
  */
-export const processWebhook = async (req: Request, res: Response, next: Function) => {
+export const processWebhook = async (req: Request, res: Response) => {
   try {
     const event: GitLabWebhookEvent = req.body;
 
     console.log(`Received webhook event: ${event.object_kind}`);
 
+    // Check for duplicate webhook processing
+    const deduplicationResult = await webhookDeduplicationService.startWebhookProcessing(event);
+
+    if (!deduplicationResult.success) {
+      console.error('Error starting webhook processing:', deduplicationResult.error);
+      res.status(500).json({ error: 'Failed to process webhook' });
+      return;
+    }
+
+    if (deduplicationResult.isDuplicate) {
+      console.log(`Webhook is already being processed (ID: ${deduplicationResult.processingId}), returning success`);
+      res.status(202).json({
+        message: 'Webhook already being processed',
+        processingId: deduplicationResult.processingId
+      });
+      return;
+    }
+
     // Acknowledge receipt of the webhook immediately
-    res.status(202).json({ message: 'Webhook received and processing started' });
+    res.status(202).json({
+      message: 'Webhook received and processing started',
+      processingId: deduplicationResult.processingId
+    });
 
-    // Check if this is a Repopo webhook event
-    const isRepopoEvent = isRepopoWebhook(req);
+    const processingId = deduplicationResult.processingId!;
 
-    // Process the event asynchronously
-    if (event.object_kind === 'push') {
-      await processPushEvent(event);
-    } else if (event.object_kind === 'merge_request') {
-      if (isRepopoEvent) {
-        await processRepopoMergeRequestEvent(event as RepopoWebhookEvent);
+    try {
+      // Check if this is a Repopo webhook event
+      const isRepopoEvent = isRepopoWebhook(req);
+
+      // Process the event asynchronously
+      if (event.object_kind === 'push') {
+        await processPushEvent(event);
+      } else if (event.object_kind === 'merge_request') {
+        if (isRepopoEvent) {
+          await processRepopoMergeRequestEvent(event as RepopoWebhookEvent);
+        } else {
+          await processMergeRequestEvent(event as GitLabMergeRequestEvent);
+        }
+      } else if (event.object_kind === 'note') {
+        await processNoteEvent(event as GitLabNoteEvent);
+      } else if (event.object_kind === 'emoji') {
+        await processEmojiEvent(event as GitLabEmojiEvent);
       } else {
-        await processMergeRequestEvent(event as GitLabMergeRequestEvent);
+        console.log(`Ignoring unsupported event type: ${(event as any).object_kind}`);
       }
-    } else if (event.object_kind === 'note') {
-      await processNoteEvent(event as GitLabNoteEvent);
-    } else if (event.object_kind === 'emoji') {
-      await processEmojiEvent(event as GitLabEmojiEvent);
-    } else {
-      console.log(`Ignoring unsupported event type: ${event}`);
+
+      // Mark processing as completed
+      await webhookDeduplicationService.completeWebhookProcessing(processingId);
+    } catch (processingError) {
+      console.error('Error processing webhook:', processingError);
+
+      // Mark processing as failed
+      const errorMessage = processingError instanceof Error ? processingError.message : 'Unknown error';
+      await webhookDeduplicationService.failWebhookProcessing(processingId, errorMessage);
     }
   } catch (error) {
-    console.error('Error processing webhook:', error);
-    // We've already sent a response, so we just log the error
+    console.error('Error in webhook handler:', error);
+    // Only send response if we haven't already sent one
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 };
 
