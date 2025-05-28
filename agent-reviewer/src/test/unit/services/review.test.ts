@@ -641,4 +641,210 @@ Ditemukan beberapa masalah yang harus diperbaiki sebelum merge:
       });
     });
   });
+
+  describe('Enhanced Critical Issue Format', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    describe('System Prompt Generation with Solution Examples', () => {
+      test('should include solution example format in base context', () => {
+        const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+        expect(systemPrompt).toContain('Format Isu Kritis (🔴)');
+        expect(systemPrompt).toContain('**Masalah:**');
+        expect(systemPrompt).toContain('**Contoh perbaikan:**');
+        expect(systemPrompt).toContain('**Cara implementasi:**');
+        expect(systemPrompt).toContain('Batasi contoh kode maksimal 5 baris');
+      });
+
+      test('should include technology-specific guidance', () => {
+        const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+        expect(systemPrompt).toContain('JavaScript untuk Nuxt.js');
+        expect(systemPrompt).toContain('Dart untuk Flutter');
+        expect(systemPrompt).toContain('Fokus pada solusi praktis');
+      });
+
+      test('should specify examples only for critical issues', () => {
+        const systemPrompt = (reviewService as any).generateSystemPromptByMode('standard');
+
+        expect(systemPrompt).toContain('Berikan contoh hanya untuk isu kritis (🔴)');
+        expect(systemPrompt).toContain('bukan untuk saran penting (🟡) atau opsional (🔵)');
+      });
+    });
+
+    describe('Quick Mode Enhanced Format', () => {
+      test('should include solution example format in quick mode', () => {
+        const quickPrompt = (reviewService as any).generateQuickModePrompt('base context');
+
+        expect(quickPrompt).toContain('🔴 [Deskripsi masalah]');
+        expect(quickPrompt).toContain('**Masalah:** [Penjelasan singkat mengapa bermasalah]');
+        expect(quickPrompt).toContain('**Contoh perbaikan:**');
+        expect(quickPrompt).toContain('// Before (bermasalah)');
+        expect(quickPrompt).toContain('// After (diperbaiki)');
+        expect(quickPrompt).toContain('**Cara implementasi:** [Panduan 1-2 kalimat]');
+      });
+
+      test('should emphasize concise examples in quick mode', () => {
+        const quickPrompt = (reviewService as any).generateQuickModePrompt('base context');
+
+        expect(quickPrompt).toContain('Berikan contoh solusi hanya untuk isu kritis');
+        expect(quickPrompt).toContain('ringkas dan langsung to the point');
+      });
+    });
+
+    describe('Standard Mode Enhanced Format', () => {
+      test('should include solution examples for critical issues only', () => {
+        const standardPrompt = (reviewService as any).generateStandardModePrompt('base context');
+
+        expect(standardPrompt).toContain('🔴 [Deskripsi masalah]');
+        expect(standardPrompt).toContain('**Masalah:** [Penjelasan singkat mengapa bermasalah]');
+        expect(standardPrompt).toContain('**Contoh perbaikan:**');
+        expect(standardPrompt).toContain('• [Improvement penting dengan reasoning - tanpa contoh kode]');
+        expect(standardPrompt).toContain('• [Saran tambahan jika ada - tanpa contoh kode]');
+      });
+
+      test('should clarify no examples for non-critical issues', () => {
+        const standardPrompt = (reviewService as any).generateStandardModePrompt('base context');
+
+        expect(standardPrompt).toContain('Contoh solusi hanya untuk isu kritis (🔴)');
+      });
+    });
+
+    describe('Detailed Mode Enhanced Format', () => {
+      test('should include comprehensive solution examples', () => {
+        const detailedPrompt = (reviewService as any).generateDetailedModePrompt('base context');
+
+        expect(detailedPrompt).toContain('🔴 [Deskripsi masalah kritis]');
+        expect(detailedPrompt).toContain('**Masalah:** [Penjelasan detail mengapa bermasalah]');
+        expect(detailedPrompt).toContain('[kode bermasalah dengan konteks]');
+        expect(detailedPrompt).toContain('[kode solusi dengan penjelasan]');
+        expect(detailedPrompt).toContain('**Cara implementasi:** [Panduan detail 1-2 kalimat]');
+      });
+
+      test('should specify no examples for non-critical suggestions', () => {
+        const detailedPrompt = (reviewService as any).generateDetailedModePrompt('base context');
+
+        expect(detailedPrompt).toContain('tanpa contoh kode untuk non-kritis');
+        expect(detailedPrompt).toContain('Gunakan contoh konkret dan solusi spesifik untuk isu kritis (🔴) saja');
+      });
+    });
+
+    describe('Sequential Thinking Enhanced Format', () => {
+      test('should include solution format in sequential thinking prompt', () => {
+        process.env.REVIEW_MODE = 'standard';
+        process.env.REVIEW_MAX_SUGGESTIONS = '5';
+
+        const sequentialPrompt = (reviewService as any).generateSequentialThinkingSystemPrompt();
+
+        expect(sequentialPrompt).toContain('Format Isu Kritis dalam Sequential Thinking');
+        expect(sequentialPrompt).toContain('🔴 [Deskripsi masalah]');
+        expect(sequentialPrompt).toContain('**Masalah:** [Penjelasan mengapa bermasalah]');
+        expect(sequentialPrompt).toContain('**Contoh perbaikan:**');
+        expect(sequentialPrompt).toContain('**Cara implementasi:** [Panduan 1-2 kalimat]');
+      });
+    });
+
+    describe('Final Step Format Enhancement', () => {
+      test('should include enhanced format for quick mode final step', () => {
+        const format = (reviewService as any).getFinalStepFormatByMode('quick');
+
+        expect(format).toContain('🔴 [Deskripsi masalah]');
+        expect(format).toContain('**Masalah:** [Penjelasan singkat mengapa bermasalah]');
+        expect(format).toContain('**Contoh perbaikan:**');
+        expect(format).toContain('// Before (bermasalah)');
+        expect(format).toContain('// After (diperbaiki)');
+        expect(format).toContain('dengan contoh solusi');
+      });
+
+      test('should include enhanced format for standard mode final step', () => {
+        const format = (reviewService as any).getFinalStepFormatByMode('standard');
+
+        expect(format).toContain('🔴 [Deskripsi masalah]');
+        expect(format).toContain('**Masalah:** [Penjelasan singkat mengapa bermasalah]');
+        expect(format).toContain('**Contoh perbaikan:**');
+        expect(format).toContain('tanpa contoh kode');
+        expect(format).toContain('Contoh solusi hanya untuk isu kritis (🔴)');
+      });
+
+      test('should include enhanced format for detailed mode final step', () => {
+        const format = (reviewService as any).getFinalStepFormatByMode('detailed');
+
+        expect(format).toContain('🔴 [Deskripsi masalah kritis]');
+        expect(format).toContain('**Masalah:** [Penjelasan detail mengapa bermasalah]');
+        expect(format).toContain('[kode bermasalah dengan konteks]');
+        expect(format).toContain('[kode solusi dengan penjelasan]');
+        expect(format).toContain('Contoh solusi hanya untuk isu kritis (🔴)');
+      });
+    });
+
+    describe('Critical Issue Detection with Enhanced Format', () => {
+      test('should detect critical issues with new solution format', () => {
+        const reviewResult = `
+**🔴 Kritis**:
+🔴 Null pointer exception pada authentication
+**Masalah:** User object tidak dicek null sebelum digunakan
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+const name = user.name;
+
+// After (diperbaiki)
+const name = user?.name || 'Guest';
+\`\`\`
+**Cara implementasi:** Gunakan optional chaining dan default value
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+
+      test('should not detect when critical section has only format template', () => {
+        const reviewResult = `
+**🔴 Kritis**:
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+\`\`\`
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(false);
+      });
+
+      test('should detect substantial critical content with solution examples', () => {
+        const reviewResult = `
+🔴 Memory leak pada component lifecycle
+**Masalah:** useEffect tidak dibersihkan saat component unmount
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before
+useEffect(() => {
+  const timer = setInterval(fetchData, 1000);
+}, []);
+
+// After
+useEffect(() => {
+  const timer = setInterval(fetchData, 1000);
+  return () => clearInterval(timer);
+}, []);
+\`\`\`
+**Cara implementasi:** Tambahkan cleanup function di return useEffect
+        `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+    });
+  });
 });

@@ -321,6 +321,48 @@ Terima kasih
 
 This ensures consistent approval messaging while maintaining the intelligent detection system.
 
+### Enhanced Critical Issue Reporting
+
+Critical issues (🔴) now include practical solution examples to make them more actionable for developers:
+
+#### Critical Issue Format
+```
+🔴 [Issue description]
+**Masalah:** [Brief explanation of why this is problematic]
+**Contoh perbaikan:**
+```javascript
+// Before (problematic)
+[problematic code]
+
+// After (fixed)
+[solution code]
+```
+**Cara implementasi:** [1-2 sentence implementation guidance]
+```
+
+#### Key Features
+- **Concise Solutions**: Code examples kept under 5 lines when possible
+- **Technology-Specific**: Uses appropriate language (JavaScript for Nuxt.js, Dart for Flutter)
+- **Practical Focus**: Immediate, actionable fixes rather than theoretical explanations
+- **Critical Issues Only**: Solution examples provided only for 🔴 critical issues, not for 🟡 important or 🔵 optional suggestions
+
+#### Example Output
+```
+🔴 Null pointer exception pada authentication
+**Masalah:** User object tidak dicek null sebelum digunakan yang dapat menyebabkan crash
+**Contoh perbaikan:**
+```javascript
+// Before (bermasalah)
+const name = user.name;
+
+// After (diperbaiki)
+const name = user?.name || 'Guest';
+```
+**Cara implementasi:** Gunakan optional chaining (?.) dan berikan default value untuk mencegah error
+```
+
+This enhancement makes critical issues immediately actionable while maintaining the concise, focused approach of the review system.
+
 ### Migration from Previous Version
 
 Existing installations will automatically use the standard mode with default settings, maintaining backward compatibility. No configuration changes are required unless you want to customize the review behavior.

@@ -98,6 +98,45 @@ Completely redesigned the automatic merge request approval logic to work intelli
 - ✅ Only important (🟡) or optional (🔵) suggestions present
 - ❌ Rejects when "❌ Perlu perbaikan signifikan" found
 
+### 7. Enhanced Critical Issue Reporting with Solution Examples
+
+Completely redesigned how critical issues are reported to make them immediately actionable for developers:
+
+#### Practical Solution Format
+Every critical issue (🔴) now includes:
+- **Concise Problem Description**: Brief explanation of what's wrong and why it's problematic
+- **Code Example**: Shows the problematic code snippet
+- **Solution Example**: Provides practical code demonstrating the fix
+- **Implementation Guidance**: 1-2 sentence explanation of how to apply the fix
+
+#### Format Structure
+```
+🔴 [Issue description]
+**Masalah:** [Brief problem explanation]
+**Contoh perbaikan:**
+```javascript
+// Before (problematic)
+[problematic code]
+
+// After (fixed)
+[solution code]
+```
+**Cara implementasi:** [1-2 sentence guidance]
+```
+
+#### Key Constraints
+- **Concise Examples**: Code solutions kept under 5 lines when possible
+- **Technology-Specific**: Uses appropriate language (JavaScript for Nuxt.js, Dart for Flutter)
+- **Critical Issues Only**: Solution examples provided only for 🔴 critical issues
+- **Practical Focus**: Immediate, actionable fixes rather than theoretical explanations
+- **Indonesian Language**: Clear, actionable language in Bahasa Indonesia
+
+#### Integration Across All Modes
+- **Quick Mode**: Concise solution examples for rapid fixes
+- **Standard Mode**: Balanced solution examples with clear implementation guidance
+- **Detailed Mode**: Comprehensive solution examples with detailed context
+- **Sequential Thinking**: Solution format integrated into thinking process
+
 ## Configuration Options
 
 ```bash
@@ -128,6 +167,12 @@ REVIEW_FOCUS_AREAS='bugs,performance,security,style'
    - `checkConclusionApproval()`: Explicit conclusion analysis
    - `checkTraditionalApprovalPhrases()`: Fallback phrase detection
    - Multi-layer decision process with detailed logging
+7. **Enhanced Critical Issue Format**: Integrated solution examples into all system prompts:
+   - Base context includes solution format template and guidelines
+   - Mode-specific prompts include appropriate level of detail for examples
+   - Sequential thinking prompts include solution format instructions
+   - Final step formats include enhanced critical issue templates
+   - Critical issue detection updated to handle new format structure
 
 ### Files Modified
 
@@ -150,6 +195,7 @@ REVIEW_FOCUS_AREAS='bugs,performance,security,style'
 2. **✅ More Selective Suggestions**: Priority-based categorization helps focus on what matters
 3. **✅ Better Project Alignment**: Conservative mode ensures suggestions align with existing standards
 4. **✅ Configurable Depth**: Teams can choose appropriate review depth for their workflow
+5. **✅ Actionable Critical Issues**: Solution examples make critical issues immediately fixable
 
 ### Additional Improvements
 
@@ -157,6 +203,10 @@ REVIEW_FOCUS_AREAS='bugs,performance,security,style'
 - **Learning Support**: Detailed mode supports knowledge transfer
 - **Team Flexibility**: Different teams can configure reviews to match their needs
 - **Quality Maintenance**: Critical issues are always highlighted regardless of mode
+- **Immediate Action**: Critical issues include practical solution examples
+- **Reduced Context Switching**: Developers get solutions without needing to research fixes
+- **Technology Awareness**: Solution examples use appropriate programming languages
+- **Consistent Format**: Structured critical issue reporting across all review modes
 
 ## Usage Examples
 

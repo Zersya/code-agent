@@ -276,7 +276,27 @@ ${REVIEW_CONSERVATIVE_MODE ?
   '* **Mode Standar**: Berikan saran perbaikan yang seimbang antara kualitas kode dan konsistensi dengan struktur existing.'
 }
 * **Batasan Saran**: Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama. Prioritaskan yang paling penting.
-* **Fokus Area**: ${FOCUS_AREAS.join(', ')}`;
+* **Fokus Area**: ${FOCUS_AREAS.join(', ')}
+
+**Format Isu Kritis (🔴):**
+Untuk setiap isu kritis, berikan solusi praktis dengan format:
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa ini bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat cara menerapkan perbaikan]
+
+**Pedoman Contoh Solusi:**
+* Batasi contoh kode maksimal 5 baris
+* Gunakan bahasa pemrograman yang sesuai (TypeScript, Vue untuk Nuxt.js, Dart untuk Flutter)
+* Fokus pada solusi praktis yang dapat langsung diterapkan
+* Berikan contoh hanya untuk isu kritis (🔴), bukan untuk saran penting (🟡) atau opsional (🔵)`;
 
     switch (mode.toLowerCase()) {
       case 'quick':
@@ -316,14 +336,23 @@ ${REVIEW_CONSERVATIVE_MODE ?
 **Ringkasan**: [1-2 kalimat tentang perubahan dan assessment umum]
 
 **Isu Kritis** (jika ada):
-🔴 [Masalah kritis 1 - dengan solusi konkret]
-🔴 [Masalah kritis 2 - dengan solusi konkret]
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat]
 
 **Kesimpulan**:
 * ✅ **Siap merge** - Tidak ada isu kritis ditemukan
 * ⚠️ **Perlu perbaikan** - Ada [X] isu kritis yang harus diperbaiki dulu
 
-Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
+Gunakan Bahasa Indonesia yang ringkas dan langsung to the point. Berikan contoh solusi hanya untuk isu kritis.`;
   }
 
   /**
@@ -352,20 +381,30 @@ Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
 **Temuan Utama**:
 
 **🔴 Kritis** (harus diperbaiki):
-• [Issue kritis dengan solusi konkret]
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat]
 
 **🟡 Penting** (sangat disarankan):
-• [Improvement penting dengan reasoning]
+• [Improvement penting dengan reasoning - tanpa contoh kode]
 
 **🔵 Opsional** (nice to have):
-• [Saran tambahan jika ada]
+• [Saran tambahan jika ada - tanpa contoh kode]
 
 **Konsistensi dengan Existing Code**: [Assessment singkat]
 
 **Kesimpulan**:
 [Pilih: ✅ Siap merge / ⚠️ Perlu perbaikan minor / ❌ Perlu perbaikan signifikan]
 
-Berikan feedback yang konstruktif, spesifik, dan dapat ditindaklanjuti. Maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama.`;
+Berikan feedback yang konstruktif, spesifik, dan dapat ditindaklanjuti. Maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama. Contoh solusi hanya untuk isu kritis (🔴).`;
   }
 
   /**
@@ -409,18 +448,28 @@ Berikan feedback yang konstruktif, spesifik, dan dapat ditindaklanjuti. Maksimal
 • [Requirement verification]
 
 **Potensi Bug & Performa** (ANALISIS MENDALAM):
-• [Detailed bug and performance analysis with examples]
+🔴 [Deskripsi masalah kritis]
+**Masalah:** [Penjelasan detail mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah dengan konteks]
+
+// After (diperbaiki)
+[kode solusi dengan penjelasan]
+\`\`\`
+**Cara implementasi:** [Panduan detail 1-2 kalimat]
 
 ---
 
 **Feedback Tambahan & Saran**:
-• [Comprehensive suggestions for improvement]
+• [Comprehensive suggestions for improvement - tanpa contoh kode untuk non-kritis]
 
 ---
 
 **Kesimpulan**: [Detailed conclusion with specific recommendations]
 
-Berikan analisis yang mendalam namun tetap actionable. Gunakan contoh konkret dan solusi spesifik.`;
+Berikan analisis yang mendalam namun tetap actionable. Gunakan contoh konkret dan solusi spesifik untuk isu kritis (🔴) saja.`;
   }
 
   /**
@@ -709,6 +758,20 @@ Anda akan memecah proses review menjadi 5 tahap berpikir yang berurutan:
 - Abaikan hasil SonarQube dan fokus pada kualitas kode intrinsik
 - Berikan output yang ringkas dan actionable sesuai mode review
 
+**Format Isu Kritis dalam Sequential Thinking:**
+Ketika mengidentifikasi isu kritis (🔴), gunakan format:
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat]
+
 Anda akan menerima instruksi untuk setiap tahap thinking dan harus merespons dengan analisis yang fokus pada tahap tersebut.`;
   }
 
@@ -962,13 +1025,23 @@ Pastikan kesimpulan selaras dengan semua analisis sebelumnya dan batasan review 
 **Ringkasan**: [1-2 kalimat tentang perubahan dan assessment umum]
 
 **Isu Kritis** (jika ada):
-🔴 [Masalah kritis dengan solusi konkret - maksimal ${REVIEW_MAX_SUGGESTIONS} item]
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat]
 
 **Kesimpulan**:
 * ✅ **Siap merge** - Tidak ada isu kritis ditemukan
 * ⚠️ **Perlu perbaikan** - Ada [X] isu kritis yang harus diperbaiki dulu
 
-Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
+Gunakan Bahasa Indonesia yang ringkas dan langsung to the point. Maksimal ${REVIEW_MAX_SUGGESTIONS} isu kritis dengan contoh solusi.`;
 
       case 'detailed':
         return `Format untuk Detailed Mode:
@@ -994,16 +1067,28 @@ Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
 • [Requirement verification]
 
 **Potensi Bug & Performa** (ANALISIS MENDALAM):
-• [Detailed bug and performance analysis with examples]
+🔴 [Deskripsi masalah kritis]
+**Masalah:** [Penjelasan detail mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah dengan konteks]
+
+// After (diperbaiki)
+[kode solusi dengan penjelasan]
+\`\`\`
+**Cara implementasi:** [Panduan detail 1-2 kalimat]
 
 ---
 
 **Feedback Tambahan & Saran**:
-• [Comprehensive suggestions for improvement - maksimal ${REVIEW_MAX_SUGGESTIONS} item utama]
+• [Comprehensive suggestions for improvement - tanpa contoh kode untuk non-kritis]
 
 ---
 
-**Kesimpulan**: [Detailed conclusion with specific recommendations]`;
+**Kesimpulan**: [Detailed conclusion with specific recommendations]
+
+Maksimal ${REVIEW_MAX_SUGGESTIONS} item utama. Contoh solusi hanya untuk isu kritis (🔴).`;
 
       default: // 'standard'
         return `Format untuk Standard Mode:
@@ -1015,20 +1100,30 @@ Gunakan Bahasa Indonesia yang ringkas dan langsung to the point.`;
 **Temuan Utama**:
 
 **🔴 Kritis** (harus diperbaiki):
-• [Issue kritis dengan solusi konkret]
+🔴 [Deskripsi masalah]
+**Masalah:** [Penjelasan singkat mengapa bermasalah]
+**Contoh perbaikan:**
+\`\`\`javascript
+// Before (bermasalah)
+[kode bermasalah]
+
+// After (diperbaiki)
+[kode solusi]
+\`\`\`
+**Cara implementasi:** [Panduan 1-2 kalimat]
 
 **🟡 Penting** (sangat disarankan):
-• [Improvement penting dengan reasoning]
+• [Improvement penting dengan reasoning - tanpa contoh kode]
 
 **🔵 Opsional** (nice to have):
-• [Saran tambahan jika ada]
+• [Saran tambahan jika ada - tanpa contoh kode]
 
 **Konsistensi dengan Existing Code**: [Assessment singkat]
 
 **Kesimpulan**:
 [Pilih: ✅ Siap merge / ⚠️ Perlu perbaikan minor / ❌ Perlu perbaikan signifikan]
 
-Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori.`;
+Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh solusi hanya untuk isu kritis (🔴).`;
     }
   }
 
