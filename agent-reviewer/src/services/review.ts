@@ -20,6 +20,7 @@ const OPENROUTER_API_URL = process.env.OPENROUTER_API_URL || 'https://openrouter
 const OPENROUTER_API_MODEL = process.env.OPENROUTER_API_MODEL || 'qwen/qwen3-235b-a22b:free';
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
+const ENABLE_SEQUENTIAL_THINKING = process.env.ENABLE_SEQUENTIAL_THINKING === 'true';
 
 // Review Configuration Environment Variables
 const REVIEW_MODE = process.env.REVIEW_MODE || 'standard'; // 'quick', 'standard', 'detailed'
@@ -98,7 +99,18 @@ export class ReviewService {
     notionContext?: CombinedNotionContext
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     try {
-      console.log('Starting sequential thinking code review process');
+
+      if (!ENABLE_SEQUENTIAL_THINKING) {
+        console.log('Sequential thinking is disabled. Falling back to direct LLM call.');
+        return await this.reviewCodeWithDirectLLM(
+          codeChanges,
+          mergeRequestTitle,
+          mergeRequestDescription,
+          projectContext,
+          notionContext
+        );
+      }
+      console.log('Sequential thinking is enabled. Using sequential thinking approach.');
 
       // Use sequential thinking for comprehensive code review
       const { thoughts, reviewResult } = await this.reviewCodeWithSequentialThinking(

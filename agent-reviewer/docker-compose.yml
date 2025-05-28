@@ -21,7 +21,6 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_API_URL=${OPENROUTER_API_URL}
       - TEMP_DIR=/app/temp
-      - SEQUENTIAL_THINKING_THOUGHTS_COUNT=${SEQUENTIAL_THINKING_THOUGHTS_COUNT}
     volumes:
       - ./temp:/app/temp
     restart: unless-stopped
