@@ -302,6 +302,25 @@ class DatabaseService {
           console.log('Column is_reembedding might already exist:', error);
         }
 
+        // Create documentation_jobs table if it doesn't exist
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS documentation_jobs (
+            id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL,
+            source_url TEXT NOT NULL,
+            processing_id TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL,
+            error TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            priority INTEGER NOT NULL DEFAULT 5
+          )
+        `);
+
 
         await client.query(`
           CREATE TABLE IF NOT EXISTS documentation_embeddings (
@@ -351,6 +370,16 @@ class DatabaseService {
         )
       `);
 
+
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_project_id ON embedding_jobs(project_id)');
+
+      // Create indexes if they don't exist
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_status ON documentation_jobs(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_processing_id ON documentation_jobs(processing_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_source_id ON documentation_jobs(source_id)');
+
       // Create indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_project_id ON embeddings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_commit_id ON embeddings(commit_id)');
@@ -358,10 +387,6 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_webhook_key ON webhook_processing(webhook_key)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_status ON webhook_processing(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_started_at ON webhook_processing(started_at)');
-
-      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
-      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_project_id ON embedding_jobs(project_id)');
 
       // Documentation indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_sources_framework ON documentation_sources(framework)');
