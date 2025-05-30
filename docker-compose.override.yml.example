@@ -1,0 +1,72 @@
+# Docker Compose Override Example
+# Copy this file to docker-compose.override.yml and customize for your development environment
+# This file is automatically loaded by docker-compose and overrides settings in docker-compose.yml
+
+version: '3.8'
+
+services:
+  # PostgreSQL development overrides
+  postgres:
+    # Expose PostgreSQL port for external access during development
+    ports:
+      - "5432:5432"
+    # Add development-specific environment variables
+    environment:
+      # Enable detailed logging for development
+      - POSTGRES_LOG_STATEMENT=all
+      - POSTGRES_LOG_MIN_DURATION_STATEMENT=0
+    # Mount custom PostgreSQL configuration for development
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+      # Uncomment to add custom PostgreSQL config
+      # - ./dev-configs/postgresql.conf:/etc/postgresql/postgresql.conf
+
+  # Agent Reviewer development overrides
+  agent-reviewer:
+    # Enable development mode
+    environment:
+      # Override for development database connection
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/repopo_reviewer
+      # Enable debug logging
+      - NODE_ENV=development
+      - DEBUG=*
+      # Development-specific settings
+      - ENABLE_MR_REVIEW=true
+      - ENABLE_PROJECT_CONTEXT=true
+      - ENABLE_SEQUENTIAL_THINKING=true
+      - ENHANCED_CONTEXT_ENABLED=true
+    # Mount source code for hot reloading (uncomment for development)
+    # volumes:
+    #   - ./agent-reviewer/src:/app/src
+    #   - ./temp:/app/temp
+    # Override command for development with nodemon
+    # command: npm run dev
+
+  # Qodo Embedding Service development overrides
+  qodo-embed-api:
+    # Development environment variables
+    environment:
+      - DEVICE=cpu  # Use CPU for development, change to 'cuda' if GPU available
+      - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B
+      - HF_HOME=/cache/huggingface
+      # Enable debug logging
+      - PYTHONUNBUFFERED=1
+    # Uncomment to mount source code for development
+    # volumes:
+    #   - huggingface_cache_vol:/cache/huggingface
+    #   - ./qodo-embedding-service:/app
+
+# Development-specific volumes
+volumes:
+  postgres_data:
+    driver: local
+  huggingface_cache_vol:
+    driver: local
+
+# Development-specific networks (if needed)
+networks:
+  qodo_network:
+    driver: bridge
+  llm-network:
+    driver: bridge

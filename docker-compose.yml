@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  # PostgreSQL database with pgvector extension for vector embeddings
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agent_reviewer_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-repopo_reviewer}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - qodo_network
+      - llm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-repopo_reviewer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   agent-reviewer:
     build:
       context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
@@ -10,7 +35,8 @@ services:
       - "4100:3000"
     environment:
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
+      # Database connection to containerized PostgreSQL
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-repopo_reviewer}
       - GITLAB_API_TOKEN=${GITLAB_API_TOKEN}
       - GITLAB_API_URL=${GITLAB_API_URL}
       - GITLAB_USERNAME=${GITLAB_USERNAME}
@@ -48,6 +74,9 @@ services:
     volumes:
       - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - qodo_network # Assigns this service to the qodo_network
       - llm-network # Assigns this service to the llm_network
@@ -124,6 +153,8 @@ networks:
 
 # Define the named volumes
 volumes:
+  postgres_data:
+    driver: local
   huggingface_cache_vol:
     driver: local
   # ollama_data:
