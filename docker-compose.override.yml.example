@@ -8,8 +8,9 @@ services:
   # PostgreSQL development overrides
   postgres:
     # Expose PostgreSQL port for external access during development
+    # Use POSTGRES_PORT environment variable or change to avoid conflicts
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     # Add development-specific environment variables
     environment:
       # Enable detailed logging for development

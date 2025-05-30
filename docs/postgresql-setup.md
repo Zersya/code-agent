@@ -14,7 +14,7 @@ The `docker-compose.yml` file includes a PostgreSQL service with the following f
 
 - **Image**: `pgvector/pgvector:pg16` - PostgreSQL 16 with pgvector extension pre-installed
 - **Container Name**: `agent_reviewer_postgres`
-- **Port**: `5432` (mapped to host port 5432)
+- **Port**: Configurable host port (default 5432) mapped to container port 5432
 - **Networks**: Connected to `qodo_network` and `llm-network`
 - **Health Check**: Monitors database availability
 - **Persistent Storage**: Data persisted in `postgres_data` volume
@@ -28,6 +28,7 @@ The following environment variables configure the PostgreSQL container:
 POSTGRES_DB='repopo_reviewer'          # Database name
 POSTGRES_USER='postgres'               # Database user
 POSTGRES_PASSWORD='postgres'           # Database password
+POSTGRES_PORT='5432'                   # Host port (change if 5432 is in use)
 ```
 
 ### Database Connection
@@ -108,6 +109,17 @@ POSTGRES_USER='your_username'
 POSTGRES_PASSWORD='your_secure_password'
 ```
 
+### Custom Port Configuration
+
+If port 5432 is already in use on your host system, you can change the PostgreSQL port:
+
+```bash
+# In your .env file
+POSTGRES_PORT='5433'  # or any other available port
+```
+
+This will map the specified host port to the container's internal port 5432. The agent-reviewer service will still connect using the internal Docker network, so no additional configuration is needed.
+
 ### External Database
 
 To use an external PostgreSQL database instead of the Docker container:
@@ -120,7 +132,17 @@ To use an external PostgreSQL database instead of the Docker container:
 
 ### Common Issues
 
-1. **Port Conflict**: If port 5432 is already in use, change the port mapping in docker-compose.yml
+1. **Port Conflict**: If port 5432 is already in use:
+   ```bash
+   # Check what's using port 5432
+   lsof -i :5432
+   # or
+   netstat -tulpn | grep 5432
+
+   # Set a different port in .env file
+   POSTGRES_PORT='5433'
+   ```
+
 2. **Permission Issues**: Ensure Docker has permission to create volumes
 3. **Extension Not Found**: Verify the pgvector/pgvector image is being used
 

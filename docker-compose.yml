@@ -6,7 +6,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: agent_reviewer_postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-repopo_reviewer}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -35,7 +35,7 @@ services:
       - "4100:3000"
     environment:
       - PORT=3000
-      # Database connection to containerized PostgreSQL
+      # Database connection to containerized PostgreSQL (internal port is always 5432)
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-repopo_reviewer}
       - GITLAB_API_TOKEN=${GITLAB_API_TOKEN}
       - GITLAB_API_URL=${GITLAB_API_URL}

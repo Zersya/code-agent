@@ -57,6 +57,7 @@ GITLAB_USERNAME='your-username'
 POSTGRES_DB='repopo_reviewer'
 POSTGRES_USER='postgres'
 POSTGRES_PASSWORD='postgres'
+POSTGRES_PORT='5432'  # Change if port 5432 is in use
 
 # LLM Provider (OpenRouter or Ollama)
 LLM_PROVIDER='openrouter'
@@ -146,6 +147,7 @@ curl http://localhost:4100/health
 | `POSTGRES_DB` | Database name | `repopo_reviewer` |
 | `POSTGRES_USER` | Database user | `postgres` |
 | `POSTGRES_PASSWORD` | Database password | `postgres` |
+| `POSTGRES_PORT` | Host port for PostgreSQL | `5432` |
 | `LLM_PROVIDER` | LLM provider (openrouter/ollama) | `openrouter` |
 | `ENABLE_MR_REVIEW` | Enable MR reviews | `true` |
 | `ENABLE_PROJECT_CONTEXT` | Enable project context | `true` |

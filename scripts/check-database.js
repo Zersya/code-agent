@@ -10,7 +10,14 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/repopo_reviewer';
+// Use environment variables for connection, with fallback to defaults
+const POSTGRES_USER = process.env.POSTGRES_USER || 'postgres';
+const POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD || 'postgres';
+const POSTGRES_DB = process.env.POSTGRES_DB || 'repopo_reviewer';
+const POSTGRES_PORT = process.env.POSTGRES_PORT || '5432';
+
+const DATABASE_URL = process.env.DATABASE_URL ||
+  `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}`;
 
 async function checkDatabase() {
   const pool = new Pool({
