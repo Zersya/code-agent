@@ -271,6 +271,38 @@ class DatabaseService {
 
       // Create documentation embeddings table
       if (vectorExtensionAvailable) {
+        // create table embedding jobs
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS embedding_jobs (
+            id TEXT PRIMARY KEY,
+            repository_url TEXT NOT NULL,
+            processing_id TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL,
+            error TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            priority INTEGER NOT NULL DEFAULT 5,
+            project_id INTEGER NOT NULL,
+            is_reembedding BOOLEAN DEFAULT FALSE
+          )
+        `);
+
+        // Add the is_reembedding column if it doesn't exist (migration)
+        try {
+          await client.query(`
+            ALTER TABLE embedding_jobs
+            ADD COLUMN IF NOT EXISTS is_reembedding BOOLEAN DEFAULT FALSE
+          `);
+        } catch (error) {
+          // Column might already exist, ignore the error
+          console.log('Column is_reembedding might already exist:', error);
+        }
+
+
         await client.query(`
           CREATE TABLE IF NOT EXISTS documentation_embeddings (
             id TEXT PRIMARY KEY,
@@ -326,6 +358,10 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_webhook_key ON webhook_processing(webhook_key)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_status ON webhook_processing(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_started_at ON webhook_processing(started_at)');
+
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_project_id ON embedding_jobs(project_id)');
 
       // Documentation indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_sources_framework ON documentation_sources(framework)');
