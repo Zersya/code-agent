@@ -808,8 +808,7 @@ const name = user?.name || 'Guest';
 
       test('should not detect when critical section has only format template', () => {
         const reviewResult = `
-**🔴 Kritis**:
-🔴 [Deskripsi masalah]
+ [Deskripsi masalah]
 **Masalah:** [Penjelasan singkat mengapa bermasalah]
 **Contoh perbaikan:**
 \`\`\`javascript
@@ -824,6 +823,7 @@ const name = user?.name || 'Guest';
 
       test('should detect substantial critical content with solution examples', () => {
         const reviewResult = `
+        **Isu Kritis**:
 🔴 Memory leak pada component lifecycle
 **Masalah:** useEffect tidak dibersihkan saat component unmount
 **Contoh perbaikan:**
@@ -841,6 +841,114 @@ useEffect(() => {
 \`\`\`
 **Cara implementasi:** Tambahkan cleanup function di return useEffect
         `;
+
+        const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
+        expect(hasCritical).toBe(true);
+      });
+
+      test('should detect critical issues when in quick mode format', () => {
+        const reviewResult = `
+Halo, berikut review untuk MR ini:
+
+## Review Kode (Quick Mode)
+
+**Ringkasan**: Perubahan ini bertujuan memperbaiki *bug* *filter* yang *reset* saat paginasi pada halaman riwayat APICAL. Perubahan inti melibatkan penyesuaian logika *filter* dan penanganan *error* dasar. Secara umum, kode bersih dan selaras dengan pola Nuxt.js yang ada, namun ada potensi *regresi* dan area minor untuk peningkatan *maintainability* dan *user experience*.
+
+**Isu Kritis**:
+
+1.  🔴 **Potensi Regresi: Logika filterVariabel yang Tidak Lengkap**
+    **Masalah:** Perubahan pada kondisi filterVariabel di handlePaginationChange berpotensi menghilangkan *filter* lama yang masih relevan, menyebabkan *bug* *reset filter* muncul kembali untuk *filter-filter* tersebut. Ini adalah risiko *regresi* fungsionalitas yang tinggi.
+    **Contoh perbaikan:**
+    javascript
+    // Before (bermasalah)
+    const filterVariabel = (this.selectedMill || this.selectedUsersId || this.selectedStatus || this.dateRange.length > 0)
+
+    // After (diperbaiki)
+    // Pastikan semua state filter yang relevan tercakup.
+    // Contoh: Jika selectedProductId dan selectedVendorId masih digunakan:
+    const filterVariabel = (
+        (this.selectedMill && this.selectedMill.length > 0) ||
+        (this.selectedUsersId && this.selectedUsersId.length > 0) ||
+        (this.selectedStatus && this.selectedStatus.length > 0) ||
+        (this.dateRange && this.dateRange.length > 0) ||
+        (this.selectedProductId && this.selectedProductId.length > 0) || // Tambahkan jika masih relevan
+        (this.selectedVendorId && this.selectedVendorId.length > 0)     // Tambahkan jika masih relevan
+        // ... tambahkan semua variabel filter lainnya yang mungkin ada
+    );
+    
+    **Cara implementasi:** Verifikasi semua *state* *filter* yang ada di UI dan pastikan semuanya tercakup dalam kondisi filterVariabel yang baru.
+
+2.  🔴 **Penanganan *Error* console.error yang Pasif**
+    **Masalah:** Penggunaan console.error untuk *error* API tidak memberikan *feedback* visual kepada pengguna, yang dapat menyebabkan kebingungan jika *data fetching* gagal.
+    **Contoh perbaikan:**
+    javascript
+    // Before (bermasalah)
+    try {
+      await this.$store.dispatch('shipment/getItemsV2', { /* ... */ });
+    } catch (error) {
+      console.error('Error applying filter:', error);
+    }
+
+    // After (diperbaiki)
+    try {
+      await this.$store.dispatch('shipment/getItemsV2', { /* ... */ });
+    } catch (error) {
+      console.error('Error applying filter:', error);
+      // this.$toast.error('Gagal memuat data. Silakan coba lagi.'); // Contoh dengan plugin toast/snackbar
+    }
+    
+    **Cara implementasi:** Tambahkan notifikasi *user-friendly* (misalnya *toast* atau *snackbar*) saat terjadi *error* pada *data fetching*.
+
+3.  🔴 **Potensi Perilaku Tidak Terduga pada *Default Page***
+    **Masalah:** Mengubah *default* page menjadi 1 di applyFilter akan selalu mereset paginasi ke halaman pertama jika page tidak diberikan secara eksplisit. Ini mungkin tidak diinginkan dalam semua skenario pemanggilan applyFilter.
+    **Contoh perbaikan:**
+    javascript
+    // Before (bermasalah)
+    async applyFilter ({
+      page = 1,
+      // ...
+    })
+
+    // After (diperbaiki)
+    // Jika ada skenario di mana halaman saat ini harus dipertahankan:
+    async applyFilter ({
+      page = this.$route.query?.page_history ? parseInt(this.$route.query.page_history as string) : 1,
+      // ...
+    })
+    
+    **Cara implementasi:** Konfirmasi perilaku yang diinginkan untuk *default value* page dan sesuaikan agar konsisten dengan *user experience* yang diharapkan.
+
+4.  🔴 **Duplikasi Logika Pengambilan filter dari $route.query**
+    **Masalah:** Objek filter dibuat ulang di handlePaginationChange dengan mengambil dari $route.query. Jika *filter state* sudah dikelola di *state* komponen atau Vuex, ini bisa menjadi *redundant* dan berpotensi menyebabkan inkonsistensi.
+    **Contoh perbaikan:**
+    javascript
+    // Before (bermasalah)
+    const filter = {
+      filterColumn: this.$route.query?.filter_column,
+      filterType: this.$route.query?.filter_type
+    } as any
+
+    // After (diperbaiki)
+    // Gunakan state filter yang sudah ada sebagai single source of truth:
+    const filter = {
+      filterColumn: this.currentFilter.column, // Asumsi ada currentFilter di data/computed
+      filterType: this.currentFilter.type
+    };
+    
+    **Cara implementasi:** Pastikan *state filter* dikelola secara terpusat dan digunakan sebagai *single source of truth*.
+
+5.  🔴 **Penamaan Variabel Kurang Deskriptif**
+    **Masalah:** Variabel filterVariabel kurang deskriptif dan dapat membingungkan.
+    **Contoh perbaikan:**
+    javascript
+    // Before (bermasalah)
+    const filterVariabel = (this.selectedMill || this.selectedUsersId || this.selectedStatus || this.dateRange.length > 0)
+
+    // After (diperbaiki)
+    const hasActiveFilters = (this.selectedMill || this.selectedUsersId || this.selectedStatus || this.dateRange.length > 0)
+    
+    **Cara implementasi:** Ganti nama variabel filterVariabel menjadi hasActiveFilters atau nama lain yang lebih jelas.
+`;
 
         const hasCritical = (reviewService as any).hasCriticalIssues(reviewResult);
         expect(hasCritical).toBe(true);

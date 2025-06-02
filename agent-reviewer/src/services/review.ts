@@ -1331,70 +1331,101 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
 
   /**
    * Check if the review contains critical issues based on the review mode format
+   * Uses a unified approach that works across all review modes
    */
   private hasCriticalIssues(reviewResult: string): boolean {
-    // Check for critical issues in different review mode formats
+    console.log('🔍 Checking for critical issues in review result...');
 
-    // Quick Mode: Check for "Isu Kritis" section with content
-    if (reviewResult.includes('Quick Mode')) {
-      const criticalSectionMatch = reviewResult.match(/\*\*Isu Kritis\*\*[^:]*:(.*?)(?=\*\*|$)/s);
-      if (criticalSectionMatch) {
-        const criticalContent = criticalSectionMatch[1].trim();
-        // If there's content after "Isu Kritis:" other than "Tidak ada"
-        return criticalContent.length > 0 &&
-               !criticalContent.toLowerCase().includes('tidak ada') &&
-               !criticalContent.toLowerCase().includes('none') &&
-               criticalContent.length > 10; // More than just whitespace/minimal text
-      }
+    // Method 1: Direct emoji detection (most reliable for all modes)
+    const emojiBasedDetection = this.detectCriticalIssuesByEmoji(reviewResult);
+    if (emojiBasedDetection !== null) {
+      console.log(`📊 Emoji-based detection result: ${emojiBasedDetection}`);
+      return emojiBasedDetection;
     }
 
-    // Standard/Detailed Mode: Check for 🔴 Critical issues
-    const criticalIssuePattern = /🔴.*?(?=🟡|🔵|\*\*|$)/gs;
-    const criticalMatches = reviewResult.match(criticalIssuePattern);
+    // Method 2: Section-based detection (fallback for edge cases)
+    const sectionBasedDetection = this.detectCriticalIssuesBySection(reviewResult);
+    console.log(`📋 Section-based detection result: ${sectionBasedDetection}`);
+    return sectionBasedDetection;
+  }
 
-    if (criticalMatches) {
-      // Check if there are actual critical issues (not just empty sections)
-      const hasRealCriticalIssues = criticalMatches.some(match => {
-        const content = match.replace(/🔴.*?:/, '').trim();
-        return content.length > 0 &&
-               !content.toLowerCase().includes('tidak ada') &&
-               !content.toLowerCase().includes('none') &&
-               content.length > 10;
-      });
+  /**
+   * Detect critical issues by looking for 🔴 emoji directly
+   * This is the most reliable method that works across all review modes
+   */
+  private detectCriticalIssuesByEmoji(reviewResult: string): boolean | null {
+    if (!reviewResult.includes('🔴')) {
+      return false;
+    }
 
-      if (hasRealCriticalIssues) {
+    console.log('🔴 Found red circle emoji, validating critical issue content...');
+
+    // Find lines with 🔴 and validate they contain actual issues
+    const criticalLines = reviewResult.split('\n').filter(line => line.includes('🔴'));
+
+    const hasRealIssues = criticalLines.some(line => {
+      const content = line.replace('🔴', '').trim();
+
+      // Check for template placeholders or empty content
+      const isTemplate = content === '[Deskripsi masalah]' ||
+                        content === '' ||
+                        content.toLowerCase().includes('tidak ada') ||
+                        content.toLowerCase().includes('none') ||
+                        content.toLowerCase().includes('template') ||
+                        content.length < 5;
+
+      if (!isTemplate) {
+        console.log(`✅ Found valid critical issue: ${content.substring(0, 50)}...`);
         return true;
       }
+      return false;
+    });
+
+    return hasRealIssues;
+  }
+
+  /**
+   * Detect critical issues by looking for section headers (fallback method)
+   * Improved to handle case variations and better content validation
+   */
+  private detectCriticalIssuesBySection(reviewResult: string): boolean {
+    console.log('📝 Attempting section-based critical issue detection...');
+
+    // Improved section detection with case-insensitive and flexible matching
+    // This pattern handles variations like "Isu Kritis", "isu kritis", "Isu Kritis (jika ada)", etc.
+    const sectionPattern = /\*\*\s*isu\s+kritis\s*\*\*[^:]*:(.*?)(?=\n\*\*(?!\s*(?:masalah|cara\s+implementasi))|$)/gis;
+    const matches = reviewResult.match(sectionPattern);
+
+    if (!matches) {
+      console.log('❌ No critical issue sections found');
+      return false;
     }
 
-    // Check for explicit critical issue indicators
-    const criticalIndicators = [
-      '🔴',
-      'Isu Kritis',
-      'Critical',
-      'harus diperbaiki',
-      'wajib diperbaiki',
-      'perlu diperbaiki sebelum merge',
-      'blocking issue',
-      'fatal error'
-    ];
+    console.log(`📋 Found ${matches.length} potential critical issue section(s)`);
 
-    // Look for critical indicators followed by actual content
-    for (const indicator of criticalIndicators) {
-      const indicatorIndex = reviewResult.indexOf(indicator);
-      if (indicatorIndex !== -1) {
-        // Get text after the indicator (next 200 characters)
-        const followingText = reviewResult.substring(indicatorIndex, indicatorIndex + 200);
-        // Check if there's substantial content after the indicator
-        if (followingText.length > indicator.length + 20 &&
-            !followingText.toLowerCase().includes('tidak ada') &&
-            !followingText.toLowerCase().includes('none')) {
-          return true;
-        }
+    return matches.some(match => {
+      // Extract content after the section header
+      const content = match.replace(/\*\*\s*isu\s+kritis\s*\*\*[^:]*/i, '').replace(':', '').trim();
+
+      // Validate that the content contains actual critical issues
+      const hasSubstantialContent = content.length > 10 &&
+                                   !content.toLowerCase().includes('tidak ada') &&
+                                   !content.toLowerCase().includes('none');
+
+      const hasIssueIndicators = content.includes('🔴') ||
+                                content.toLowerCase().includes('masalah') ||
+                                content.toLowerCase().includes('bug') ||
+                                content.toLowerCase().includes('error') ||
+                                content.toLowerCase().includes('diperbaiki');
+
+      const isValid = hasSubstantialContent && hasIssueIndicators;
+
+      if (isValid) {
+        console.log(`✅ Found valid critical issue in section: ${content.substring(0, 100)}...`);
       }
-    }
 
-    return false;
+      return isValid;
+    });
   }
 
   /**
