@@ -955,4 +955,313 @@ Halo, berikut review untuk MR ini:
       });
     });
   });
+
+  describe('Domain-Specific Review Scope', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    describe('shouldUseDiffOnlyScope', () => {
+      const mockSmallChanges = [
+        {
+          oldPath: 'src/components/Button.vue',
+          newPath: 'src/components/Button.vue',
+          oldContent: 'old content',
+          newContent: 'new content',
+          diffContent: '+  console.log("test");\n-  console.log("old");',
+          language: 'vue'
+        }
+      ];
+
+      const mockLargeChanges = Array.from({ length: 10 }, (_, i) => ({
+        oldPath: `src/components/Component${i}.vue`,
+        newPath: `src/components/Component${i}.vue`,
+        oldContent: 'old content',
+        newContent: 'new content',
+        diffContent: Array.from({ length: 20 }, (_, j) => `+  line ${j}`).join('\n'),
+        language: 'vue'
+      }));
+
+      test('should return true when REVIEW_DOMAIN_SCOPE is diff-only', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'diff-only';
+
+        const result = (reviewService as any).shouldUseDiffOnlyScope(mockLargeChanges);
+        expect(result).toBe(true);
+      });
+
+      test('should return false when REVIEW_DOMAIN_SCOPE is full-context', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'full-context';
+
+        const result = (reviewService as any).shouldUseDiffOnlyScope(mockSmallChanges);
+        expect(result).toBe(false);
+      });
+
+      test('should use diff-only for small changesets in auto mode', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'auto';
+
+        const result = (reviewService as any).shouldUseDiffOnlyScope(mockSmallChanges);
+        expect(result).toBe(true);
+      });
+
+      test('should use full-context for large changesets in auto mode', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'auto';
+
+        const result = (reviewService as any).shouldUseDiffOnlyScope(mockLargeChanges);
+        expect(result).toBe(false);
+      });
+
+      test('should default to false for unknown domain scope values', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'unknown';
+
+        const result = (reviewService as any).shouldUseDiffOnlyScope(mockSmallChanges);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('getDomainScopeInstructions', () => {
+      test('should return empty string when useDiffOnly is false', () => {
+        const instructions = (reviewService as any).getDomainScopeInstructions(false);
+        expect(instructions).toBe('');
+      });
+
+      test('should return diff-only instructions when useDiffOnly is true', () => {
+        const instructions = (reviewService as any).getDomainScopeInstructions(true);
+
+        expect(instructions).toContain('BATASAN DOMAIN REVIEW (DIFF-ONLY MODE AKTIF)');
+        expect(instructions).toContain('HANYA analisis kode yang diubah dalam diff');
+        expect(instructions).toContain('FOKUS pada perubahan spesifik');
+        expect(instructions).toContain('HINDARI saran arsitektur umum');
+        expect(instructions).toContain('JANGAN berikan rekomendasi refactoring');
+        expect(instructions).toContain('baris kode yang ditambah (+) atau dimodifikasi');
+      });
+    });
+
+    describe('System Prompt Integration with Domain Scope', () => {
+      test('should include domain scope instructions in system prompt when diff-only is active', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'diff-only';
+
+        const mockChanges = [
+          {
+            oldPath: 'test.js',
+            newPath: 'test.js',
+            oldContent: 'old',
+            newContent: 'new',
+            diffContent: '+  new line',
+            language: 'javascript'
+          }
+        ];
+
+        const systemPrompt = (reviewService as any).generateSystemPrompt(mockChanges);
+
+        expect(systemPrompt).toContain('BATASAN DOMAIN REVIEW (DIFF-ONLY MODE AKTIF)');
+        expect(systemPrompt).toContain('HANYA analisis kode yang diubah dalam diff');
+      });
+
+      test('should not include domain scope instructions when full-context is active', () => {
+        process.env.REVIEW_DOMAIN_SCOPE = 'full-context';
+
+        const mockChanges = [
+          {
+            oldPath: 'test.js',
+            newPath: 'test.js',
+            oldContent: 'old',
+            newContent: 'new',
+            diffContent: '+  new line',
+            language: 'javascript'
+          }
+        ];
+
+        const systemPrompt = (reviewService as any).generateSystemPrompt(mockChanges);
+
+        expect(systemPrompt).not.toContain('BATASAN DOMAIN REVIEW');
+      });
+    });
+  });
+
+  describe('Critical Issue Threshold Configuration', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    describe('getCriticalIssueThresholdDefinition', () => {
+      test('should return strict threshold definition', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'strict';
+
+        const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
+
+        expect(definition).toContain('THRESHOLD: STRICT');
+        expect(definition).toContain('Vulnerability yang jelas');
+        expect(definition).toContain('Breaking Changes');
+        expect(definition).toContain('Crashes');
+        expect(definition).toContain('Data Corruption');
+        expect(definition).toContain('JANGAN tandai sebagai kritis');
+        expect(definition).toContain('Code style');
+        expect(definition).toContain('optimasi performa minor');
+      });
+
+      test('should return lenient threshold definition', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'lenient';
+
+        const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
+
+        expect(definition).toContain('THRESHOLD: LENIENT');
+        expect(definition).toContain('Deployment Blockers');
+        expect(definition).toContain('Critical Security');
+        expect(definition).toContain('System Failures');
+        expect(definition).toContain('Data Loss');
+        expect(definition).toContain('JANGAN tandai sebagai kritis');
+        expect(definition).toContain('Bug minor');
+        expect(definition).toContain('performance issues');
+      });
+
+      test('should return standard threshold definition by default', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'standard';
+
+        const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
+
+        expect(definition).toContain('THRESHOLD: STANDARD');
+        expect(definition).toContain('Bugs Signifikan');
+        expect(definition).toContain('Keamanan');
+        expect(definition).toContain('Performa Kritis');
+        expect(definition).toContain('Breaking Changes');
+        expect(definition).toContain('Error Handling');
+        expect(definition).toContain('Gunakan 🟡 untuk');
+        expect(definition).toContain('Gunakan 🔵 untuk');
+      });
+
+      test('should default to standard for unknown threshold values', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'unknown';
+
+        const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
+
+        expect(definition).toContain('THRESHOLD: STANDARD');
+      });
+    });
+
+    describe('validateCriticalIssueByThreshold', () => {
+      test('should validate strict threshold correctly', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'strict';
+
+        // Should pass strict validation
+        expect((reviewService as any).validateCriticalIssueByThreshold('SQL injection vulnerability found')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Breaking change in API')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Application crash detected')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Data corruption risk')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Deployment will fail')).toBe(true);
+
+        // Should fail strict validation
+        expect((reviewService as any).validateCriticalIssueByThreshold('Code style issue')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Minor performance optimization')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Documentation missing')).toBe(false);
+      });
+
+      test('should validate lenient threshold correctly', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'lenient';
+
+        // Should pass lenient validation
+        expect((reviewService as any).validateCriticalIssueByThreshold('Deployment blocker found')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Critical security vulnerability')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('System failure detected')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Data loss risk')).toBe(true);
+
+        // Should fail lenient validation
+        expect((reviewService as any).validateCriticalIssueByThreshold('Minor bug found')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Performance issue')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Code quality concern')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Regular security issue')).toBe(false);
+      });
+
+      test('should validate standard threshold correctly (allow all)', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'standard';
+
+        // Should pass all validations in standard mode
+        expect((reviewService as any).validateCriticalIssueByThreshold('Any issue')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Code style problem')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Performance issue')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Security vulnerability')).toBe(true);
+      });
+    });
+
+    describe('Enhanced Critical Issue Detection with Threshold', () => {
+      test('should respect strict threshold in emoji detection', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'strict';
+
+        const reviewWithSecurityIssue = `
+        🔴 SQL injection vulnerability in user input
+        `;
+
+        const reviewWithStyleIssue = `
+        🔴 Code style inconsistency found
+        `;
+
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithSecurityIssue)).toBe(true);
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithStyleIssue)).toBe(false);
+      });
+
+      test('should respect lenient threshold in emoji detection', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'lenient';
+
+        const reviewWithDeploymentBlocker = `
+        🔴 Deployment will fail due to missing dependency
+        `;
+
+        const reviewWithMinorBug = `
+        🔴 Minor bug in UI component
+        `;
+
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithDeploymentBlocker)).toBe(true);
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithMinorBug)).toBe(false);
+      });
+
+      test('should filter out non-critical issues under strict threshold', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'strict';
+
+        const reviewWithStyleIssue = `
+        🔴 Code formatting issue detected
+        `;
+
+        const reviewWithSecurityIssue = `
+        🔴 SQL injection vulnerability found
+        `;
+
+        // Style issue should be filtered out under strict threshold
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithStyleIssue)).toBe(false);
+
+        // Security issue should pass under strict threshold
+        expect((reviewService as any).detectCriticalIssuesByEmoji(reviewWithSecurityIssue)).toBe(true);
+      });
+    });
+
+    describe('System Prompt Integration with Threshold', () => {
+      test('should include threshold definition in system prompt', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'strict';
+
+        const systemPrompt = (reviewService as any).generateSystemPrompt();
+
+        expect(systemPrompt).toContain('THRESHOLD: STRICT');
+        expect(systemPrompt).toContain('HANYA TANDAI SEBAGAI 🔴 JIKA');
+      });
+
+      test('should include threshold definition in sequential thinking prompt', () => {
+        process.env.CRITICAL_ISSUE_THRESHOLD = 'lenient';
+
+        const sequentialPrompt = (reviewService as any).generateSequentialThinkingSystemPrompt();
+
+        expect(sequentialPrompt).toContain('THRESHOLD: LENIENT');
+        expect(sequentialPrompt).toContain('HANYA TANDAI SEBAGAI 🔴 JIKA');
+      });
+    });
+  });
 });

@@ -76,6 +76,8 @@ services:
       - REVIEW_CONSERVATIVE_MODE=${REVIEW_CONSERVATIVE_MODE}
       - REVIEW_FOCUS_AREAS=${REVIEW_FOCUS_AREAS}
       - FOCUS_AREAS=${FOCUS_AREAS}
+      - REVIEW_DOMAIN_SCOPE=${REVIEW_DOMAIN_SCOPE}
+      - CRITICAL_ISSUE_THRESHOLD=${CRITICAL_ISSUE_THRESHOLD}
     volumes:
       - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
     restart: unless-stopped

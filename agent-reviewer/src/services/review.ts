@@ -27,6 +27,8 @@ const REVIEW_MODE = process.env.REVIEW_MODE || 'standard'; // 'quick', 'standard
 const REVIEW_MAX_SUGGESTIONS = parseInt(process.env.REVIEW_MAX_SUGGESTIONS || '5');
 const REVIEW_CONSERVATIVE_MODE = process.env.REVIEW_CONSERVATIVE_MODE === 'true';
 const REVIEW_FOCUS_AREAS = process.env.REVIEW_FOCUS_AREAS || 'bugs,performance,security,style';
+const REVIEW_DOMAIN_SCOPE = process.env.REVIEW_DOMAIN_SCOPE || 'auto'; // 'diff-only', 'full-context', 'auto'
+const CRITICAL_ISSUE_THRESHOLD = process.env.CRITICAL_ISSUE_THRESHOLD || 'standard'; // 'strict', 'standard', 'lenient'
 
 // Parse focus areas into array
 const FOCUS_AREAS = REVIEW_FOCUS_AREAS.split(',').map(area => area.trim().toLowerCase());
@@ -79,7 +81,99 @@ export class ReviewService {
     console.log(`   Max Suggestions: ${REVIEW_MAX_SUGGESTIONS}`);
     console.log(`   Conservative Mode: ${REVIEW_CONSERVATIVE_MODE}`);
     console.log(`   Focus Areas: ${FOCUS_AREAS.join(', ')}`);
+    console.log(`   Domain Scope: ${REVIEW_DOMAIN_SCOPE}`);
+    console.log(`   Critical Issue Threshold: ${CRITICAL_ISSUE_THRESHOLD}`);
     console.log(`   LLM Provider: ${LLM_PROVIDER}`);
+  }
+
+  /**
+   * Determine if diff-only scope should be used based on configuration and changeset size
+   */
+  private shouldUseDiffOnlyScope(changes: MergeRequestChange[]): boolean {
+    if (REVIEW_DOMAIN_SCOPE === 'diff-only') {
+      return true;
+    }
+
+    if (REVIEW_DOMAIN_SCOPE === 'full-context') {
+      return false;
+    }
+
+    // Auto mode: use diff-only for small changesets
+    if (REVIEW_DOMAIN_SCOPE === 'auto') {
+      const totalFiles = changes.length;
+      const totalLines = changes.reduce((sum, change) => {
+        // Count lines in diff (rough estimation)
+        const diffLines = change.diffContent.split('\n').filter(line =>
+          line.startsWith('+') || line.startsWith('-')
+        ).length;
+        return sum + diffLines;
+      }, 0);
+
+      // Use diff-only for small changesets (similar to enhanced context thresholds)
+      return totalFiles <= 5 && totalLines <= 50;
+    }
+
+    return false; // Default to full-context for unknown values
+  }
+
+  /**
+   * Get domain scope instructions for system prompts
+   */
+  private getDomainScopeInstructions(useDiffOnly: boolean): string {
+    if (!useDiffOnly) {
+      return '';
+    }
+
+    return `
+**BATASAN DOMAIN REVIEW (DIFF-ONLY MODE AKTIF):**
+* **HANYA analisis kode yang diubah dalam diff** - jangan berikan saran untuk kode yang tidak dimodifikasi
+* **FOKUS pada perubahan spesifik** yang dibuat dalam merge request ini
+* **HINDARI saran arsitektur umum** atau perbaikan kode yang tidak terkait dengan perubahan
+* **JANGAN berikan rekomendasi refactoring** untuk kode yang tidak disentuh dalam diff
+* **PRIORITASKAN analisis dampak perubahan** terhadap fungsionalitas yang ada
+* **BATASI review pada scope perubahan** yang sebenarnya dilakukan developer
+
+Ingat: Anda hanya boleh menganalisis dan memberikan feedback pada baris kode yang ditambah (+) atau dimodifikasi dalam diff. Abaikan kode yang tidak berubah.`;
+  }
+
+  /**
+   * Get critical issue threshold definition for system prompts
+   */
+  private getCriticalIssueThresholdDefinition(): string {
+    switch (CRITICAL_ISSUE_THRESHOLD.toLowerCase()) {
+      case 'strict':
+        return `
+**DEFINISI ISU KRITIS (THRESHOLD: STRICT) - HANYA TANDAI SEBAGAI 🔴 JIKA:**
+* **Keamanan:** Vulnerability yang jelas (SQL injection, XSS, data exposure, authentication bypass)
+* **Breaking Changes:** Perubahan yang akan merusak API atau fungsionalitas existing
+* **Crashes:** Bug yang menyebabkan aplikasi crash atau tidak dapat dijalankan
+* **Data Corruption:** Risiko kehilangan atau korupsi data
+* **Deployment Blockers:** Masalah yang mencegah deployment berhasil
+
+**JANGAN tandai sebagai kritis:** Code style, optimasi performa minor, refactoring suggestions, documentation issues, atau masalah yang tidak mengancam stabilitas sistem.`;
+
+      case 'lenient':
+        return `
+**DEFINISI ISU KRITIS (THRESHOLD: LENIENT) - HANYA TANDAI SEBAGAI 🔴 JIKA:**
+* **Deployment Blockers:** Masalah yang akan mencegah deployment berhasil
+* **Critical Security:** Vulnerability yang memungkinkan akses tidak sah ke sistem
+* **System Failures:** Bug yang menyebabkan sistem tidak dapat berfungsi sama sekali
+* **Data Loss:** Risiko kehilangan data permanen
+
+**JANGAN tandai sebagai kritis:** Bug minor, performance issues, code quality concerns, atau masalah yang tidak menghalangi deployment.`;
+
+      default: // 'standard'
+        return `
+**DEFINISI ISU KRITIS (THRESHOLD: STANDARD) - TANDAI SEBAGAI 🔴 JIKA:**
+* **Bugs Signifikan:** Logic error, null pointer exceptions, infinite loops
+* **Keamanan:** Vulnerability, input validation issues, authentication problems
+* **Performa Kritis:** Bottleneck yang berdampak signifikan pada user experience
+* **Breaking Changes:** Perubahan yang merusak kompatibilitas atau fungsionalitas existing
+* **Error Handling:** Missing error handling untuk operasi kritis
+
+**Gunakan 🟡 untuk:** Code quality issues, minor performance optimizations, style improvements
+**Gunakan 🔵 untuk:** Nice-to-have improvements, documentation suggestions`;
+    }
   }
 
   /**
@@ -89,6 +183,7 @@ export class ReviewService {
    * @param mergeRequestDescription The description of the merge request
    * @param projectContext Optional project context to enhance the review
    * @param notionContext Optional Notion task context to enhance the review
+   * @param changes Optional merge request changes for domain scope analysis
    * @returns The review result with sequential thoughts
    */
   private async reviewCodeWithLLM(
@@ -96,7 +191,8 @@ export class ReviewService {
     mergeRequestTitle: string,
     mergeRequestDescription: string,
     projectContext?: ProjectContext,
-    notionContext?: CombinedNotionContext
+    notionContext?: CombinedNotionContext,
+    changes?: MergeRequestChange[]
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     try {
 
@@ -107,7 +203,8 @@ export class ReviewService {
           mergeRequestTitle,
           mergeRequestDescription,
           projectContext,
-          notionContext
+          notionContext,
+          changes
         );
       }
       console.log('Sequential thinking is enabled. Using sequential thinking approach.');
@@ -118,7 +215,8 @@ export class ReviewService {
         mergeRequestTitle,
         mergeRequestDescription,
         projectContext,
-        notionContext
+        notionContext,
+        changes
       );
 
       return { thoughts, reviewResult };
@@ -132,7 +230,8 @@ export class ReviewService {
         mergeRequestTitle,
         mergeRequestDescription,
         projectContext,
-        notionContext
+        notionContext,
+        changes
       );
     }
   }
@@ -146,13 +245,14 @@ export class ReviewService {
     mergeRequestTitle: string,
     mergeRequestDescription: string,
     projectContext?: ProjectContext,
-    notionContext?: CombinedNotionContext
+    notionContext?: CombinedNotionContext,
+    changes?: MergeRequestChange[]
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     const thoughts: SequentialThought[] = [];
     let conversationHistory: any[] = [];
 
     // Initialize the system prompt for sequential thinking
-    const systemPrompt = this.generateSequentialThinkingSystemPrompt();
+    const systemPrompt = this.generateSequentialThinkingSystemPrompt(changes);
     conversationHistory.push({ role: 'system', content: systemPrompt });
 
     // Step 1: Initial Analysis and Context Understanding
@@ -219,11 +319,12 @@ export class ReviewService {
     mergeRequestTitle: string,
     mergeRequestDescription: string,
     projectContext?: ProjectContext,
-    notionContext?: CombinedNotionContext
+    notionContext?: CombinedNotionContext,
+    changes?: MergeRequestChange[]
   ): Promise<{ thoughts: SequentialThought[], reviewResult: string }> {
     try {
-      // Generate the system prompt
-      const systemPrompt = this.generateSystemPrompt();
+      // Generate the system prompt with changes context for domain scope
+      const systemPrompt = this.generateSystemPrompt(changes);
 
       // Generate the user prompt with code changes, project context, and Notion context
       const userPrompt = this.generateUserPrompt(
@@ -267,20 +368,24 @@ export class ReviewService {
   /**
    * Generate the system prompt for the LLM based on review mode
    */
-  private generateSystemPrompt(): string {
-    return this.generateSystemPromptByMode(REVIEW_MODE);
+  private generateSystemPrompt(changes?: MergeRequestChange[]): string {
+    return this.generateSystemPromptByMode(REVIEW_MODE, changes);
   }
 
   /**
    * Generate system prompt based on review mode
    */
-  private generateSystemPromptByMode(mode: string): string {
+  private generateSystemPromptByMode(mode: string, changes?: MergeRequestChange[]): string {
+    // Determine if diff-only scope should be used
+    const useDiffOnly = changes ? this.shouldUseDiffOnlyScope(changes) : false;
+
     const baseContext = `Anda adalah seorang Insinyur Perangkat Lunak Senior dengan keahlian mendalam dalam pengembangan antarmuka pengguna (frontend), khususnya dengan Nuxt.js dan Flutter. Peran Anda dalam code review ini adalah sebagai seorang Arsitek Teknis yang memastikan kualitas, skalabilitas, maintenabilitas, dan performa kode.
 
 **Konteks Teknologi Spesifik (PENTING):**
 * **Nuxt.js:** Pahami bahwa pengembangan Nuxt.js dalam proyek ini **wajib mengikuti dokumentasi resmi Nuxt.js**. Penyimpangan dari praktik standar Nuxt harus memiliki justifikasi yang kuat.
 * **Flutter:** Untuk kode Flutter, fokus pada arsitektur state management yang digunakan (BLoC), efisiensi widget tree, platform-specific considerations, dan adherence terhadap panduan gaya Dart dan Flutter.
 * **Struktur Proyek Saat Ini:** **Sangat penting** untuk selalu merujuk dan **mengikuti struktur proyek yang sudah ada (existing project structure)**. Perubahan kode harus konsisten dengan pola, arsitektur, dan konvensi yang telah ditetapkan dalam proyek ini.
+${this.getDomainScopeInstructions(useDiffOnly)}
 
 **Prinsip Review:**
 ${REVIEW_CONSERVATIVE_MODE ?
@@ -289,6 +394,7 @@ ${REVIEW_CONSERVATIVE_MODE ?
 }
 * **Batasan Saran**: Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama. Prioritaskan yang paling penting.
 * **Fokus Area**: ${FOCUS_AREAS.join(', ')}
+${this.getCriticalIssueThresholdDefinition()}
 
 **Format Isu Kritis (🔴):**
 Untuk setiap isu kritis, berikan solusi praktis dengan format:
@@ -733,13 +839,17 @@ ${codeChanges}
   /**
    * Generate the system prompt for sequential thinking
    */
-  private generateSequentialThinkingSystemPrompt(): string {
+  private generateSequentialThinkingSystemPrompt(changes?: MergeRequestChange[]): string {
+    // Determine if diff-only scope should be used
+    const useDiffOnly = changes ? this.shouldUseDiffOnlyScope(changes) : false;
+
     return `Anda adalah seorang Insinyur Perangkat Lunak Senior dengan keahlian mendalam dalam pengembangan antarmuka pengguna (frontend), khususnya dengan Nuxt.js dan Flutter. Anda akan melakukan code review menggunakan pendekatan sequential thinking yang terstruktur.
 
 **Peran Anda:**
 - Arsitek Teknis yang memastikan kualitas, skalabilitas, maintenabilitas, dan performa kode
 - Reviewer yang memberikan analisis mendalam melalui tahapan berpikir yang sistematis
 - Mentor yang memberikan panduan teknis konstruktif dalam Bahasa Indonesia
+${this.getDomainScopeInstructions(useDiffOnly)}
 
 **Mode Review Saat Ini: ${REVIEW_MODE.toUpperCase()}**
 ${REVIEW_CONSERVATIVE_MODE ?
@@ -751,6 +861,7 @@ ${REVIEW_CONSERVATIVE_MODE ?
 - Maksimal ${REVIEW_MAX_SUGGESTIONS} saran utama per tahap
 - Fokus area: ${FOCUS_AREAS.join(', ')}
 - Prioritaskan isu berdasarkan severity dan impact
+${this.getCriticalIssueThresholdDefinition()}
 
 **Pendekatan Sequential Thinking:**
 Anda akan memecah proses review menjadi 5 tahap berpikir yang berurutan:
@@ -1187,6 +1298,10 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       // Format the changes for review
       const formattedChanges = this.formatChangesForReview(changes);
 
+      // Log domain scope decision
+      const useDiffOnly = this.shouldUseDiffOnlyScope(changes);
+      console.log(`🎯 Domain Scope Decision: ${useDiffOnly ? 'DIFF-ONLY' : 'FULL-CONTEXT'} (Config: ${REVIEW_DOMAIN_SCOPE}, Files: ${changes.length}, Lines: ${changes.reduce((sum, change) => sum + change.diffContent.split('\n').filter(line => line.startsWith('+') || line.startsWith('-')).length, 0)})`);
+
       console.log('Formatted changes for review:', formattedChanges);
 
       // Get project context if enabled
@@ -1226,7 +1341,8 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
         mergeRequest.title,
         mergeRequest.description || '',
         projectContext,
-        notionContext
+        notionContext,
+        changes
       );
 
       console.log('Review result:', reviewResult);
@@ -1352,6 +1468,7 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
   /**
    * Detect critical issues by looking for 🔴 emoji directly
    * This is the most reliable method that works across all review modes
+   * Enhanced with threshold-based validation
    */
   private detectCriticalIssuesByEmoji(reviewResult: string): boolean | null {
     if (!reviewResult.includes('🔴')) {
@@ -1374,14 +1491,63 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
                         content.toLowerCase().includes('template') ||
                         content.length < 5;
 
-      if (!isTemplate) {
-        console.log(`✅ Found valid critical issue: ${content.substring(0, 50)}...`);
-        return true;
+      if (isTemplate) {
+        return false;
       }
-      return false;
+
+      // Apply threshold-based validation
+      const isValidCriticalIssue = this.validateCriticalIssueByThreshold(content);
+
+      if (isValidCriticalIssue) {
+        console.log(`✅ Found valid critical issue (${CRITICAL_ISSUE_THRESHOLD} threshold): ${content.substring(0, 50)}...`);
+        return true;
+      } else {
+        console.log(`⚠️ Issue found but not critical under ${CRITICAL_ISSUE_THRESHOLD} threshold: ${content.substring(0, 50)}...`);
+        return false;
+      }
     });
 
     return hasRealIssues;
+  }
+
+  /**
+   * Validate if an issue qualifies as critical based on the configured threshold
+   */
+  private validateCriticalIssueByThreshold(issueContent: string): boolean {
+    const lowerContent = issueContent.toLowerCase();
+
+    switch (CRITICAL_ISSUE_THRESHOLD.toLowerCase()) {
+      case 'strict':
+        // Only security vulnerabilities, breaking changes, crashes, data corruption
+        return lowerContent.includes('security') ||
+               lowerContent.includes('vulnerability') ||
+               lowerContent.includes('sql injection') ||
+               lowerContent.includes('xss') ||
+               lowerContent.includes('authentication') ||
+               lowerContent.includes('authorization') ||
+               lowerContent.includes('breaking change') ||
+               lowerContent.includes('crash') ||
+               lowerContent.includes('data corruption') ||
+               lowerContent.includes('data loss') ||
+               lowerContent.includes('deployment') ||
+               lowerContent.includes('tidak dapat dijalankan') ||
+               lowerContent.includes('gagal deploy');
+
+      case 'lenient':
+        // Only deployment blockers and critical system failures
+        return lowerContent.includes('deployment') ||
+               lowerContent.includes('deploy') ||
+               lowerContent.includes('critical security') ||
+               lowerContent.includes('system failure') ||
+               lowerContent.includes('data loss') ||
+               lowerContent.includes('tidak dapat berfungsi') ||
+               lowerContent.includes('gagal deploy') ||
+               lowerContent.includes('blocking');
+
+      default: // 'standard'
+        // Current behavior - allow all critical issues
+        return true;
+    }
   }
 
   /**
@@ -1636,7 +1802,8 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
         mergeRequest.title,
         mergeRequest.description || '',
         projectContext,
-        notionContext
+        notionContext,
+        newChanges
       );
 
       // Determine if the merge request should be approved based on new changes
