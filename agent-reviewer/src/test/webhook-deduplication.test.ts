@@ -1,6 +1,5 @@
 // Test file for webhook deduplication functionality
-// This is a simple test to verify the webhook deduplication logic
-
+import { describe, test, expect } from 'bun:test';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
 import { GitLabPushEvent, GitLabMergeRequestEvent } from '../types/webhook.js';
 
@@ -169,47 +168,86 @@ const sampleMergeRequestEvent: GitLabMergeRequestEvent = {
   labels: []
 };
 
-/**
- * Test webhook key generation
- */
+describe('Webhook Deduplication Service', () => {
+  describe('generateWebhookKey', () => {
+    test('should generate consistent keys for identical push events', () => {
+      const pushKey1 = webhookDeduplicationService.generateWebhookKey(samplePushEvent);
+      const pushKey2 = webhookDeduplicationService.generateWebhookKey(samplePushEvent);
+
+      expect(pushKey1).toBe(pushKey2);
+      expect(pushKey1).toBeTruthy();
+      expect(typeof pushKey1).toBe('string');
+    });
+
+    test('should generate consistent keys for identical merge request events', () => {
+      const mrKey1 = webhookDeduplicationService.generateWebhookKey(sampleMergeRequestEvent);
+      const mrKey2 = webhookDeduplicationService.generateWebhookKey(sampleMergeRequestEvent);
+
+      expect(mrKey1).toBe(mrKey2);
+      expect(mrKey1).toBeTruthy();
+      expect(typeof mrKey1).toBe('string');
+    });
+
+    test('should generate different keys for different event types', () => {
+      const pushKey = webhookDeduplicationService.generateWebhookKey(samplePushEvent);
+      const mrKey = webhookDeduplicationService.generateWebhookKey(sampleMergeRequestEvent);
+
+      expect(pushKey).not.toBe(mrKey);
+    });
+
+    test('should generate different keys for events with different commit IDs', () => {
+      const event1 = { ...samplePushEvent, after: 'commit1' };
+      const event2 = { ...samplePushEvent, after: 'commit2' };
+
+      const key1 = webhookDeduplicationService.generateWebhookKey(event1);
+      const key2 = webhookDeduplicationService.generateWebhookKey(event2);
+
+      expect(key1).not.toBe(key2);
+    });
+  });
+
+  describe('createWebhookIdentifier', () => {
+    test('should create valid identifier for push event', () => {
+      const identifier = webhookDeduplicationService.createWebhookIdentifier(samplePushEvent);
+
+      expect(identifier).toHaveProperty('uniqueKey');
+      expect(identifier).toHaveProperty('eventType');
+      expect(identifier).toHaveProperty('projectId');
+      expect(identifier.eventType).toBe('push');
+      expect(identifier.projectId).toBe(samplePushEvent.project_id);
+    });
+
+    test('should create valid identifier for merge request event', () => {
+      const identifier = webhookDeduplicationService.createWebhookIdentifier(sampleMergeRequestEvent);
+
+      expect(identifier).toHaveProperty('uniqueKey');
+      expect(identifier).toHaveProperty('eventType');
+      expect(identifier).toHaveProperty('projectId');
+      expect(identifier.eventType).toBe('merge_request');
+      expect(identifier.projectId).toBe(sampleMergeRequestEvent.project.id);
+    });
+  });
+
+  describe('Edge cases and error handling', () => {
+    test('should handle malformed webhook events', () => {
+      const malformedEvent = { object_kind: 'unknown' } as any;
+
+      expect(() => {
+        webhookDeduplicationService.generateWebhookKey(malformedEvent);
+      }).not.toThrow();
+    });
+  });
+});
+
+// Export test functions for backward compatibility
 export function testWebhookKeyGeneration() {
-  console.log('Testing webhook key generation...');
-  
-  // Test push event key generation
   const pushKey1 = webhookDeduplicationService.generateWebhookKey(samplePushEvent);
   const pushKey2 = webhookDeduplicationService.generateWebhookKey(samplePushEvent);
-  
-  console.log('Push event key 1:', pushKey1);
-  console.log('Push event key 2:', pushKey2);
-  console.log('Push keys match:', pushKey1 === pushKey2);
-  
-  // Test merge request event key generation
-  const mrKey1 = webhookDeduplicationService.generateWebhookKey(sampleMergeRequestEvent);
-  const mrKey2 = webhookDeduplicationService.generateWebhookKey(sampleMergeRequestEvent);
-  
-  console.log('MR event key 1:', mrKey1);
-  console.log('MR event key 2:', mrKey2);
-  console.log('MR keys match:', mrKey1 === mrKey2);
-  
-  // Test that different events generate different keys
-  console.log('Push and MR keys are different:', pushKey1 !== mrKey1);
+  return pushKey1 === pushKey2;
 }
 
-/**
- * Test webhook identifier creation
- */
 export function testWebhookIdentifierCreation() {
-  console.log('\nTesting webhook identifier creation...');
-  
   const pushIdentifier = webhookDeduplicationService.createWebhookIdentifier(samplePushEvent);
-  console.log('Push identifier:', pushIdentifier);
-  
   const mrIdentifier = webhookDeduplicationService.createWebhookIdentifier(sampleMergeRequestEvent);
-  console.log('MR identifier:', mrIdentifier);
-}
-
-// Run tests if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testWebhookKeyGeneration();
-  testWebhookIdentifierCreation();
+  return pushIdentifier && mrIdentifier;
 }

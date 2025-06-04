@@ -3,8 +3,11 @@ import { embeddingService } from './embedding.js';
 import { repositoryService } from './repository.js';
 import { gitlabService } from './gitlab.js';
 import { queueService } from './queue.js';
-import { CodeEmbedding, CodeFile, ProjectMetadata } from '../models/embedding.js';
+import { enhancedContextService } from './enhanced-context.js';
+import { documentationService } from './documentation.js';
+import { CodeEmbedding, CodeFile, ProjectMetadata, DocumentationContext, DocumentationEmbedding } from '../models/embedding.js';
 import { MergeRequestChange } from '../types/review.js';
+import { EnhancedContextResult } from '../types/context.js';
 import { JobStatus } from '../models/queue.js';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,6 +26,8 @@ export interface ProjectContext {
   projectMetadata: ProjectMetadata | null;
   relevantFiles: CodeEmbedding[];
   contextSummary: string;
+  enhancedContext?: EnhancedContextResult;
+  documentationContext?: DocumentationContext;
 }
 
 /**
@@ -151,14 +156,38 @@ export class ContextService {
       // Get relevant files based on the changes
       const relevantFiles = await this.findRelevantFiles(projectId, changes);
 
-      // Generate a summary of the context
-      const contextSummary = this.generateContextSummary(relevantFiles);
+      // Check if we should use enhanced context for small changesets
+      let enhancedContext: EnhancedContextResult | undefined;
+      if (enhancedContextService.shouldUseEnhancedContext(changes)) {
+        try {
+          console.log(`Getting enhanced context for small changeset in project ${projectId}`);
+          enhancedContext = await enhancedContextService.getEnhancedContext(changes);
+          console.log(`Enhanced context gathering completed: ${enhancedContext.success ? 'success' : 'failed'}`);
+        } catch (error) {
+          console.warn(`Error getting enhanced context, continuing with standard context:`, error);
+        }
+      }
+
+      // Get documentation context
+      let documentationContext: DocumentationContext | undefined;
+      try {
+        console.log(`Getting documentation context for project ${projectId}`);
+        documentationContext = await this.getDocumentationContext(projectId, changes);
+        console.log(`Documentation context gathering completed: ${documentationContext.relevantSections.length} sections found`);
+      } catch (error) {
+        console.warn(`Error getting documentation context, continuing without it:`, error);
+      }
+
+      // Generate a summary of the context (including enhanced and documentation context if available)
+      const contextSummary = this.generateContextSummary(relevantFiles, enhancedContext, documentationContext);
 
       return {
         projectId: projectId,
         projectMetadata,
         relevantFiles,
-        contextSummary
+        contextSummary,
+        enhancedContext,
+        documentationContext
       };
     } catch (error) {
       console.error(`Error getting project context for ${projectId}:`, error);
@@ -297,13 +326,146 @@ export class ContextService {
   }
 
   /**
+   * Get documentation context for the changes
+   * @param projectId The ID of the project
+   * @param changes The changes to review
+   * @returns Documentation context
+   */
+  private async getDocumentationContext(projectId: number, changes: MergeRequestChange[]): Promise<DocumentationContext> {
+    try {
+      // Auto-detect frameworks and map to documentation if not already mapped
+      await documentationService.autoMapProjectDocumentation(projectId, changes);
+
+      // Get project documentation mappings
+      const mappings = await dbService.getProjectDocumentationMappings(projectId);
+
+      if (mappings.length === 0) {
+        console.log(`No documentation mappings found for project ${projectId}`);
+        return {
+          relevantSections: [],
+          frameworks: [],
+          totalSections: 0,
+          averageRelevanceScore: 0,
+          sources: []
+        };
+      }
+
+      // Get documentation sources
+      const sourceIds = mappings.map(m => m.sourceId);
+      const sources = await Promise.all(
+        sourceIds.map(id => dbService.getDocumentationSource(id))
+      );
+      const validSources = sources.filter(s => s !== null);
+
+      if (validSources.length === 0) {
+        console.log(`No valid documentation sources found for project ${projectId}`);
+        return {
+          relevantSections: [],
+          frameworks: [],
+          totalSections: 0,
+          averageRelevanceScore: 0,
+          sources: []
+        };
+      }
+
+      // Detect frameworks from changes
+      const detectionResult = documentationService.detectFrameworks(changes);
+      const frameworks = detectionResult.frameworks.length > 0
+        ? detectionResult.frameworks
+        : validSources.map(s => s.framework);
+
+      // Generate embeddings for the changes to find relevant documentation
+      const relevantSections: DocumentationEmbedding[] = [];
+      let totalRelevanceScore = 0;
+
+      for (const change of changes.slice(0, 3)) { // Limit to first 3 changes to avoid too many API calls
+        if (!change.newContent || change.newContent.length > 5000) {
+          continue;
+        }
+
+        try {
+          const embedding = await embeddingService.generateEmbedding(change.newContent);
+          const similarDocs = await dbService.searchSimilarDocumentation(frameworks, embedding, 3);
+
+          for (const doc of similarDocs) {
+            if (!relevantSections.some(s => s.id === doc.id)) {
+              relevantSections.push(doc);
+              totalRelevanceScore += 0.8; // Assume good relevance for now
+            }
+          }
+        } catch (error) {
+          console.error(`Error finding documentation for change ${change.newPath}:`, error);
+        }
+      }
+
+      const averageRelevanceScore = relevantSections.length > 0
+        ? totalRelevanceScore / relevantSections.length
+        : 0;
+
+      return {
+        relevantSections: relevantSections.slice(0, 10), // Limit to 10 sections
+        frameworks,
+        totalSections: relevantSections.length,
+        averageRelevanceScore,
+        sources: validSources
+      };
+    } catch (error) {
+      console.error(`Error getting documentation context for project ${projectId}:`, error);
+      return {
+        relevantSections: [],
+        frameworks: [],
+        totalSections: 0,
+        averageRelevanceScore: 0,
+        sources: []
+      };
+    }
+  }
+
+  /**
    * Generate a summary of the context
    * @param relevantFiles The relevant files
+   * @param enhancedContext Optional enhanced context for small changesets
+   * @param documentationContext Optional documentation context
    * @returns A summary of the context
    */
-  private generateContextSummary(relevantFiles: CodeEmbedding[]): string {
+  private generateContextSummary(
+    relevantFiles: CodeEmbedding[],
+    enhancedContext?: EnhancedContextResult,
+    documentationContext?: DocumentationContext
+  ): string {
+    let summary = '';
+
+    // Add enhanced context summary if available
+    if (enhancedContext && enhancedContext.success) {
+      summary += enhancedContext.contextSummary + '\n\n';
+      summary += '---\n\n';
+    }
+
+    // Add documentation context if available
+    if (documentationContext && documentationContext.relevantSections.length > 0) {
+      summary += `Documentation Context (${documentationContext.frameworks.join(', ')} - ${documentationContext.relevantSections.length} relevant sections):\n\n`;
+
+      const docSummary = documentationContext.relevantSections.map(section => {
+        // Truncate content if it's too long
+        const truncatedContent = section.content.length > 400
+          ? section.content.substring(0, 400) + '...'
+          : section.content;
+
+        return `
+**${section.title}** (${section.framework})
+${section.url ? `URL: ${section.url}` : ''}
+Keywords: ${section.keywords.join(', ')}
+
+${truncatedContent}
+`;
+      }).join('\n');
+
+      summary += docSummary + '\n\n---\n\n';
+    }
+
     if (relevantFiles.length === 0) {
-      return 'No relevant context files found.';
+      summary += 'No relevant context files found from semantic search.';
+      return summary;
     }
 
     // Generate a summary of the relevant files
@@ -321,11 +483,13 @@ ${truncatedContent}
 `;
     }).join('\n');
 
-    return `
-Project Context (${relevantFiles.length} relevant files):
+    summary += `
+Standard Project Context (${relevantFiles.length} relevant files from semantic search):
 
 ${filesSummary}
 `;
+
+    return summary;
   }
 }
 

@@ -7,6 +7,16 @@ import { apiAuth } from './middleware/api-auth.js';
 import { processWebhook } from './controllers/webhook.js';
 import { processRepository, getRepositoryStatus, getQueueStatus } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
+import {
+  addDocumentationSource,
+  getDocumentationSources,
+  getDocumentationSource,
+  updateDocumentationSource,
+  deleteDocumentationSource,
+  reembedDocumentationSource,
+  mapProjectToDocumentation,
+  getProjectDocumentationMappings
+} from './controllers/documentation.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 
@@ -37,6 +47,18 @@ app.get('/api/queue/status', apiAuth, getQueueStatus);
 // Code search API
 app.post('/api/search', apiAuth, searchCode);
 app.get('/api/projects', apiAuth, listProjects);
+
+// Documentation API
+app.post('/api/documentation/sources', apiAuth, addDocumentationSource);
+app.get('/api/documentation/sources', apiAuth, getDocumentationSources);
+app.get('/api/documentation/sources/:id', apiAuth, getDocumentationSource);
+app.put('/api/documentation/sources/:id', apiAuth, updateDocumentationSource);
+app.delete('/api/documentation/sources/:id', apiAuth, deleteDocumentationSource);
+app.post('/api/documentation/sources/:id/reembed', apiAuth, reembedDocumentationSource);
+
+// Project documentation mapping API
+app.post('/api/projects/:projectId/documentation', apiAuth, mapProjectToDocumentation);
+app.get('/api/projects/:projectId/documentation', apiAuth, getProjectDocumentationMappings);
 
 // Webhook processing statistics API
 app.get('/api/webhook/stats', apiAuth, async (_req, res) => {
