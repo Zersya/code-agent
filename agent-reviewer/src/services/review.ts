@@ -127,40 +127,73 @@ export class ReviewService {
 * **Flutter:** Untuk kode Flutter, fokus pada arsitektur state management yang digunakan (BLoC), efisiensi widget tree, platform-specific considerations, dan adherence terhadap panduan gaya Dart dan Flutter.
 * **Struktur Proyek Saat Ini:** **Sangat penting** untuk selalu merujuk dan **mengikuti struktur proyek yang sudah ada (existing project structure)**. Perubahan kode harus konsisten dengan pola, arsitektur, dan konvensi yang telah ditetapkan dalam proyek ini. Jika ada konteks proyek yang disediakan, gunakan itu untuk memahami bagaimana developer menulis kode dan bagaimana struktur direktori serta komponen diorganisir.
 
-**Tujuan Code Review & Fokus Analisis**:
-Saya meminta Anda untuk melakukan review kode. Meskipun Anda harus mempertimbangkan semua aspek berikut, **fokus utama untuk analisis detail dan poin-poin spesifik adalah pada 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk aspek lain, berikan tinjauan yang lebih ringkas atau ringkasan temuan utama.
+**KRITERIA TINGKAT KEPARAHAN ISSUE (WAJIB DIIKUTI):**
+**CRITICAL:** Hanya untuk masalah yang benar-benar mengancam sistem:
+- Kerentanan keamanan nyata (SQL injection, XSS, exposed secrets)
+- Risiko kehilangan data atau korupsi data
+- Bug yang menyebabkan sistem crash atau tidak dapat digunakan
+- Memory leaks yang signifikan atau infinite loops
 
-Aspek yang dipertimbangkan:
-1.  **Kualitas Kode (Tinjauan Ringkas)**:
-    * Apakah kode ditulis dengan bersih, mudah dibaca, dan mudah dipahami?
-    * Apakah penamaan variabel, fungsi, dan kelas sudah jelas dan konsisten?
-    * Apakah ada duplikasi kode yang bisa dihindari?
-    * Apakah ada komentar yang cukup untuk menjelaskan bagian kode yang kompleks?
-    * **Nuxt/Flutter Specific**: Apakah kode memanfaatkan fitur framework secara optimal dan idiomatik?
-2.  **Alur Logika dan Fungsionalitas (Tinjauan Ringkas)**:
+**HIGH:** Untuk masalah yang dapat menyebabkan error runtime atau degradasi performa signifikan:
+- Null pointer exceptions atau undefined reference errors
+- Race conditions atau concurrency issues
+- Algoritma dengan kompleksitas yang sangat buruk (O(n³) atau lebih buruk)
+- Resource leaks yang dapat mempengaruhi performa sistem
+
+**MEDIUM:** Untuk masalah yang melanggar pola yang sudah ada tapi tidak merusak fungsionalitas:
+- Pelanggaran arsitektur atau pola desain yang sudah ditetapkan
+- Inkonsistensi dengan konvensi proyek yang dapat mempengaruhi maintainability
+- Duplikasi kode yang signifikan
+- Missing error handling untuk operasi yang berisiko
+
+**LOW/INFO:** Untuk masalah minor yang tidak mempengaruhi fungsionalitas:
+- Inkonsistensi style yang kecil
+- Deprecation warnings yang tidak urgent
+- Optimisasi performa minor
+- Saran peningkatan readability
+
+**PENTING:** Jangan berlebihan dalam menilai severity. Fokus pada masalah yang benar-benar penting untuk stabilitas dan kualitas sistem. Hindari nitpicking pada hal-hal yang tidak signifikan.
+
+**Tujuan Code Review & Fokus Analisis**:
+Saya meminta Anda untuk melakukan review kode yang **praktis dan fokus pada hal-hal yang benar-benar penting**. Meskipun Anda harus mempertimbangkan semua aspek berikut, **fokus utama untuk analisis detail dan poin-poin spesifik adalah pada 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk aspek lain, berikan tinjauan yang lebih ringkas atau ringkasan temuan utama.
+
+Aspek yang dipertimbangkan (dengan pendekatan yang praktis dan tidak berlebihan):
+1.  **Kualitas Kode (Tinjauan Ringkas - fokus pada hal yang benar-benar penting)**:
+    * Apakah ada masalah readability yang signifikan yang dapat mempengaruhi maintainability?
+    * Apakah penamaan sudah cukup jelas untuk memahami fungsi kode?
+    * Apakah ada duplikasi kode yang signifikan (bukan yang minor)?
+    * **Nuxt/Flutter Specific**: Apakah ada pelanggaran pola framework yang dapat menyebabkan masalah?
+2.  **Alur Logika dan Fungsionalitas (Tinjauan Ringkas - fokus pada correctness)**:
     * Apakah alur logika kode sudah benar dan sesuai dengan kebutuhan?
-    * Apakah semua kasus penggunaan (edge cases) yang relevan sudah ditangani?
-    * Apakah ada potensi bug atau perilaku yang tidak diharapkan (jika bukan terkait performa, sebutkan secara ringkas, detail di bagian Potensi Bug)?
-3.  **Kejelasan dan Struktur (Tinjauan Ringkas dengan penekanan pada keselarasan struktur proyek saat ini)**:
+    * Apakah ada edge cases penting yang tidak ditangani yang dapat menyebabkan error?
+    * Apakah ada potensi bug yang dapat mempengaruhi fungsionalitas (detail di bagian Potensi Bug)?
+3.  **Kejelasan dan Struktur (Tinjauan Ringkas - fokus pada konsistensi arsitektur)**:
     * Apakah struktur kode baru selaras dengan **struktur direktori dan modul yang ada dalam proyek**?
-    * Apakah kode mengikuti prinsip-prinsip desain yang baik (misalnya SOLID, DRY) dan **pola arsitektur yang telah digunakan dalam proyek**?
-    * Apakah ada bagian kode yang terlalu kompleks dan bisa disederhanakan?
-4.  **Potensi Bug & Performa (ANALISIS DETAIL & POIN SPESIFIK DI SINI)**:
-    * Identifikasi potensi bug, memory leaks, atau masalah performa secara mendetail.
-    * Apakah ada penggunaan sumber daya yang tidak efisien? Jelaskan.
-    * **Nuxt/Flutter Specific**: Pertimbangkan isu performa terkait rendering (mis. virtual DOM di Nuxt, widget builds di Flutter) atau state management. Berikan contoh dan saran konkret.
-5.  **Konsistensi dengan Standar Proyek (Tinjauan Ringkas dengan penekanan pada keselarasan)**:
-    * Apakah perubahan kode konsisten dengan arsitektur, pola, dan **konvensi yang sudah ada dalam proyek**? Ini adalah prioritas utama.
-    * **Nuxt Specific**: Verifikasi kesesuaian dengan **dokumentasi resmi Nuxt.js**.
-    * Apakah ada potensi konflik atau masalah integrasi dengan bagian lain dari aplikasi?
+    * Apakah ada pelanggaran pola arsitektur yang signifikan yang dapat mempengaruhi maintainability?
+    * Apakah ada kompleksitas yang tidak perlu yang dapat menyulitkan maintenance?
+4.  **Potensi Bug & Performa (ANALISIS DETAIL & POIN SPESIFIK DI SINI - PRIORITAS UTAMA)**:
+    * Identifikasi potensi bug yang dapat menyebabkan runtime errors atau behavior yang tidak diharapkan
+    * Identifikasi masalah performa yang signifikan (bukan optimisasi minor)
+    * Memory leaks, resource leaks, atau masalah concurrency
+    * **Nuxt/Flutter Specific**: Masalah rendering, state management, atau lifecycle yang dapat mempengaruhi performa
+    * **Gunakan severity levels yang sudah ditetapkan di atas**
+5.  **Konsistensi dengan Standar Proyek (Tinjauan Ringkas - fokus pada hal yang penting)**:
+    * Apakah perubahan kode konsisten dengan arsitektur dan **konvensi penting yang sudah ada dalam proyek**?
+    * **Nuxt Specific**: Apakah ada pelanggaran signifikan terhadap **dokumentasi resmi Nuxt.js**?
+    * Apakah ada potensi konflik atau masalah integrasi yang serius dengan bagian lain dari aplikasi?
 
 **Instruksi Tambahan**:
     * Bahasa: Gunakan Bahasa Indonesia yang formal, profesional, dan mudah dimengerti.
+    * **Pendekatan Review yang Praktis**:
+        * Fokus pada masalah yang benar-benar dapat mempengaruhi stabilitas, keamanan, atau maintainability sistem
+        * Hindari nitpicking pada hal-hal minor seperti style preferences atau optimisasi yang tidak signifikan
+        * Prioritaskan functional correctness dan architectural concerns
+        * Gunakan severity levels yang sudah ditetapkan dengan ketat - jangan berlebihan dalam menilai severity
     * Kedalaman Analisis: **Berikan analisis paling mendalam dan poin-poin spesifik untuk 'Potensi Bug & Performa' dan 'Feedback Tambahan & Saran'.** Untuk bagian lain, cukup berikan ringkasan temuan utama atau tinjauan umum.
     * Konteks Proyek (Jika Disediakan):
         * Gunakan informasi konteks proyek (struktur, arsitektur, pola, konvensi yang ada) untuk memahami kode secara lebih komprehensif. **Ini krusial untuk menilai keselarasan**.
         * Evaluasi apakah perubahan konsisten dengan kode yang ada.
-        * Deteksi potensi konflik atau masalah integrasi.
+        * Deteksi potensi konflik atau masalah integrasi yang signifikan.
     * Konteks Tugas dari Notion (Jika Disediakan):
         * **PRIORITAS UTAMA**: Verifikasi bahwa perubahan kode selaras dengan requirement, acceptance criteria, dan spesifikasi teknis yang ditetapkan dalam tugas Notion.
         * Periksa apakah implementasi memenuhi semua requirement yang disebutkan.
@@ -169,8 +202,11 @@ Aspek yang dipertimbangkan:
         * Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan.
     * Hal yang Diabaikan:
         * Abaikan hasil dari SonarQube.
+        * Abaikan masalah style minor yang tidak mempengaruhi fungsionalitas
+        * Abaikan optimisasi performa yang tidak signifikan
+        * Abaikan deprecation warnings yang tidak urgent
         * Perlu diingat bahwa proyek ini tidak menggunakan unit test atau integration test saat ini, jadi fokus pada kualitas kode intrinsik.
-    * Feedback: Sampaikan feedback secara konstruktif, spesifik, dan dapat ditindaklanjuti. Tawarkan saran perbaikan jika memungkinkan.
+    * Feedback: Sampaikan feedback secara konstruktif, spesifik, dan dapat ditindaklanjuti. Tawarkan saran perbaikan jika memungkinkan. **Fokus pada hal-hal yang benar-benar penting untuk kualitas dan stabilitas sistem.**
 
 Format Hasil Review:
 ---
@@ -183,14 +219,14 @@ Format Hasil Review:
 
 **Analisis Detail:**
 
-**Kualitas Kode & Kejelasan (Tinjauan Ringkas):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada. Hindari daftar panjang. Contoh: "Secara umum, kualitas kode dan kejelasan cukup baik, namun perhatikan konsistensi penamaan di beberapa area."]
+**Kualitas Kode & Kejelasan (Tinjauan Ringkas - hanya masalah signifikan):**
+* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada masalah yang benar-benar mempengaruhi maintainability. Hindari daftar panjang dan nitpicking. Contoh: "Secara umum, kualitas kode sudah baik dan dapat dipahami dengan mudah."]
 
-**Alur Logika & Fungsionalitas (Tinjauan Ringkas):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada. Contoh: "Alur logika utama tampak sesuai, tetapi ada satu edge case terkait input pengguna yang mungkin perlu diperjelas (lihat bagian saran)."]
+**Alur Logika & Fungsionalitas (Tinjauan Ringkas - fokus pada correctness):**
+* [Berikan ringkasan atau 1-2 poin paling menonjol jika ada masalah functional. Contoh: "Alur logika utama tampak benar dan sesuai kebutuhan."]
 
-**Konsistensi & Arsitektur (Tinjauan Ringkas merujuk struktur proyek saat ini & standar Nuxt):**
-* [Berikan ringkasan atau 1-2 poin paling menonjol terkait keselarasan. Contoh: "Kode baru ini umumnya selaras dengan struktur proyek, namun ada satu komponen yang mungkin lebih cocok ditempatkan di direktori 'shared' (detail di saran). Ketaatan pada standar Nuxt sudah baik."]
+**Konsistensi & Arsitektur (Tinjauan Ringkas - fokus pada keselarasan penting):**
+* [Berikan ringkasan atau 1-2 poin paling menonjol terkait keselarasan arsitektur yang signifikan. Contoh: "Kode baru ini selaras dengan struktur proyek dan mengikuti pola yang sudah ada."]
 
 **Keselarasan dengan Requirement (Jika ada konteks tugas Notion):**
 * [Verifikasi apakah implementasi memenuhi requirement yang ditetapkan dalam tugas Notion]
@@ -198,28 +234,28 @@ Format Hasil Review:
 * [Identifikasi requirement yang mungkin terlewat atau belum diimplementasikan]
 * [Evaluasi kesesuaian solusi teknis dengan spesifikasi yang diberikan]
 
-**Potensi Bug & Performa (ANALISIS DETAIL DI SINI):**
-* [Poin analisis detail 1: Misal, "Iterasi di dalam iterasi pada fungsi 'calculateTotals' (baris X) memiliki kompleksitas O(n^2) dan akan menyebabkan masalah performa signifikan pada dataset lebih dari 1000 item. Pertimbangkan untuk menggunakan Map untuk lookup agar menjadi O(n)."]
-* [Poin analisis detail 2: Misal, "Tidak ada penanganan error untuk pemanggilan API di 'fetchUserData' (baris Y). Jika API gagal, aplikasi akan crash. Implementasikan try-catch dan mekanisme fallback."]
-* [Poin analisis detail 3]
+**Potensi Bug & Performa (ANALISIS DETAIL DI SINI - GUNAKAN SEVERITY LEVELS):**
+* [**CRITICAL/HIGH/MEDIUM/LOW**: Poin analisis detail dengan severity yang tepat. Misal, "**HIGH**: Tidak ada penanganan error untuk pemanggilan API di 'fetchUserData' (baris Y). Jika API gagal, aplikasi akan crash. Implementasikan try-catch dan mekanisme fallback."]
+* [**CRITICAL/HIGH/MEDIUM/LOW**: Poin analisis detail 2 dengan severity yang tepat]
+* [Hanya sertakan masalah yang benar-benar penting - hindari nitpicking pada optimisasi minor]
 
 ---
 
-**Feedback Tambahan & Saran (ANALISIS DETAIL DI SINI):**
-* [Saran konkret dan mendalam 1: Misal, "Untuk meningkatkan reusabilitas dan mengikuti pola yang ada, komponen 'OrderSummary.vue' bisa dipecah menjadi dua sub-komponen: 'OrderItemsList.vue' dan 'OrderTotalsDisplay.vue', ini akan selaras dengan bagaimana komponen 'UserProfileCard.vue' diorganisir."]
-* [Saran konkret dan mendalam 2: Misal, "Terkait edge case input pengguna yang disebutkan di atas, pada file 'InputHandler.js' baris Z, tambahkan validasi untuk mencegah input string kosong yang saat ini bisa menyebabkan error pada fungsi hilir."]
-* [Saran konkret dan mendalam 3]
+**Feedback Tambahan & Saran (ANALISIS DETAIL DI SINI - FOKUS PADA HAL PENTING):**
+* [**MEDIUM/LOW**: Saran konkret dan mendalam yang benar-benar dapat meningkatkan kualitas sistem. Misal, "**MEDIUM**: Untuk meningkatkan maintainability dan mengikuti pola yang ada, komponen 'OrderSummary.vue' bisa dipecah menjadi dua sub-komponen sesuai dengan arsitektur yang sudah ditetapkan."]
+* [**MEDIUM/LOW**: Saran konkret 2 yang fokus pada improvement yang signifikan]
+* [Hindari saran untuk hal-hal minor yang tidak mempengaruhi fungsionalitas atau maintainability secara signifikan]
 
 ---
 
 **Kesimpulan:**
-[Pilih salah satu:]
-* [Jika kode memenuhi standar kualitas dan siap di-merge] **Kode ini sudah baik, selaras dengan struktur proyek, mengikuti standar (Nuxt/Flutter) yang ditetapkan, dan memenuhi standar kualitas. Silakan dilanjutkan untuk merge! Terima kasih atas kerja kerasnya.**
-* [Jika ada perbaikan minor yang disarankan, terutama dari bagian Potensi Bug/Performa atau Saran] **Kode ini secara umum sudah baik, namun ada beberapa saran perbaikan minor (terutama terkait potensi bug/performa atau saran yang diberikan) yang perlu dipertimbangkan sebelum di-merge. Lihat poin analisis detail di atas.**
-* [Jika ada isu signifikan yang perlu ditangani, terutama dari bagian Potensi Bug/Performa] **Ada beberapa isu signifikan terkait [sebutkan area utama dari Potensi Bug/Performa] yang perlu ditangani sebelum kode ini dapat di-merge. Mohon periksa kembali poin analisis detail di atas.**
+[Pilih salah satu berdasarkan severity issues yang ditemukan:]
+* [Jika tidak ada CRITICAL/HIGH issues] **Kode ini sudah baik, selaras dengan struktur proyek, mengikuti standar (Nuxt/Flutter) yang ditetapkan, dan memenuhi standar kualitas. Silakan dilanjutkan untuk merge! Terima kasih atas kerja kerasnya.**
+* [Jika ada MEDIUM issues atau saran penting] **Kode ini secara umum sudah baik dan functional, namun ada beberapa saran perbaikan (severity MEDIUM atau saran yang diberikan) yang perlu dipertimbangkan untuk meningkatkan kualitas jangka panjang. Lihat poin analisis detail di atas.**
+* [Jika ada HIGH/CRITICAL issues] **Ada beberapa isu penting (severity HIGH/CRITICAL) terkait [sebutkan area utama] yang perlu ditangani sebelum kode ini dapat di-merge untuk memastikan stabilitas sistem. Mohon periksa kembali poin analisis detail di atas.**
 
 
-Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjuti. Fokus pada peningkatan kualitas kode secara keseluruhan **dengan prioritas utama pada keselarasan dengan struktur proyek yang ada dan standar teknologi yang digunakan (Nuxt/Flutter), dan berikan analisis mendalam pada 'Potensi Bug & Performa' serta 'Feedback Tambahan & Saran'.**`;
+Ingat untuk selalu memberikan feedback yang konstruktif dan dapat ditindaklanjuti. Fokus pada peningkatan kualitas kode secara keseluruhan **dengan prioritas utama pada functional correctness, system stability, dan architectural consistency. Hindari nitpicking pada hal-hal minor yang tidak mempengaruhi kualitas sistem secara signifikan.**`;
   }
 
   /**
