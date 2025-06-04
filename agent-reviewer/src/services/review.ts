@@ -144,35 +144,35 @@ Ingat: Anda hanya boleh menganalisis dan memberikan feedback pada baris kode yan
       case 'strict':
         return `
 **DEFINISI ISU KRITIS (THRESHOLD: STRICT) - HANYA TANDAI SEBAGAI 🔴 JIKA:**
-* **Keamanan:** Vulnerability yang jelas (SQL injection, XSS, data exposure, authentication bypass)
-* **Breaking Changes:** Perubahan yang akan merusak API atau fungsionalitas existing
-* **Crashes:** Bug yang menyebabkan aplikasi crash atau tidak dapat dijalankan
-* **Data Corruption:** Risiko kehilangan atau korupsi data
-* **Deployment Blockers:** Masalah yang mencegah deployment berhasil
+* **Security Vulnerabilities:** Kerentanan keamanan yang dapat menyebabkan data breach atau akses tidak sah (SQL injection, XSS yang dapat dieksploitasi, authentication bypass, data exposure)
+* **Data Loss/Corruption:** Risiko kehilangan data permanen atau korupsi data yang tidak dapat dipulihkan
+* **System-Breaking Bugs:** Bug yang menyebabkan aplikasi crash secara total atau tidak dapat dijalankan sama sekali
+* **Memory/Resource Exhaustion:** Memory leaks atau resource exhaustion yang dapat menyebabkan sistem crash
 
-**JANGAN tandai sebagai kritis:** Code style, optimasi performa minor, refactoring suggestions, documentation issues, atau masalah yang tidak mengancam stabilitas sistem.`;
+**JANGAN tandai sebagai kritis:** Code style violations, non-breaking API changes, performance optimizations yang tidak menyebabkan ketidakstabilan sistem, refactoring suggestions, documentation improvements, minor logic improvements, input validation yang tidak berdampak keamanan kritis.`;
 
       case 'lenient':
         return `
 **DEFINISI ISU KRITIS (THRESHOLD: LENIENT) - HANYA TANDAI SEBAGAI 🔴 JIKA:**
-* **Deployment Blockers:** Masalah yang akan mencegah deployment berhasil
-* **Critical Security:** Vulnerability yang memungkinkan akses tidak sah ke sistem
-* **System Failures:** Bug yang menyebabkan sistem tidak dapat berfungsi sama sekali
-* **Data Loss:** Risiko kehilangan data permanen
+* **Critical Security Vulnerabilities:** Kerentanan yang memungkinkan akses tidak sah ke sistem atau data breach
+* **Complete System Failure:** Bug yang menyebabkan sistem tidak dapat berfungsi sama sekali
+* **Permanent Data Loss:** Risiko kehilangan data permanen yang tidak dapat dipulihkan
+* **Deployment Blockers:** Masalah yang akan mencegah deployment berhasil secara total
 
-**JANGAN tandai sebagai kritis:** Bug minor, performance issues, code quality concerns, atau masalah yang tidak menghalangi deployment.`;
+**JANGAN tandai sebagai kritis:** Bug minor, performance issues, code quality concerns, missing error handling, logic errors yang tidak menyebabkan system failure, atau masalah yang tidak menghalangi deployment.`;
 
       default: // 'standard'
         return `
-**DEFINISI ISU KRITIS (THRESHOLD: STANDARD) - TANDAI SEBAGAI 🔴 JIKA:**
-* **Bugs Signifikan:** Logic error, null pointer exceptions, infinite loops
-* **Keamanan:** Vulnerability, input validation issues, authentication problems
-* **Performa Kritis:** Bottleneck yang berdampak signifikan pada user experience
-* **Breaking Changes:** Perubahan yang merusak kompatibilitas atau fungsionalitas existing
-* **Error Handling:** Missing error handling untuk operasi kritis
+**DEFINISI ISU KRITIS (THRESHOLD: STANDARD) - HANYA TANDAI SEBAGAI 🔴 JIKA:**
+* **Severe Security Issues:** Vulnerability yang dapat menyebabkan data breach atau unauthorized access (bukan hanya input validation biasa)
+* **Application-Breaking Bugs:** Bug yang menyebabkan aplikasi crash atau tidak dapat berfungsi (bukan hanya logic error minor)
+* **Data Corruption/Loss:** Risiko kehilangan atau korupsi data yang signifikan
+* **Critical System Instability:** Memory leaks atau resource exhaustion yang dapat crash sistem
+* **Major Breaking Changes:** Perubahan yang merusak fungsionalitas core existing secara signifikan
 
-**Gunakan 🟡 untuk:** Code quality issues, minor performance optimizations, style improvements
-**Gunakan 🔵 untuk:** Nice-to-have improvements, documentation suggestions`;
+**Gunakan 🟡 untuk:** Logic errors yang tidak menyebabkan crash, missing error handling, performance bottlenecks, input validation issues, minor breaking changes
+**Gunakan � untuk:** Code quality improvements, style violations, refactoring suggestions, documentation improvements, minor performance optimizations
+**Gunakan ℹ️ untuk:** Nice-to-have improvements, best practice suggestions yang tidak urgent`;
     }
   }
 
@@ -437,15 +437,19 @@ Untuk setiap isu kritis, berikan solusi praktis dengan format:
 **Tujuan**: Identifikasi hanya masalah kritis yang harus diperbaiki sebelum merge.
 
 **Fokus Utama** (hanya analisis yang paling penting):
-1. **Bug Kritis**: Potensi crash, null pointer, logic error yang fatal
-2. **Keamanan**: Vulnerability yang jelas (XSS, injection, data exposure)
-3. **Performa Kritis**: Bottleneck yang akan berdampak signifikan pada user experience
+1. **Security Vulnerabilities**: Kerentanan yang dapat menyebabkan data breach atau akses tidak sah
+2. **System-Breaking Bugs**: Bug yang menyebabkan aplikasi crash atau tidak dapat berfungsi
+3. **Data Loss/Corruption**: Risiko kehilangan atau korupsi data yang signifikan
+4. **Critical System Instability**: Memory leaks atau resource exhaustion yang dapat crash sistem
 
 **Yang TIDAK perlu dianalisis dalam mode quick**:
 - Code style dan formatting minor
-- Optimasi performa yang tidak kritis
+- Logic errors yang tidak menyebabkan crash
+- Performance optimizations yang tidak kritis
 - Refactoring suggestions
 - Documentation improvements
+- Minor input validation issues
+- Non-breaking API changes
 
 **Format Output (RINGKAS)**:
 ---
@@ -470,7 +474,7 @@ Untuk setiap isu kritis, berikan solusi praktis dengan format:
 * ✅ **Siap merge** - Tidak ada isu kritis ditemukan
 * ⚠️ **Perlu perbaikan** - Ada [X] isu kritis yang harus diperbaiki dulu
 
-Gunakan Bahasa Indonesia yang ringkas dan langsung to the point. Berikan contoh solusi hanya untuk isu kritis.`;
+Gunakan Bahasa Indonesia yang ringkas dan langsung to the point. Berikan contoh solusi hanya untuk isu kritis yang benar-benar mengancam stabilitas sistem.`;
   }
 
   /**
@@ -1032,7 +1036,7 @@ Berikan analisis yang konstruktif dan spesifik.`;
   private generateStep3Prompt(step1Analysis: string, step2Analysis: string): string {
     return `**TAHAP 3: ANALISIS BUG DAN KEAMANAN**
 
-Berdasarkan pemahaman dari tahap 1 dan 2, sekarang fokus pada identifikasi potensi bug dan masalah keamanan.
+Berdasarkan pemahaman dari tahap 1 dan 2, sekarang fokus pada identifikasi potensi bug dan masalah keamanan yang benar-benar kritis.
 
 **Analisis sebelumnya:**
 **Tahap 1:** ${step1Analysis}
@@ -1040,28 +1044,34 @@ Berdasarkan pemahaman dari tahap 1 dan 2, sekarang fokus pada identifikasi poten
 **Tahap 2:** ${step2Analysis}
 
 **Tugas Anda pada tahap ini:**
-1. Identifikasi potensi bug dan error handling yang kurang
-2. Analisis keamanan kode (input validation, XSS, CSRF, dll)
-3. Periksa edge cases yang mungkin tidak tertangani
-4. Evaluasi error handling dan exception management
-5. Identifikasi memory leaks atau resource management issues
+1. Identifikasi bug yang dapat menyebabkan aplikasi crash atau tidak dapat berfungsi
+2. Analisis keamanan kritis (vulnerability yang dapat menyebabkan data breach atau unauthorized access)
+3. Periksa risiko kehilangan atau korupsi data
+4. Evaluasi memory leaks atau resource exhaustion yang dapat crash sistem
+5. Identifikasi masalah yang dapat mencegah deployment berhasil
 
-**Fokus analisis:**
-- Null pointer exceptions dan undefined values
-- Input validation dan sanitization
-- Authentication dan authorization issues
-- Data exposure dan privacy concerns
-- Race conditions dan concurrency issues
-- Resource leaks (memory, file handles, connections)
+**Fokus analisis (HANYA yang benar-benar kritis):**
+- Security vulnerabilities yang dapat dieksploitasi (SQL injection, XSS exploitable, authentication bypass)
+- System-breaking bugs yang menyebabkan crash total
+- Data loss atau corruption risks
+- Memory leaks atau resource exhaustion yang dapat crash sistem
+- Critical system instability issues
+
+**JANGAN fokus pada:**
+- Logic errors minor yang tidak menyebabkan crash
+- Input validation biasa yang tidak berdampak keamanan kritis
+- Performance issues yang tidak menyebabkan ketidakstabilan sistem
+- Missing error handling untuk operasi non-kritis
+- Code quality concerns
 
 **Output yang diharapkan:**
 Berikan analisis detail yang mencakup:
-- Daftar potensi bug dengan tingkat severity
-- Identifikasi masalah keamanan dan mitigasinya
-- Rekomendasi untuk memperbaiki error handling
-- Saran untuk meningkatkan robustness kode
+- Daftar HANYA bug dan masalah keamanan yang benar-benar kritis
+- Identifikasi masalah yang dapat menyebabkan system failure atau data breach
+- Rekomendasi untuk memperbaiki masalah yang mengancam stabilitas sistem
+- Prioritas berdasarkan severity dan dampak terhadap sistem secara keseluruhan
 
-Prioritaskan masalah berdasarkan dampak dan kemungkinan terjadinya.`;
+Ingat: Hanya tandai sebagai kritis jika benar-benar mengancam stabilitas sistem atau keamanan data.`;
   }
 
   /**
@@ -1518,35 +1528,37 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
 
     switch (CRITICAL_ISSUE_THRESHOLD.toLowerCase()) {
       case 'strict':
-        // Only security vulnerabilities, breaking changes, crashes, data corruption
-        return lowerContent.includes('security') ||
-               lowerContent.includes('vulnerability') ||
+        // Only the most severe issues: security vulnerabilities, data loss, system crashes, memory exhaustion
+        return (lowerContent.includes('security') && (lowerContent.includes('vulnerability') || lowerContent.includes('breach') || lowerContent.includes('unauthorized access'))) ||
                lowerContent.includes('sql injection') ||
-               lowerContent.includes('xss') ||
-               lowerContent.includes('authentication') ||
-               lowerContent.includes('authorization') ||
-               lowerContent.includes('breaking change') ||
-               lowerContent.includes('crash') ||
-               lowerContent.includes('data corruption') ||
-               lowerContent.includes('data loss') ||
-               lowerContent.includes('deployment') ||
-               lowerContent.includes('tidak dapat dijalankan') ||
-               lowerContent.includes('gagal deploy');
+               lowerContent.includes('xss') && lowerContent.includes('exploitable') ||
+               lowerContent.includes('authentication bypass') ||
+               lowerContent.includes('data exposure') ||
+               (lowerContent.includes('data') && (lowerContent.includes('loss') || lowerContent.includes('corruption'))) ||
+               (lowerContent.includes('crash') && (lowerContent.includes('aplikasi') || lowerContent.includes('system') || lowerContent.includes('total'))) ||
+               lowerContent.includes('memory leak') ||
+               lowerContent.includes('resource exhaustion') ||
+               lowerContent.includes('tidak dapat dijalankan sama sekali') ||
+               lowerContent.includes('sistem tidak dapat berfungsi');
 
       case 'lenient':
-        // Only deployment blockers and critical system failures
-        return lowerContent.includes('deployment') ||
-               lowerContent.includes('deploy') ||
-               lowerContent.includes('critical security') ||
-               lowerContent.includes('system failure') ||
-               lowerContent.includes('data loss') ||
-               lowerContent.includes('tidak dapat berfungsi') ||
-               lowerContent.includes('gagal deploy') ||
-               lowerContent.includes('blocking');
+        // Only the most critical system-breaking issues
+        return (lowerContent.includes('security') && lowerContent.includes('critical') && (lowerContent.includes('vulnerability') || lowerContent.includes('breach'))) ||
+               (lowerContent.includes('system') && lowerContent.includes('failure') && lowerContent.includes('complete')) ||
+               (lowerContent.includes('data') && lowerContent.includes('loss') && lowerContent.includes('permanent')) ||
+               (lowerContent.includes('deployment') && lowerContent.includes('blocker')) ||
+               lowerContent.includes('tidak dapat berfungsi sama sekali') ||
+               lowerContent.includes('gagal deploy secara total');
 
       default: // 'standard'
-        // Current behavior - allow all critical issues
-        return true;
+        // More restrictive than before - only genuine severe issues
+        return (lowerContent.includes('security') && (lowerContent.includes('vulnerability') || lowerContent.includes('breach'))) ||
+               (lowerContent.includes('crash') && !lowerContent.includes('minor')) ||
+               (lowerContent.includes('data') && (lowerContent.includes('corruption') || lowerContent.includes('loss'))) ||
+               lowerContent.includes('memory leak') ||
+               lowerContent.includes('resource exhaustion') ||
+               (lowerContent.includes('breaking') && lowerContent.includes('major')) ||
+               lowerContent.includes('system instability');
     }
   }
 

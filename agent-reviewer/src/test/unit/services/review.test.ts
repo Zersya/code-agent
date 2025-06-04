@@ -1102,13 +1102,13 @@ Halo, berikut review untuk MR ini:
         const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
 
         expect(definition).toContain('THRESHOLD: STRICT');
-        expect(definition).toContain('Vulnerability yang jelas');
-        expect(definition).toContain('Breaking Changes');
-        expect(definition).toContain('Crashes');
-        expect(definition).toContain('Data Corruption');
+        expect(definition).toContain('Security Vulnerabilities');
+        expect(definition).toContain('Data Loss/Corruption');
+        expect(definition).toContain('System-Breaking Bugs');
+        expect(definition).toContain('Memory/Resource Exhaustion');
         expect(definition).toContain('JANGAN tandai sebagai kritis');
-        expect(definition).toContain('Code style');
-        expect(definition).toContain('optimasi performa minor');
+        expect(definition).toContain('Code style violations');
+        expect(definition).toContain('performance optimizations yang tidak menyebabkan ketidakstabilan sistem');
       });
 
       test('should return lenient threshold definition', () => {
@@ -1117,13 +1117,13 @@ Halo, berikut review untuk MR ini:
         const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
 
         expect(definition).toContain('THRESHOLD: LENIENT');
+        expect(definition).toContain('Critical Security Vulnerabilities');
+        expect(definition).toContain('Complete System Failure');
+        expect(definition).toContain('Permanent Data Loss');
         expect(definition).toContain('Deployment Blockers');
-        expect(definition).toContain('Critical Security');
-        expect(definition).toContain('System Failures');
-        expect(definition).toContain('Data Loss');
         expect(definition).toContain('JANGAN tandai sebagai kritis');
         expect(definition).toContain('Bug minor');
-        expect(definition).toContain('performance issues');
+        expect(definition).toContain('logic errors yang tidak menyebabkan system failure');
       });
 
       test('should return standard threshold definition by default', () => {
@@ -1132,11 +1132,11 @@ Halo, berikut review untuk MR ini:
         const definition = (reviewService as any).getCriticalIssueThresholdDefinition();
 
         expect(definition).toContain('THRESHOLD: STANDARD');
-        expect(definition).toContain('Bugs Signifikan');
-        expect(definition).toContain('Keamanan');
-        expect(definition).toContain('Performa Kritis');
-        expect(definition).toContain('Breaking Changes');
-        expect(definition).toContain('Error Handling');
+        expect(definition).toContain('Severe Security Issues');
+        expect(definition).toContain('Application-Breaking Bugs');
+        expect(definition).toContain('Data Corruption/Loss');
+        expect(definition).toContain('Critical System Instability');
+        expect(definition).toContain('Major Breaking Changes');
         expect(definition).toContain('Gunakan 🟡 untuk');
         expect(definition).toContain('Gunakan 🔵 untuk');
       });
@@ -1156,41 +1156,53 @@ Halo, berikut review untuk MR ini:
 
         // Should pass strict validation
         expect((reviewService as any).validateCriticalIssueByThreshold('SQL injection vulnerability found')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Breaking change in API')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Application crash detected')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Data corruption risk')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Deployment will fail')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Security vulnerability with data breach risk')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Application crash secara total')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Data corruption and loss')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Memory leak causing system crash')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Authentication bypass vulnerability')).toBe(true);
 
         // Should fail strict validation
         expect((reviewService as any).validateCriticalIssueByThreshold('Code style issue')).toBe(false);
         expect((reviewService as any).validateCriticalIssueByThreshold('Minor performance optimization')).toBe(false);
         expect((reviewService as any).validateCriticalIssueByThreshold('Documentation missing')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Logic error without crash')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Input validation issue')).toBe(false);
       });
 
       test('should validate lenient threshold correctly', () => {
         process.env.CRITICAL_ISSUE_THRESHOLD = 'lenient';
 
         // Should pass lenient validation
-        expect((reviewService as any).validateCriticalIssueByThreshold('Deployment blocker found')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Critical security vulnerability')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('System failure detected')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Data loss risk')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Deployment blocker preventing release')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Critical security vulnerability with breach')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Complete system failure detected')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Permanent data loss risk')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Tidak dapat berfungsi sama sekali')).toBe(true);
 
         // Should fail lenient validation
         expect((reviewService as any).validateCriticalIssueByThreshold('Minor bug found')).toBe(false);
         expect((reviewService as any).validateCriticalIssueByThreshold('Performance issue')).toBe(false);
         expect((reviewService as any).validateCriticalIssueByThreshold('Code quality concern')).toBe(false);
         expect((reviewService as any).validateCriticalIssueByThreshold('Regular security issue')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Logic error without system failure')).toBe(false);
       });
 
-      test('should validate standard threshold correctly (allow all)', () => {
+      test('should validate standard threshold correctly (more restrictive)', () => {
         process.env.CRITICAL_ISSUE_THRESHOLD = 'standard';
 
-        // Should pass all validations in standard mode
-        expect((reviewService as any).validateCriticalIssueByThreshold('Any issue')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Code style problem')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Performance issue')).toBe(true);
-        expect((reviewService as any).validateCriticalIssueByThreshold('Security vulnerability')).toBe(true);
+        // Should pass standard validation
+        expect((reviewService as any).validateCriticalIssueByThreshold('Security vulnerability with breach')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Application crash detected')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Data corruption risk')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Memory leak causing instability')).toBe(true);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Major breaking change')).toBe(true);
+
+        // Should fail standard validation (now more restrictive)
+        expect((reviewService as any).validateCriticalIssueByThreshold('Code style problem')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Minor logic error')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Performance optimization needed')).toBe(false);
+        expect((reviewService as any).validateCriticalIssueByThreshold('Input validation missing')).toBe(false);
       });
     });
 
