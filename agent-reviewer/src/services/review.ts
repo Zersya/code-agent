@@ -84,6 +84,8 @@ export class ReviewService {
     console.log(`   Domain Scope: ${REVIEW_DOMAIN_SCOPE}`);
     console.log(`   Critical Issue Threshold: ${CRITICAL_ISSUE_THRESHOLD}`);
     console.log(`   LLM Provider: ${LLM_PROVIDER}`);
+    console.log(`   OpenRouter API URL: ${OPENROUTER_API_URL}`);
+    console.log(`   OpenRouter API Model: ${OPENROUTER_API_MODEL}`);
   }
 
   /**
