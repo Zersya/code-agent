@@ -3,7 +3,9 @@ import { gitlabService } from './gitlab.js';
 import { contextService, ProjectContext } from './context.js';
 import { dbService } from './database.js';
 import { notionService } from './notion.js';
+import { analyticsService } from './analytics.js';
 import { CombinedNotionContext } from '../types/notion.js';
+import { ReviewCompletionData } from '../models/analytics.js';
 
 import dotenv from 'dotenv';
 import axios from 'axios';
@@ -1726,6 +1728,50 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       } else {
         console.log(`Did not approve merge request !${mergeRequestIid} in project ${projectId}`);
       }
+
+      // Track analytics for review completion
+      try {
+        const changes = await gitlabService.getMergeRequestChanges(projectId, mergeRequestIid);
+        const reviewStartTime = new Date(mergeRequest.created_at);
+        const reviewEndTime = new Date();
+        const reviewTimeHours = (reviewEndTime.getTime() - reviewStartTime.getTime()) / (1000 * 60 * 60);
+
+        // Count critical issues in review result
+        const criticalIssuesCount = (reviewResult.reviewText.match(/🔴/g) || []).length;
+
+        // Calculate basic metrics from changes
+        const linesAdded = changes.reduce((sum, change) => {
+          const addedLines = change.diffContent.split('\n').filter(line => line.startsWith('+')).length;
+          return sum + addedLines;
+        }, 0);
+
+        const linesRemoved = changes.reduce((sum, change) => {
+          const removedLines = change.diffContent.split('\n').filter(line => line.startsWith('-')).length;
+          return sum + removedLines;
+        }, 0);
+
+        const reviewCompletionData: ReviewCompletionData = {
+          projectId,
+          mergeRequestIid,
+          reviewResult: reviewResult.reviewText,
+          shouldApprove: reviewResult.shouldApprove,
+          criticalIssuesCount,
+          totalReviewComments: 1, // The review comment we just added
+          reviewMode: ENABLE_SEQUENTIAL_THINKING ? 'sequential' : 'direct',
+          sequentialThinkingUsed: ENABLE_SEQUENTIAL_THINKING,
+          hasNotionContext: false, // This would need to be determined from the review process
+          linesAdded,
+          linesRemoved,
+          filesChanged: changes.length,
+          reviewTimeHours,
+          codeQualityScore: this.calculateCodeQualityScore(criticalIssuesCount, linesAdded + linesRemoved)
+        };
+
+        await analyticsService.trackReviewCompleted(reviewCompletionData);
+      } catch (analyticsError) {
+        console.error('Error tracking review completion analytics:', analyticsError);
+        // Don't fail the main process for analytics errors
+      }
     } catch (error) {
       console.error(`Error submitting review for merge request !${mergeRequestIid} in project ${projectId}:`, error);
       throw error;
@@ -1864,6 +1910,21 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
     }
 
     return comment;
+  }
+
+  /**
+   * Calculate a basic code quality score based on critical issues and code size
+   */
+  private calculateCodeQualityScore(criticalIssuesCount: number, totalLinesChanged: number): number {
+    if (totalLinesChanged === 0) return 100;
+
+    // Calculate issues per 100 lines of code
+    const issuesDensity = (criticalIssuesCount / totalLinesChanged) * 100;
+
+    // Convert to quality score (0-100, where 100 is best)
+    const qualityScore = Math.max(0, 100 - (issuesDensity * 20)); // Each issue per 100 lines reduces score by 20
+
+    return Math.round(qualityScore * 100) / 100; // Round to 2 decimal places
   }
 }
 

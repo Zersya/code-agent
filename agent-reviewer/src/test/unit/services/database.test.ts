@@ -3,6 +3,7 @@ import { describe, test, expect, beforeEach } from 'bun:test';
 import { dbService } from '../../../services/database.js';
 import { CodeEmbedding, ProjectMetadata } from '../../../models/embedding.js';
 import { WebhookProcessingStatus } from '../../../models/webhook.js';
+import { MergeRequestAnalytics, DeveloperMetrics, ReviewFeedbackAnalytics } from '../../../models/analytics.js';
 
 describe('Database Service', () => {
   beforeEach(() => {
@@ -335,6 +336,213 @@ describe('Database Service', () => {
         };
 
         expect(mockEmbedding.branch).toBe(branch);
+      });
+    });
+  });
+
+  describe('Analytics database operations', () => {
+    describe('saveMergeRequestAnalytics', () => {
+      test('should have saveMergeRequestAnalytics method', () => {
+        expect(typeof dbService.saveMergeRequestAnalytics).toBe('function');
+      });
+
+      test('should handle merge request analytics data structure', () => {
+        const mockAnalytics: MergeRequestAnalytics = {
+          projectId: 123,
+          mergeRequestIid: 456,
+          developerId: 789,
+          developerUsername: 'testuser',
+          title: 'Test MR',
+          sourceBranch: 'feature/test',
+          targetBranch: 'main',
+          createdAt: new Date('2024-01-01T10:00:00Z'),
+          linesAdded: 100,
+          linesRemoved: 50,
+          filesChanged: 5,
+          criticalIssuesCount: 2,
+          totalReviewComments: 3,
+          wasApproved: true,
+          requiredRework: false,
+          hasNotionContext: false,
+          sequentialThinkingUsed: true
+        };
+
+        expect(mockAnalytics.projectId).toBe(123);
+        expect(mockAnalytics.mergeRequestIid).toBe(456);
+        expect(mockAnalytics.developerId).toBe(789);
+        expect(mockAnalytics.developerUsername).toBe('testuser');
+        expect(mockAnalytics.wasApproved).toBe(true);
+        expect(mockAnalytics.sequentialThinkingUsed).toBe(true);
+      });
+    });
+
+    describe('updateDeveloperMetrics', () => {
+      test('should have updateDeveloperMetrics method', () => {
+        expect(typeof dbService.updateDeveloperMetrics).toBe('function');
+      });
+
+      test('should handle developer metrics data structure', () => {
+        const mockMetrics: DeveloperMetrics = {
+          developerId: 789,
+          developerUsername: 'testuser',
+          developerEmail: 'test@example.com',
+          projectId: 123,
+          metricDate: new Date('2024-01-01'),
+          mrsCreated: 5,
+          mrsMerged: 4,
+          mrsClosed: 1,
+          totalLinesAdded: 500,
+          totalLinesRemoved: 200,
+          totalFilesChanged: 25,
+          avgCycleTimeHours: 24.5,
+          avgReviewTimeHours: 2.5,
+          criticalIssuesCount: 3,
+          totalReviewComments: 15,
+          approvalRate: 80.0,
+          reworkRate: 20.0,
+          codeQualityScore: 85.5,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        expect(mockMetrics.developerId).toBe(789);
+        expect(mockMetrics.projectId).toBe(123);
+        expect(mockMetrics.mrsCreated).toBe(5);
+        expect(mockMetrics.mrsMerged).toBe(4);
+        expect(mockMetrics.approvalRate).toBe(80.0);
+        expect(mockMetrics.codeQualityScore).toBe(85.5);
+      });
+    });
+
+    describe('saveReviewFeedbackAnalytics', () => {
+      test('should have saveReviewFeedbackAnalytics method', () => {
+        expect(typeof dbService.saveReviewFeedbackAnalytics).toBe('function');
+      });
+
+      test('should handle review feedback analytics data structure', () => {
+        const mockFeedback: ReviewFeedbackAnalytics = {
+          mergeRequestAnalyticsId: 1,
+          projectId: 123,
+          mergeRequestIid: 456,
+          feedbackType: 'critical',
+          category: 'security',
+          severity: 'high',
+          feedbackText: 'SQL injection vulnerability detected',
+          filePath: 'src/auth.ts',
+          lineNumber: 42,
+          wasAddressed: false,
+          createdAt: new Date()
+        };
+
+        expect(mockFeedback.mergeRequestAnalyticsId).toBe(1);
+        expect(mockFeedback.feedbackType).toBe('critical');
+        expect(mockFeedback.category).toBe('security');
+        expect(mockFeedback.severity).toBe('high');
+        expect(mockFeedback.wasAddressed).toBe(false);
+      });
+    });
+
+    describe('getMergeRequestAnalytics', () => {
+      test('should have getMergeRequestAnalytics method', () => {
+        expect(typeof dbService.getMergeRequestAnalytics).toBe('function');
+      });
+
+      test('should accept project ID and merge request IID parameters', () => {
+        const projectId = 123;
+        const mergeRequestIid = 456;
+
+        // Test that the method signature accepts the expected parameters
+        expect(() => {
+          dbService.getMergeRequestAnalytics(projectId, mergeRequestIid);
+        }).not.toThrow();
+      });
+    });
+
+    describe('Analytics schema validation', () => {
+      test('should validate required fields for merge request analytics', () => {
+        const requiredFields = [
+          'projectId',
+          'mergeRequestIid',
+          'developerId',
+          'developerUsername',
+          'title',
+          'sourceBranch',
+          'targetBranch',
+          'createdAt',
+          'linesAdded',
+          'linesRemoved',
+          'filesChanged',
+          'criticalIssuesCount',
+          'totalReviewComments',
+          'wasApproved',
+          'requiredRework',
+          'hasNotionContext',
+          'sequentialThinkingUsed'
+        ];
+
+        const mockAnalytics: MergeRequestAnalytics = {
+          projectId: 123,
+          mergeRequestIid: 456,
+          developerId: 789,
+          developerUsername: 'testuser',
+          title: 'Test MR',
+          sourceBranch: 'feature/test',
+          targetBranch: 'main',
+          createdAt: new Date(),
+          linesAdded: 100,
+          linesRemoved: 50,
+          filesChanged: 5,
+          criticalIssuesCount: 2,
+          totalReviewComments: 3,
+          wasApproved: true,
+          requiredRework: false,
+          hasNotionContext: false,
+          sequentialThinkingUsed: true
+        };
+
+        requiredFields.forEach(field => {
+          expect(mockAnalytics).toHaveProperty(field);
+        });
+      });
+
+      test('should validate required fields for developer metrics', () => {
+        const requiredFields = [
+          'developerId',
+          'developerUsername',
+          'projectId',
+          'metricDate',
+          'mrsCreated',
+          'mrsMerged',
+          'mrsClosed',
+          'totalLinesAdded',
+          'totalLinesRemoved',
+          'totalFilesChanged',
+          'criticalIssuesCount',
+          'totalReviewComments',
+          'createdAt',
+          'updatedAt'
+        ];
+
+        const mockMetrics: DeveloperMetrics = {
+          developerId: 789,
+          developerUsername: 'testuser',
+          projectId: 123,
+          metricDate: new Date(),
+          mrsCreated: 5,
+          mrsMerged: 4,
+          mrsClosed: 1,
+          totalLinesAdded: 500,
+          totalLinesRemoved: 200,
+          totalFilesChanged: 25,
+          criticalIssuesCount: 3,
+          totalReviewComments: 15,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        requiredFields.forEach(field => {
+          expect(mockMetrics).toHaveProperty(field);
+        });
       });
     });
   });

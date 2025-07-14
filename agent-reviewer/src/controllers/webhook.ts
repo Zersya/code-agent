@@ -6,7 +6,9 @@ import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
+import { analyticsService } from '../services/analytics.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
+import { MergeRequestEventData } from '../models/analytics.js';
 
 /**
  * Process a GitLab webhook event
@@ -302,6 +304,31 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     //   return;
     // }
 
+    // Track analytics for merge request creation/update
+    try {
+      const eventData: MergeRequestEventData = {
+        projectId,
+        mergeRequestIid,
+        developerId: event.object_attributes.author.id,
+        developerUsername: event.object_attributes.author.username,
+        developerEmail: event.object_attributes.author.email,
+        title: event.object_attributes.title,
+        description: event.object_attributes.description,
+        sourceBranch,
+        targetBranch: event.object_attributes.target_branch,
+        createdAt: new Date(event.object_attributes.created_at),
+        lastCommitId: commitId,
+        action: event.object_attributes.action || 'open'
+      };
+
+      if (event.object_attributes.action === 'open') {
+        await analyticsService.trackMergeRequestCreated(eventData);
+      }
+    } catch (analyticsError) {
+      console.error('Error tracking merge request analytics:', analyticsError);
+      // Don't fail the main process for analytics errors
+    }
+
     console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
   } catch (error) {
     console.error('Error processing merge request event:', error);
@@ -340,6 +367,28 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
       }
     } catch (reEmbeddingError) {
       console.error(`Error triggering re-embedding for project ${projectId} after merge !${mergeRequestIid}:`, reEmbeddingError);
+    }
+
+    // Track analytics for merge completion
+    try {
+      const eventData: MergeRequestEventData = {
+        projectId,
+        mergeRequestIid,
+        developerId: event.object_attributes.author.id,
+        developerUsername: event.object_attributes.author.username,
+        developerEmail: event.object_attributes.author.email,
+        title: event.object_attributes.title,
+        description: event.object_attributes.description,
+        sourceBranch: event.object_attributes.source_branch,
+        targetBranch,
+        createdAt: new Date(event.object_attributes.created_at),
+        lastCommitId: event.object_attributes.last_commit.id,
+        action: 'merge'
+      };
+
+      await analyticsService.trackMergeRequestCompleted(eventData);
+    } catch (analyticsError) {
+      console.error('Error tracking merge completion analytics:', analyticsError);
     }
   } catch (error) {
     console.error('Error processing merge completion event:', error);

@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
+import { DeveloperMetrics, MergeRequestAnalytics, ReviewFeedbackAnalytics, ProjectPerformanceMetrics } from '../models/analytics.js';
 
 dotenv.config();
 
@@ -380,6 +381,9 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_processing_id ON documentation_jobs(processing_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_jobs_source_id ON documentation_jobs(source_id)');
 
+      // Create analytics tables
+      await this.createAnalyticsTables(client);
+
       // Create indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_project_id ON embeddings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_commit_id ON embeddings(commit_id)');
@@ -395,6 +399,9 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_embeddings_framework ON documentation_embeddings(framework)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_project_id ON project_documentation_mappings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_enabled ON project_documentation_mappings(is_enabled)');
+
+      // Create analytics indexes
+      await this.createAnalyticsIndexes(client);
 
       console.log('Database schema initialized');
     } catch (error) {
@@ -1915,6 +1922,353 @@ class DatabaseService {
       return result.rows as DocumentationSource[];
     } catch (error) {
       console.error('Error getting all documentation sources:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Create analytics tables for developer performance tracking
+   */
+  private async createAnalyticsTables(client: any): Promise<void> {
+    // Create developer_metrics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS developer_metrics (
+        id SERIAL PRIMARY KEY,
+        developer_id INTEGER NOT NULL,
+        developer_username TEXT NOT NULL,
+        developer_email TEXT,
+        project_id INTEGER NOT NULL,
+        metric_date DATE NOT NULL,
+
+        -- Productivity metrics
+        mrs_created INTEGER DEFAULT 0,
+        mrs_merged INTEGER DEFAULT 0,
+        mrs_closed INTEGER DEFAULT 0,
+        total_lines_added INTEGER DEFAULT 0,
+        total_lines_removed INTEGER DEFAULT 0,
+        total_files_changed INTEGER DEFAULT 0,
+        avg_cycle_time_hours DECIMAL(10,2),
+        avg_review_time_hours DECIMAL(10,2),
+
+        -- Quality metrics
+        critical_issues_count INTEGER DEFAULT 0,
+        total_review_comments INTEGER DEFAULT 0,
+        approval_rate DECIMAL(5,2),
+        rework_rate DECIMAL(5,2),
+        code_quality_score DECIMAL(5,2),
+
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+        UNIQUE(developer_id, project_id, metric_date)
+      )
+    `);
+
+    // Create merge_request_analytics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS merge_request_analytics (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL,
+        merge_request_iid INTEGER NOT NULL,
+        developer_id INTEGER NOT NULL,
+        developer_username TEXT NOT NULL,
+
+        -- Basic MR info
+        title TEXT NOT NULL,
+        source_branch TEXT NOT NULL,
+        target_branch TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        merged_at TIMESTAMP WITH TIME ZONE,
+        closed_at TIMESTAMP WITH TIME ZONE,
+
+        -- Size metrics
+        lines_added INTEGER DEFAULT 0,
+        lines_removed INTEGER DEFAULT 0,
+        files_changed INTEGER DEFAULT 0,
+        complexity_score INTEGER DEFAULT 0,
+
+        -- Time metrics
+        cycle_time_hours DECIMAL(10,2),
+        review_time_hours DECIMAL(10,2),
+        first_response_time_hours DECIMAL(10,2),
+
+        -- Quality metrics
+        critical_issues_count INTEGER DEFAULT 0,
+        total_review_comments INTEGER DEFAULT 0,
+        was_approved BOOLEAN DEFAULT FALSE,
+        required_rework BOOLEAN DEFAULT FALSE,
+        code_quality_score DECIMAL(5,2),
+
+        -- Review context
+        has_notion_context BOOLEAN DEFAULT FALSE,
+        review_mode TEXT,
+        sequential_thinking_used BOOLEAN DEFAULT FALSE,
+
+        UNIQUE(project_id, merge_request_iid)
+      )
+    `);
+
+    // Create review_feedback_analytics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS review_feedback_analytics (
+        id SERIAL PRIMARY KEY,
+        merge_request_analytics_id INTEGER REFERENCES merge_request_analytics(id),
+        project_id INTEGER NOT NULL,
+        merge_request_iid INTEGER NOT NULL,
+
+        -- Feedback categorization
+        feedback_type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        severity TEXT NOT NULL,
+
+        -- Feedback content
+        feedback_text TEXT NOT NULL,
+        file_path TEXT,
+        line_number INTEGER,
+
+        -- Resolution tracking
+        was_addressed BOOLEAN DEFAULT FALSE,
+        resolution_time_hours DECIMAL(10,2),
+
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Create project_performance_metrics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_performance_metrics (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL,
+        metric_date DATE NOT NULL,
+
+        -- Aggregate metrics
+        total_developers INTEGER DEFAULT 0,
+        total_mrs_created INTEGER DEFAULT 0,
+        total_mrs_merged INTEGER DEFAULT 0,
+        avg_cycle_time_hours DECIMAL(10,2),
+        avg_code_quality_score DECIMAL(5,2),
+
+        -- Trend indicators
+        productivity_trend DECIMAL(5,2),
+        quality_trend DECIMAL(5,2),
+
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+        UNIQUE(project_id, metric_date)
+      )
+    `);
+
+    console.log('Analytics tables created successfully');
+  }
+
+  /**
+   * Create indexes for analytics tables
+   */
+  private async createAnalyticsIndexes(client: any): Promise<void> {
+    // Developer metrics indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_developer_metrics_developer_project ON developer_metrics(developer_id, project_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_developer_metrics_date ON developer_metrics(metric_date)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_developer_metrics_project_date ON developer_metrics(project_id, metric_date)');
+
+    // Merge request analytics indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_mr_analytics_project_id ON merge_request_analytics(project_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_mr_analytics_developer_id ON merge_request_analytics(developer_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_mr_analytics_created_at ON merge_request_analytics(created_at)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_mr_analytics_merged_at ON merge_request_analytics(merged_at)');
+
+    // Review feedback analytics indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_review_feedback_mr_analytics_id ON review_feedback_analytics(merge_request_analytics_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_review_feedback_project_mr ON review_feedback_analytics(project_id, merge_request_iid)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_review_feedback_type ON review_feedback_analytics(feedback_type)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_review_feedback_category ON review_feedback_analytics(category)');
+
+    // Project performance metrics indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_project_performance_project_date ON project_performance_metrics(project_id, metric_date)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_project_performance_date ON project_performance_metrics(metric_date)');
+
+    console.log('Analytics indexes created successfully');
+  }
+
+  // Analytics database methods
+
+  /**
+   * Save merge request analytics data
+   */
+  async saveMergeRequestAnalytics(analytics: MergeRequestAnalytics): Promise<number> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        INSERT INTO merge_request_analytics (
+          project_id, merge_request_iid, developer_id, developer_username,
+          title, source_branch, target_branch, created_at, merged_at, closed_at,
+          lines_added, lines_removed, files_changed, complexity_score,
+          cycle_time_hours, review_time_hours, first_response_time_hours,
+          critical_issues_count, total_review_comments, was_approved, required_rework,
+          code_quality_score, has_notion_context, review_mode, sequential_thinking_used
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+        ON CONFLICT (project_id, merge_request_iid)
+        DO UPDATE SET
+          merged_at = EXCLUDED.merged_at,
+          closed_at = EXCLUDED.closed_at,
+          cycle_time_hours = EXCLUDED.cycle_time_hours,
+          review_time_hours = EXCLUDED.review_time_hours,
+          first_response_time_hours = EXCLUDED.first_response_time_hours,
+          critical_issues_count = EXCLUDED.critical_issues_count,
+          total_review_comments = EXCLUDED.total_review_comments,
+          was_approved = EXCLUDED.was_approved,
+          required_rework = EXCLUDED.required_rework,
+          code_quality_score = EXCLUDED.code_quality_score,
+          has_notion_context = EXCLUDED.has_notion_context,
+          review_mode = EXCLUDED.review_mode,
+          sequential_thinking_used = EXCLUDED.sequential_thinking_used
+        RETURNING id
+      `, [
+        analytics.projectId, analytics.mergeRequestIid, analytics.developerId, analytics.developerUsername,
+        analytics.title, analytics.sourceBranch, analytics.targetBranch, analytics.createdAt,
+        analytics.mergedAt, analytics.closedAt, analytics.linesAdded, analytics.linesRemoved,
+        analytics.filesChanged, analytics.complexityScore, analytics.cycleTimeHours,
+        analytics.reviewTimeHours, analytics.firstResponseTimeHours, analytics.criticalIssuesCount,
+        analytics.totalReviewComments, analytics.wasApproved, analytics.requiredRework,
+        analytics.codeQualityScore, analytics.hasNotionContext, analytics.reviewMode,
+        analytics.sequentialThinkingUsed
+      ]);
+
+      return result.rows[0].id;
+    } catch (error) {
+      console.error('Error saving merge request analytics:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Save review feedback analytics data
+   */
+  async saveReviewFeedbackAnalytics(feedback: ReviewFeedbackAnalytics): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO review_feedback_analytics (
+          merge_request_analytics_id, project_id, merge_request_iid,
+          feedback_type, category, severity, feedback_text, file_path, line_number,
+          was_addressed, resolution_time_hours, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `, [
+        feedback.mergeRequestAnalyticsId, feedback.projectId, feedback.mergeRequestIid,
+        feedback.feedbackType, feedback.category, feedback.severity, feedback.feedbackText,
+        feedback.filePath, feedback.lineNumber, feedback.wasAddressed, feedback.resolutionTimeHours,
+        feedback.createdAt
+      ]);
+    } catch (error) {
+      console.error('Error saving review feedback analytics:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update or create developer metrics for a specific date
+   */
+  async updateDeveloperMetrics(metrics: DeveloperMetrics): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO developer_metrics (
+          developer_id, developer_username, developer_email, project_id, metric_date,
+          mrs_created, mrs_merged, mrs_closed, total_lines_added, total_lines_removed,
+          total_files_changed, avg_cycle_time_hours, avg_review_time_hours,
+          critical_issues_count, total_review_comments, approval_rate, rework_rate,
+          code_quality_score, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        ON CONFLICT (developer_id, project_id, metric_date)
+        DO UPDATE SET
+          mrs_created = EXCLUDED.mrs_created,
+          mrs_merged = EXCLUDED.mrs_merged,
+          mrs_closed = EXCLUDED.mrs_closed,
+          total_lines_added = EXCLUDED.total_lines_added,
+          total_lines_removed = EXCLUDED.total_lines_removed,
+          total_files_changed = EXCLUDED.total_files_changed,
+          avg_cycle_time_hours = EXCLUDED.avg_cycle_time_hours,
+          avg_review_time_hours = EXCLUDED.avg_review_time_hours,
+          critical_issues_count = EXCLUDED.critical_issues_count,
+          total_review_comments = EXCLUDED.total_review_comments,
+          approval_rate = EXCLUDED.approval_rate,
+          rework_rate = EXCLUDED.rework_rate,
+          code_quality_score = EXCLUDED.code_quality_score,
+          updated_at = EXCLUDED.updated_at
+      `, [
+        metrics.developerId, metrics.developerUsername, metrics.developerEmail, metrics.projectId,
+        metrics.metricDate, metrics.mrsCreated, metrics.mrsMerged, metrics.mrsClosed,
+        metrics.totalLinesAdded, metrics.totalLinesRemoved, metrics.totalFilesChanged,
+        metrics.avgCycleTimeHours, metrics.avgReviewTimeHours, metrics.criticalIssuesCount,
+        metrics.totalReviewComments, metrics.approvalRate, metrics.reworkRate,
+        metrics.codeQualityScore, metrics.createdAt, metrics.updatedAt
+      ]);
+    } catch (error) {
+      console.error('Error updating developer metrics:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get merge request analytics by project and MR IID
+   */
+  async getMergeRequestAnalytics(projectId: number, mergeRequestIid: number): Promise<MergeRequestAnalytics | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query(`
+        SELECT * FROM merge_request_analytics
+        WHERE project_id = $1 AND merge_request_iid = $2
+      `, [projectId, mergeRequestIid]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        mergeRequestIid: row.merge_request_iid,
+        developerId: row.developer_id,
+        developerUsername: row.developer_username,
+        title: row.title,
+        sourceBranch: row.source_branch,
+        targetBranch: row.target_branch,
+        createdAt: row.created_at,
+        mergedAt: row.merged_at,
+        closedAt: row.closed_at,
+        linesAdded: row.lines_added,
+        linesRemoved: row.lines_removed,
+        filesChanged: row.files_changed,
+        complexityScore: row.complexity_score,
+        cycleTimeHours: row.cycle_time_hours,
+        reviewTimeHours: row.review_time_hours,
+        firstResponseTimeHours: row.first_response_time_hours,
+        criticalIssuesCount: row.critical_issues_count,
+        totalReviewComments: row.total_review_comments,
+        wasApproved: row.was_approved,
+        requiredRework: row.required_rework,
+        codeQualityScore: row.code_quality_score,
+        hasNotionContext: row.has_notion_context,
+        reviewMode: row.review_mode,
+        sequentialThinkingUsed: row.sequential_thinking_used
+      };
+    } catch (error) {
+      console.error('Error getting merge request analytics:', error);
       throw error;
     } finally {
       client.release();

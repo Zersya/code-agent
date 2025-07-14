@@ -17,6 +17,14 @@ import {
   mapProjectToDocumentation,
   getProjectDocumentationMappings
 } from './controllers/documentation.js';
+import {
+  getDeveloperMetrics,
+  getProjectMetrics,
+  getMergeRequestAnalytics,
+  getAnalyticsSummary,
+  getTopPerformers,
+  getAnalyticsTrends
+} from './controllers/analytics.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 
@@ -59,6 +67,14 @@ app.post('/api/documentation/sources/:id/reembed', apiAuth, reembedDocumentation
 // Project documentation mapping API
 app.post('/api/projects/:projectId/documentation', apiAuth, mapProjectToDocumentation);
 app.get('/api/projects/:projectId/documentation', apiAuth, getProjectDocumentationMappings);
+
+// Analytics API endpoints
+app.get('/api/analytics/developers/:developerId/projects/:projectId/metrics', apiAuth, getDeveloperMetrics);
+app.get('/api/analytics/projects/:projectId/metrics', apiAuth, getProjectMetrics);
+app.get('/api/analytics/projects/:projectId/merge-requests/:mergeRequestIid', apiAuth, getMergeRequestAnalytics);
+app.get('/api/analytics/projects/:projectId/summary', apiAuth, getAnalyticsSummary);
+app.get('/api/analytics/projects/:projectId/top-performers', apiAuth, getTopPerformers);
+app.get('/api/analytics/projects/:projectId/trends', apiAuth, getAnalyticsTrends);
 
 // Webhook processing statistics API
 app.get('/api/webhook/stats', apiAuth, async (_req, res) => {
