@@ -65,6 +65,20 @@ const qodoApi = axios.create({
 
 export class EmbeddingService {
   /**
+   * Check the health status of the embedding service
+   * @returns Promise<boolean> True if the service is healthy and model is loaded
+   */
+  async checkEmbeddingServiceHealth(): Promise<boolean> {
+    try {
+      const response = await qodoApi.get('/health');
+      return response.data?.model_status === 'loaded';
+    } catch (error) {
+      console.error('Failed to check embedding service health:', error);
+      return false;
+    }
+  }
+
+  /**
    * Check if a file should be processed based on its extension or name
    * @param filePath The path of the file to check
    * @returns True if the file should be processed, false otherwise
@@ -180,12 +194,32 @@ export class EmbeddingService {
         if (job.status === JobStatus.COMPLETED) {
           console.log(`Embedding process completed successfully for project ${projectId}`);
           return true;
+        } else if (job.status === JobStatus.FAILED) {
+          const errorMessage = job.error || 'Unknown error';
+
+          // Check if the failure is due to embedding service being unavailable
+          if (errorMessage.includes('Embedding service unavailable') ||
+              errorMessage.includes('model may not be loaded')) {
+            console.error(`Embedding process failed for project ${projectId} due to service unavailability: ${errorMessage}`);
+            console.log(`This is likely a temporary issue. The embedding can be retried later when the service is available.`);
+          } else {
+            console.error(`Embedding process failed for project ${projectId}: ${errorMessage}`);
+          }
+          return false;
         } else {
           console.warn(`Embedding process did not complete successfully for project ${projectId}: ${job.status}`);
           return false;
         }
       } catch (error) {
         console.error(`Error checking and embedding project ${projectId}:`, error);
+
+        // Check if the error is related to embedding service unavailability
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Embedding service unavailable') ||
+            errorMessage.includes('model may not be loaded')) {
+          console.log(`Project ${projectId} embedding failed due to service unavailability. This can be retried later.`);
+        }
+
         return false;
       }
     }
@@ -272,18 +306,51 @@ export class EmbeddingService {
           input: text,
         });
 
-        return response.data.data[0].embedding;
+        // Validate response structure
+        if (!response.data) {
+          throw new Error('Invalid response: missing data property');
+        }
+
+        if (!response.data.data || !Array.isArray(response.data.data)) {
+          throw new Error('Invalid response: data.data is not an array');
+        }
+
+        if (response.data.data.length === 0) {
+          throw new Error('Embedding service returned empty data array - model may not be loaded or available');
+        }
+
+        const embeddingData = response.data.data[0];
+        if (!embeddingData) {
+          throw new Error('Invalid response: first embedding data is undefined');
+        }
+
+        if (!embeddingData.embedding || !Array.isArray(embeddingData.embedding)) {
+          throw new Error('Invalid response: embedding property is missing or not an array');
+        }
+
+        if (embeddingData.embedding.length === 0) {
+          throw new Error('Invalid response: embedding array is empty');
+        }
+
+        return embeddingData.embedding;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error generating embedding (attempt ${retries + 1}/${maxRetries + 1}):`, error);
+
+        // Log more detailed error information
+        if (error instanceof Error && error.message.includes('model may not be loaded')) {
+          console.error(`Embedding service model not available (attempt ${retries + 1}/${maxRetries + 1}): ${error.message}`);
+        } else {
+          console.error(`Error generating embedding (attempt ${retries + 1}/${maxRetries + 1}):`, error);
+        }
 
         // Check if we should retry
         if (retries >= maxRetries) {
           break;
         }
 
-        // Exponential backoff with jitter
-        const baseDelay = Math.pow(2, retries) * 1000;
+        // For model not loaded errors, use longer delays
+        const isModelError = error instanceof Error && error.message.includes('model may not be loaded');
+        const baseDelay = isModelError ? Math.pow(2, retries) * 5000 : Math.pow(2, retries) * 1000; // 5x longer for model errors
         const jitter = Math.random() * 1000;
         const delay = baseDelay + jitter;
 
@@ -294,8 +361,12 @@ export class EmbeddingService {
       }
     }
 
-    // If we've exhausted all retries, throw the last error
-    throw lastError || new Error('Failed to generate embedding after multiple attempts');
+    // If we've exhausted all retries, throw the last error with more context
+    const contextualError = lastError || new Error('Failed to generate embedding after multiple attempts');
+    if (lastError && lastError.message.includes('model may not be loaded')) {
+      throw new Error(`Embedding service unavailable: ${lastError.message}. Please ensure the Qodo embedding service is running and the model is properly loaded.`);
+    }
+    throw contextualError;
   }
 
   /**
@@ -313,6 +384,12 @@ export class EmbeddingService {
     const failedFiles: { file: CodeFile, error: string }[] = [];
 
     console.log(`Starting embedding generation for ${files.length} files with batch size ${batchSize}`);
+
+    // Check embedding service health before processing
+    const isHealthy = await this.checkEmbeddingServiceHealth();
+    if (!isHealthy) {
+      console.warn('Embedding service is not healthy or model is not loaded. Attempting to proceed with retries...');
+    }
 
     // Log file extension statistics
     const extensionStats = this.getFileExtensionStats(files);

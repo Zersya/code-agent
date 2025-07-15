@@ -287,7 +287,15 @@ export class DocumentationService {
 
           embeddings.push(docEmbedding);
         } catch (error) {
-          console.error(`Error generating embedding for section ${section.section}:`, error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          if (errorMessage.includes('Embedding service unavailable') ||
+              errorMessage.includes('model may not be loaded')) {
+            console.error(`Error generating embedding for section ${section.section} - embedding service unavailable:`, errorMessage);
+            console.log(`Documentation embedding will be skipped for this section and can be retried later.`);
+          } else {
+            console.error(`Error generating embedding for section ${section.section}:`, error);
+          }
         }
       }
 

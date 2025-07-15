@@ -631,15 +631,24 @@ export class QueueService {
         lastError = error instanceof Error ? error : new Error(String(error));
         retries++;
 
+        // Check if this is an embedding service unavailable error
+        const isServiceUnavailable = lastError.message.includes('Embedding service unavailable') ||
+                                   lastError.message.includes('model may not be loaded');
+
         if (retries >= maxRetries) {
-          console.error(`Failed to generate embeddings after ${maxRetries} attempts:`, error);
-          throw lastError;
+          if (isServiceUnavailable) {
+            console.error(`Embedding service is unavailable after ${maxRetries} attempts. This may be due to the model not being loaded or the service being down.`);
+            throw new Error(`Embedding service unavailable: ${lastError.message}. Please check if the Qodo embedding service is running and the model is properly loaded.`);
+          } else {
+            console.error(`Failed to generate embeddings after ${maxRetries} attempts:`, error);
+            throw lastError;
+          }
         }
 
-        // Exponential backoff
-        const delay = Math.pow(2, retries) * 1000;
-        console.log(`Retrying embedding generation in ${delay}ms (attempt ${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // Use longer delays for service unavailable errors
+        const baseDelay = isServiceUnavailable ? Math.pow(2, retries) * 5000 : Math.pow(2, retries) * 1000;
+        console.log(`Retrying embedding generation in ${baseDelay}ms (attempt ${retries + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, baseDelay));
       }
     }
 
