@@ -5,6 +5,7 @@
  */
 export enum JobStatus {
   PENDING = 'pending',
+  DELAYED = 'delayed',
   PROCESSING = 'processing',
   COMPLETED = 'completed',
   FAILED = 'failed',
@@ -27,6 +28,7 @@ export interface EmbeddingJob {
   updatedAt: Date;
   startedAt?: Date;
   completedAt?: Date;
+  scheduledFor?: Date;
   priority: number;
   isReembedding?: boolean;
 }

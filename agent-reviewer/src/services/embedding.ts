@@ -5,13 +5,54 @@ import { gitlabService } from './gitlab.js';
 import { dbService } from './database.js';
 import { queueService } from './queue.js';
 import { repositoryService } from './repository.js';
+import { schedulingService } from './scheduling.js';
 import { JobStatus } from '../models/queue.js';
 import { v4 as uuidv4 } from 'uuid';
 import { CodeFile, CodeEmbedding } from '../models/embedding.js';
 
+// Custom error types for better error handling
+export class UnrecoverableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnrecoverableError';
+  }
+}
+
+export class ServiceUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+  }
+}
+
+// Health check result interface
+export interface HealthCheckResult {
+  isHealthy: boolean;
+  canEmbed: boolean;
+  modelLoaded: boolean;
+  error?: string;
+  lastChecked: Date;
+}
+
+// Circuit breaker state
+export interface CircuitBreakerState {
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  failureCount: number;
+  lastFailureTime?: Date;
+  nextRetryTime?: Date;
+}
+
 dotenv.config();
 
 const QODO_EMBED_API_URL = process.env.QODO_EMBED_API_URL || 'http://localhost:8000/v1/embeddings';
+
+// Circuit breaker configuration
+const CIRCUIT_BREAKER_THRESHOLD = parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || '5');
+const CIRCUIT_BREAKER_TIMEOUT = parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT || '60000'); // 1 minute
+const HEALTH_CHECK_CACHE_TTL = parseInt(process.env.HEALTH_CHECK_CACHE_TTL || '30000'); // 30 seconds
+
+// Test embedding text for health checks
+const TEST_EMBEDDING_TEXT = 'function test() { return "hello world"; }';
 
 // Default list of allowed file extensions if not specified in environment variables
 const DEFAULT_ALLOWED_EXTENSIONS = [
@@ -64,18 +105,139 @@ const qodoApi = axios.create({
 });
 
 export class EmbeddingService {
+  private circuitBreakerState: CircuitBreakerState = {
+    state: 'CLOSED',
+    failureCount: 0
+  };
+
+  private healthCheckCache: HealthCheckResult | null = null;
+
   /**
-   * Check the health status of the embedding service
-   * @returns Promise<boolean> True if the service is healthy and model is loaded
+   * Check the health status of the embedding service with comprehensive testing
+   * @returns Promise<HealthCheckResult> Detailed health status including embedding capability
    */
-  async checkEmbeddingServiceHealth(): Promise<boolean> {
+  async checkEmbeddingServiceHealth(): Promise<HealthCheckResult> {
+    // Return cached result if still valid
+    if (this.healthCheckCache &&
+        Date.now() - this.healthCheckCache.lastChecked.getTime() < HEALTH_CHECK_CACHE_TTL) {
+      return this.healthCheckCache;
+    }
+
+    const result: HealthCheckResult = {
+      isHealthy: false,
+      canEmbed: false,
+      modelLoaded: false,
+      lastChecked: new Date()
+    };
+
     try {
-      const response = await qodoApi.get('/health');
-      return response.data?.model_status === 'loaded';
+      // First check basic health endpoint
+      const healthResponse = await qodoApi.get('/health');
+      result.modelLoaded = healthResponse.data?.model_status === 'loaded';
+
+      if (!result.modelLoaded) {
+        result.error = 'Model not loaded according to health endpoint';
+        this.healthCheckCache = result;
+        return result;
+      }
+
+      // Test actual embedding capability with a small test
+      try {
+        const testResponse = await qodoApi.post('', {
+          model: 'qodo-embed-1',
+          input: TEST_EMBEDDING_TEXT,
+        });
+
+        // Validate test response
+        if (testResponse.data?.data?.length > 0 &&
+            testResponse.data.data[0]?.embedding?.length > 0) {
+          result.isHealthy = true;
+          result.canEmbed = true;
+
+          // Reset circuit breaker on successful health check
+          this.resetCircuitBreaker();
+        } else {
+          result.error = 'Test embedding returned invalid response structure';
+        }
+      } catch (embeddingError) {
+        result.error = `Test embedding failed: ${embeddingError instanceof Error ? embeddingError.message : String(embeddingError)}`;
+      }
+
     } catch (error) {
+      result.error = `Health check failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('Failed to check embedding service health:', error);
+    }
+
+    // Cache the result
+    this.healthCheckCache = result;
+
+    // Update circuit breaker state if unhealthy
+    if (!result.isHealthy) {
+      this.recordFailure();
+    }
+
+    return result;
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * @returns Promise<boolean> True if the service is healthy and can embed
+   */
+  async checkEmbeddingServiceHealthLegacy(): Promise<boolean> {
+    const result = await this.checkEmbeddingServiceHealth();
+    return result.isHealthy && result.canEmbed;
+  }
+
+  /**
+   * Record a failure for circuit breaker logic
+   */
+  private recordFailure(): void {
+    this.circuitBreakerState.failureCount++;
+    this.circuitBreakerState.lastFailureTime = new Date();
+
+    if (this.circuitBreakerState.failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+      this.circuitBreakerState.state = 'OPEN';
+      this.circuitBreakerState.nextRetryTime = new Date(Date.now() + CIRCUIT_BREAKER_TIMEOUT);
+      console.warn(`Circuit breaker opened after ${this.circuitBreakerState.failureCount} failures. Next retry at: ${this.circuitBreakerState.nextRetryTime}`);
+    }
+  }
+
+  /**
+   * Reset circuit breaker to closed state
+   */
+  private resetCircuitBreaker(): void {
+    this.circuitBreakerState = {
+      state: 'CLOSED',
+      failureCount: 0
+    };
+  }
+
+  /**
+   * Check if circuit breaker allows requests
+   */
+  private isCircuitBreakerOpen(): boolean {
+    if (this.circuitBreakerState.state === 'CLOSED') {
       return false;
     }
+
+    if (this.circuitBreakerState.state === 'OPEN') {
+      if (this.circuitBreakerState.nextRetryTime && Date.now() >= this.circuitBreakerState.nextRetryTime.getTime()) {
+        this.circuitBreakerState.state = 'HALF_OPEN';
+        console.log('Circuit breaker moved to HALF_OPEN state for testing');
+        return false;
+      }
+      return true;
+    }
+
+    // HALF_OPEN state allows one request to test recovery
+    return false;
+  }
+
+  /**
+   * Get current circuit breaker state for monitoring
+   */
+  getCircuitBreakerState(): CircuitBreakerState {
+    return { ...this.circuitBreakerState };
   }
 
   /**
@@ -171,9 +333,12 @@ export class EmbeddingService {
           return false;
         }
 
-        // Queue the project for embedding with high priority
+        // Queue the project for embedding with high priority and automatic scheduling
         const processingId = uuidv4();
-        await queueService.addJob(projectId, project.web_url, processingId, 10);
+        await queueService.addJob(projectId, project.web_url, processingId, 10, false, {
+          isAutomatic: true,
+          forceImmediate: waitForCompletion // Force immediate if waiting for completion
+        });
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 
@@ -250,9 +415,12 @@ export class EmbeddingService {
       const reembeddingTimestamp = new Date();
       await dbService.updateLastReembeddingTimestamp(projectId, reembeddingTimestamp);
 
-      // Queue the project for re-embedding with high priority
+      // Queue the project for re-embedding with high priority and automatic scheduling
       const processingId = uuidv4();
-      await queueService.addJob(projectId, repositoryUrl, processingId, 10, true); // High priority, mark as re-embedding
+      await queueService.addJob(projectId, repositoryUrl, processingId, 10, true, {
+        isAutomatic: true,
+        forceImmediate: forceReembedding // Force immediate if explicitly requested
+      }); // High priority, mark as re-embedding
 
       console.log(`Project ${projectId} queued for re-embedding after merge (processingId: ${processingId})`);
 
@@ -293,9 +461,14 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embeddings for a single code file with retry logic
+   * Generate embeddings for a single code file with retry logic and circuit breaker
    */
   async generateEmbedding(text: string, maxRetries: number = 3): Promise<number[]> {
+    // Check circuit breaker before attempting
+    if (this.isCircuitBreakerOpen()) {
+      throw new ServiceUnavailableError('Embedding service circuit breaker is open - service temporarily unavailable');
+    }
+
     let retries = 0;
     let lastError: Error | null = null;
 
@@ -316,7 +489,7 @@ export class EmbeddingService {
         }
 
         if (response.data.data.length === 0) {
-          throw new Error('Embedding service returned empty data array - model may not be loaded or available');
+          throw new UnrecoverableError('Embedding service returned empty data array - model may not be loaded or available');
         }
 
         const embeddingData = response.data.data[0];
@@ -332,25 +505,54 @@ export class EmbeddingService {
           throw new Error('Invalid response: embedding array is empty');
         }
 
+        // Success - reset circuit breaker if in HALF_OPEN state
+        if (this.circuitBreakerState.state === 'HALF_OPEN') {
+          this.resetCircuitBreaker();
+          console.log('Circuit breaker reset to CLOSED after successful request');
+        }
+
         return embeddingData.embedding;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Log more detailed error information
-        if (error instanceof Error && error.message.includes('model may not be loaded')) {
-          console.error(`Embedding service model not available (attempt ${retries + 1}/${maxRetries + 1}): ${error.message}`);
+        // Classify error types
+        const isModelNotLoadedError = lastError.message.includes('model may not be loaded') ||
+                                     lastError.message.includes('empty data array');
+        const isNetworkError = lastError.message.includes('ECONNREFUSED') ||
+                              lastError.message.includes('timeout') ||
+                              lastError.message.includes('ENOTFOUND');
+
+        // Log error with classification
+        if (isModelNotLoadedError) {
+          console.error(`Embedding service model not available (attempt ${retries + 1}/${maxRetries + 1}): ${lastError.message}`);
+        } else if (isNetworkError) {
+          console.error(`Network error connecting to embedding service (attempt ${retries + 1}/${maxRetries + 1}): ${lastError.message}`);
         } else {
           console.error(`Error generating embedding (attempt ${retries + 1}/${maxRetries + 1}):`, error);
         }
 
+        // For UnrecoverableError, don't retry
+        if (error instanceof UnrecoverableError) {
+          this.recordFailure();
+          throw error;
+        }
+
         // Check if we should retry
         if (retries >= maxRetries) {
+          this.recordFailure();
           break;
         }
 
-        // For model not loaded errors, use longer delays
-        const isModelError = error instanceof Error && error.message.includes('model may not be loaded');
-        const baseDelay = isModelError ? Math.pow(2, retries) * 5000 : Math.pow(2, retries) * 1000; // 5x longer for model errors
+        // Calculate delay based on error type
+        let baseDelay: number;
+        if (isModelNotLoadedError) {
+          baseDelay = Math.pow(2, retries) * 5000; // 5x longer for model errors
+        } else if (isNetworkError) {
+          baseDelay = Math.pow(2, retries) * 2000; // 2x longer for network errors
+        } else {
+          baseDelay = Math.pow(2, retries) * 1000; // Standard exponential backoff
+        }
+
         const jitter = Math.random() * 1000;
         const delay = baseDelay + jitter;
 
@@ -361,12 +563,20 @@ export class EmbeddingService {
       }
     }
 
-    // If we've exhausted all retries, throw the last error with more context
-    const contextualError = lastError || new Error('Failed to generate embedding after multiple attempts');
-    if (lastError && lastError.message.includes('model may not be loaded')) {
-      throw new Error(`Embedding service unavailable: ${lastError.message}. Please ensure the Qodo embedding service is running and the model is properly loaded.`);
+    // If we've exhausted all retries, classify and throw appropriate error
+    if (lastError) {
+      if (lastError.message.includes('model may not be loaded') ||
+          lastError.message.includes('empty data array')) {
+        throw new UnrecoverableError(`Embedding service model not loaded: ${lastError.message}. Please ensure the Qodo embedding service is running and the model is properly loaded.`);
+      } else if (lastError.message.includes('ECONNREFUSED') ||
+                 lastError.message.includes('ENOTFOUND')) {
+        throw new ServiceUnavailableError(`Cannot connect to embedding service: ${lastError.message}. Please check if the service is running.`);
+      } else {
+        throw new ServiceUnavailableError(`Embedding service unavailable after ${maxRetries + 1} attempts: ${lastError.message}`);
+      }
     }
-    throw contextualError;
+
+    throw new ServiceUnavailableError('Failed to generate embedding after multiple attempts');
   }
 
   /**
@@ -386,9 +596,19 @@ export class EmbeddingService {
     console.log(`Starting embedding generation for ${files.length} files with batch size ${batchSize}`);
 
     // Check embedding service health before processing
-    const isHealthy = await this.checkEmbeddingServiceHealth();
-    if (!isHealthy) {
-      console.warn('Embedding service is not healthy or model is not loaded. Attempting to proceed with retries...');
+    const healthResult = await this.checkEmbeddingServiceHealth();
+    if (!healthResult.isHealthy || !healthResult.canEmbed) {
+      const errorMsg = `Embedding service is not ready: ${healthResult.error || 'Unknown error'}`;
+      console.error(errorMsg);
+
+      // If circuit breaker is open or model is not loaded, fail fast
+      if (this.isCircuitBreakerOpen() || !healthResult.modelLoaded) {
+        throw new UnrecoverableError(errorMsg);
+      }
+
+      console.warn('Embedding service health check failed, but attempting to proceed with retries...');
+    } else {
+      console.log('Embedding service health check passed - model is loaded and ready');
     }
 
     // Log file extension statistics

@@ -76,9 +76,12 @@ export class ContextService {
         // Save project metadata
         await dbService.saveProjectMetadata(newProjectMetadata);
 
-        // Queue the project for embedding with high priority
+        // Queue the project for embedding with high priority and automatic scheduling
         const processingId = uuidv4();
-        await queueService.addJob(projectId, project.web_url, processingId, 10);
+        await queueService.addJob(projectId, project.web_url, processingId, 10, false, {
+          isAutomatic: true,
+          forceImmediate: WAIT_FOR_EMBEDDINGS // Force immediate if waiting for embeddings
+        });
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 
@@ -122,9 +125,12 @@ export class ContextService {
       if (!hasEmbeddings) {
         console.log(`Project ${projectId} exists but has no embeddings, triggering embedding process`);
 
-        // Queue the project for embedding with high priority
+        // Queue the project for embedding with high priority and automatic scheduling
         const processingId = uuidv4();
-        await queueService.addJob(projectId, projectMetadata.url, processingId, 10);
+        await queueService.addJob(projectId, projectMetadata.url, processingId, 10, false, {
+          isAutomatic: true,
+          forceImmediate: WAIT_FOR_EMBEDDINGS // Force immediate if waiting for embeddings
+        });
 
         console.log(`Project ${projectId} queued for embedding (processingId: ${processingId})`);
 

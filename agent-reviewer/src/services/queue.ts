@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { EmbeddingJob, DocumentationJob, JobStatus, JobResult, QueueConfig } from '../models/queue.js';
 import { dbService } from './database.js';
 import { repositoryService } from './repository.js';
-import { embeddingService } from './embedding.js';
+import { embeddingService, UnrecoverableError, ServiceUnavailableError } from './embedding.js';
+import { schedulingService, SchedulingOptions } from './scheduling.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 import dotenv from 'dotenv';
 import { GitLabPushEvent } from '../types/webhook.js';
@@ -104,28 +105,56 @@ export class QueueService {
   }
 
   /**
-   * Add a job to the queue
+   * Add a job to the queue with optional scheduling
    */
-  async addJob(projectId: number, repositoryUrl: string, processingId: string, priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL, isReembedding: boolean = false): Promise<EmbeddingJob> {
+  async addJob(
+    projectId: number,
+    repositoryUrl: string,
+    processingId: string,
+    priority: number = DEFAULT_QUEUE_CONFIG.priorityLevels.NORMAL,
+    isReembedding: boolean = false,
+    schedulingOptions?: SchedulingOptions
+  ): Promise<EmbeddingJob> {
     try {
+      // Determine scheduling if options provided
+      let scheduledFor: Date | undefined;
+      let actualStatus = JobStatus.PENDING;
+
+      if (schedulingOptions) {
+        const schedulingResult = schedulingService.shouldScheduleForMidnight(schedulingOptions);
+
+        if (schedulingResult.shouldSchedule) {
+          scheduledFor = schedulingResult.scheduledTime;
+          actualStatus = JobStatus.DELAYED;
+          console.log(`Job scheduled for midnight WIB: ${schedulingResult.reason}`);
+        } else {
+          console.log(`Job will be processed immediately: ${schedulingResult.reason}`);
+        }
+      }
+
       const job: EmbeddingJob = {
         id: uuidv4(),
         repositoryUrl,
         processingId,
-        status: JobStatus.PENDING,
+        status: actualStatus,
         attempts: 0,
         maxAttempts: this.config.maxAttempts,
         createdAt: new Date(),
         updatedAt: new Date(),
         priority,
         projectId,
-        isReembedding
+        isReembedding,
+        scheduledFor
       };
 
       // Save the job to the database
       await this.saveJob(job);
 
-      console.log(`Added job ${job.id} to the queue for repository ${repositoryUrl}`);
+      if (scheduledFor) {
+        console.log(`Added scheduled job ${job.id} to the queue for repository ${repositoryUrl} - scheduled for ${scheduledFor.toISOString()}`);
+      } else {
+        console.log(`Added job ${job.id} to the queue for repository ${repositoryUrl}`);
+      }
 
       // Start processing if not already processing
       if (!this.isProcessing) {
@@ -347,7 +376,7 @@ export class QueueService {
   }
 
   /**
-   * Get next pending jobs up to concurrency limit
+   * Get next pending jobs up to concurrency limit, including delayed jobs that are ready
    */
   private async getNextPendingJobs(): Promise<EmbeddingJob[]> {
     const client = await dbService.getClient();
@@ -358,13 +387,18 @@ export class QueueService {
           id, repository_url as "repositoryUrl", processing_id as "processingId",
           status, attempts, max_attempts as "maxAttempts", error,
           created_at as "createdAt", updated_at as "updatedAt",
-          started_at as "startedAt", completed_at as "completedAt", priority, project_id as "projectId",
+          started_at as "startedAt", completed_at as "completedAt",
+          scheduled_for as "scheduledFor", priority, project_id as "projectId",
           is_reembedding as "isReembedding"
         FROM embedding_jobs
-        WHERE status = $1 OR (status = $2 AND updated_at < NOW() - INTERVAL '1 minute' * attempts)
+        WHERE (
+          status = $1 OR
+          (status = $2 AND updated_at < NOW() - INTERVAL '1 minute' * attempts) OR
+          (status = $3 AND (scheduled_for IS NULL OR scheduled_for <= NOW()))
+        )
         ORDER BY priority DESC, created_at ASC
-        LIMIT $3
-      `, [JobStatus.PENDING, JobStatus.RETRYING, this.config.concurrency - this.activeJobs.size]);
+        LIMIT $4
+      `, [JobStatus.PENDING, JobStatus.RETRYING, JobStatus.DELAYED, this.config.concurrency - this.activeJobs.size]);
 
       return result.rows as EmbeddingJob[];
     } finally {
@@ -607,7 +641,7 @@ export class QueueService {
   }
 
   /**
-   * Generate embeddings with retry logic
+   * Generate embeddings with retry logic and improved error handling
    */
   private async generateEmbeddingsWithRetry(
     files: any[],
@@ -629,31 +663,108 @@ export class QueueService {
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Handle UnrecoverableError - don't retry
+        if (error instanceof UnrecoverableError) {
+          console.error(`Unrecoverable error in embedding generation: ${error.message}`);
+          throw error;
+        }
+
+        // Handle ServiceUnavailableError - retry with backoff
+        if (error instanceof ServiceUnavailableError) {
+          console.error(`Service unavailable error (attempt ${retries + 1}/${maxRetries}): ${error.message}`);
+        } else {
+          console.error(`Error generating embeddings (attempt ${retries + 1}/${maxRetries}):`, error);
+        }
+
         retries++;
 
-        // Check if this is an embedding service unavailable error
-        const isServiceUnavailable = lastError.message.includes('Embedding service unavailable') ||
-                                   lastError.message.includes('model may not be loaded');
-
+        // Check if we should retry
         if (retries >= maxRetries) {
-          if (isServiceUnavailable) {
-            console.error(`Embedding service is unavailable after ${maxRetries} attempts. This may be due to the model not being loaded or the service being down.`);
-            throw new Error(`Embedding service unavailable: ${lastError.message}. Please check if the Qodo embedding service is running and the model is properly loaded.`);
+          if (error instanceof ServiceUnavailableError) {
+            console.error(`Embedding service is unavailable after ${maxRetries} attempts: ${error.message}`);
+            throw new ServiceUnavailableError(`Embedding service unavailable after ${maxRetries} attempts: ${error.message}. Please check if the Qodo embedding service is running and the model is properly loaded.`);
           } else {
             console.error(`Failed to generate embeddings after ${maxRetries} attempts:`, error);
             throw lastError;
           }
         }
 
-        // Use longer delays for service unavailable errors
-        const baseDelay = isServiceUnavailable ? Math.pow(2, retries) * 5000 : Math.pow(2, retries) * 1000;
+        // Calculate delay based on error type
+        let baseDelay: number;
+        if (error instanceof ServiceUnavailableError) {
+          baseDelay = Math.pow(2, retries) * 5000; // Longer delays for service issues
+        } else {
+          baseDelay = Math.pow(2, retries) * 1000; // Standard exponential backoff
+        }
+
         console.log(`Retrying embedding generation in ${baseDelay}ms (attempt ${retries + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, baseDelay));
       }
     }
 
     // This should never be reached due to the throw in the catch block
-    throw lastError || new Error('Failed to generate embeddings');
+    throw lastError || new ServiceUnavailableError('Failed to generate embeddings after multiple attempts');
+  }
+
+  /**
+   * Get queue statistics for monitoring
+   */
+  async getQueueStatistics(): Promise<{
+    pending: number;
+    delayed: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    retrying: number;
+    oldestPendingJob?: Date;
+    oldestProcessingJob?: Date;
+  }> {
+    const client = await dbService.getClient();
+
+    try {
+      const result = await client.query(`
+        SELECT
+          status,
+          COUNT(*) as count,
+          MIN(created_at) as oldest_created_at,
+          MIN(started_at) as oldest_started_at
+        FROM embedding_jobs
+        GROUP BY status
+      `);
+
+      const stats = {
+        pending: 0,
+        delayed: 0,
+        processing: 0,
+        completed: 0,
+        failed: 0,
+        retrying: 0,
+        oldestPendingJob: undefined as Date | undefined,
+        oldestProcessingJob: undefined as Date | undefined
+      };
+
+      for (const row of result.rows) {
+        const status = row.status;
+        const count = parseInt(row.count);
+
+        if (status in stats) {
+          (stats as any)[status] = count;
+        }
+
+        // Track oldest jobs
+        if (status === 'pending' && row.oldest_created_at) {
+          stats.oldestPendingJob = new Date(row.oldest_created_at);
+        }
+        if (status === 'processing' && row.oldest_started_at) {
+          stats.oldestProcessingJob = new Date(row.oldest_started_at);
+        }
+      }
+
+      return stats;
+    } finally {
+      client.release();
+    }
   }
 
   /**

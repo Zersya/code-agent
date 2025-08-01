@@ -302,6 +302,17 @@ class DatabaseService {
           console.log('Column is_reembedding might already exist:', error);
         }
 
+        // Add the scheduled_for column if it doesn't exist (migration for scheduling)
+        try {
+          await client.query(`
+            ALTER TABLE embedding_jobs
+            ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMP WITH TIME ZONE
+          `);
+        } catch (error) {
+          // Column might already exist, ignore the error
+          console.log('Column scheduled_for might already exist:', error);
+        }
+
         // Create documentation_jobs table if it doesn't exist
         await client.query(`
           CREATE TABLE IF NOT EXISTS documentation_jobs (

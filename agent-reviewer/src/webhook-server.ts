@@ -19,6 +19,7 @@ import {
 } from './controllers/documentation.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
+import { monitoringService } from './services/monitoring.js';
 
 dotenv.config();
 
@@ -30,9 +31,50 @@ app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Health check endpoint
+// Health check endpoints
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Comprehensive system health endpoint
+app.get('/health/system', async (_req, res) => {
+  try {
+    const systemHealth = await monitoringService.getSystemHealth();
+    const statusCode = systemHealth.overall === 'healthy' ? 200 :
+                      systemHealth.overall === 'degraded' ? 200 : 503;
+    res.status(statusCode).json(systemHealth);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get system health',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Embedding service metrics endpoint
+app.get('/health/embedding', async (_req, res) => {
+  try {
+    const metrics = await monitoringService.getEmbeddingMetrics();
+    res.status(200).json(metrics);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get embedding metrics',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Queue statistics endpoint
+app.get('/health/queue', async (_req, res) => {
+  try {
+    const stats = await monitoringService.getQueueStatistics();
+    res.status(200).json(stats);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get queue statistics',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
 });
 
 // Webhook endpoint
@@ -91,6 +133,9 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`Webhook server running on port ${PORT}`);
+
+      // Start periodic monitoring
+      monitoringService.startPeriodicMonitoring(5); // Every 5 minutes
     });
   } catch (error) {
     console.error('Failed to start server:', error);
