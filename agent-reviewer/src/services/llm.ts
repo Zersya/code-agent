@@ -198,6 +198,8 @@ Please analyze these code snippets and provide a comprehensive review that:
 5. Suggests how I might use or adapt this code for my needs
 
 Focus on being thorough but concise, and prioritize the most relevant aspects of the code to my query.
+
+Ensure to give the user only the **Summary & Recommendation** section of your analysis, do not include any other sections.
 `;
   }
 }
