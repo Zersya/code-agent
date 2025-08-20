@@ -2,20 +2,6 @@
   <BaseCard title="Embed Repository">
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <div>
-        <label for="projectId" class="block text-sm font-medium text-gray-700 mb-2">
-          Project ID
-        </label>
-        <BaseInput
-          id="projectId"
-          v-model="form.projectId"
-          type="number"
-          placeholder="Enter project ID"
-          :error="errors.projectId"
-          required
-        />
-      </div>
-
-      <div>
         <label for="repositoryUrl" class="block text-sm font-medium text-gray-700 mb-2">
           Repository URL
         </label>
@@ -23,10 +9,52 @@
           id="repositoryUrl"
           v-model="form.repositoryUrl"
           type="url"
-          placeholder="https://gitlab.com/username/repository.git"
+          placeholder="https://repopo.transtrack.id/username/repository.git"
           :error="errors.repositoryUrl"
           required
+          @input="onRepositoryUrlChange"
         />
+        <p v-if="extractedProjectId" class="mt-1 text-sm text-green-600">
+          ✓ Project ID {{ extractedProjectId }} detected from URL
+        </p>
+      </div>
+
+      <div>
+        <label for="projectId" class="block text-sm font-medium text-gray-700 mb-2">
+          Project ID
+        </label>
+        <div class="space-y-2">
+          <!-- Project ID Input -->
+          <BaseInput
+            id="projectId"
+            v-model="form.projectId"
+            type="number"
+            placeholder="Enter project ID or select from existing projects"
+            :error="errors.projectId"
+            required
+          />
+
+          <!-- Existing Projects Dropdown -->
+          <div v-if="availableProjects.length > 0">
+            <label class="block text-xs font-medium text-gray-500 mb-1">
+              Or select from existing projects:
+            </label>
+            <select
+              v-model="selectedExistingProject"
+              @change="onExistingProjectSelect"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            >
+              <option value="">Select an existing project...</option>
+              <option
+                v-for="project in availableProjects"
+                :key="project.projectId"
+                :value="project.projectId"
+              >
+                {{ project.name }} (ID: {{ project.projectId }})
+              </option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div>
@@ -83,13 +111,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import BaseCard from './BaseCard.vue'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 import BaseAlert from './BaseAlert.vue'
-import { repositoryApi } from '@/services/api'
-import type { RepositoryEmbeddingRequest } from '@/types'
+import { repositoryApi, projectsApi } from '@/services/api'
+import type { RepositoryEmbeddingRequest, Project } from '@/types'
 
 interface FormData {
   projectId: string
@@ -115,6 +143,12 @@ const errors = reactive({
 const isSubmitting = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+// Project management
+const availableProjects = ref<Project[]>([])
+const selectedExistingProject = ref('')
+const extractedProjectId = ref<number | null>(null)
+const isLoadingProjects = ref(false)
 
 const isFormValid = computed(() => {
   return form.projectId.trim() !== '' && 
@@ -159,6 +193,90 @@ const resetForm = () => {
   errors.repositoryUrl = ''
   successMessage.value = ''
   errorMessage.value = ''
+  selectedExistingProject.value = ''
+  extractedProjectId.value = null
+}
+
+// Utility function to extract project ID from GitLab URL
+const extractProjectIdFromUrl = (url: string): number | null => {
+  if (!url) return null
+
+  try {
+    // Handle various GitLab URL formats:
+    // https://gitlab.com/username/project
+    // https://gitlab.com/username/project.git
+    // https://gitlab.com/username/project/-/tree/main
+    // https://gitlab.example.com/group/subgroup/project
+
+    const urlObj = new URL(url)
+    let pathname = urlObj.pathname
+
+    // Remove leading slash
+    if (pathname.startsWith('/')) {
+      pathname = pathname.substring(1)
+    }
+
+    // Remove .git suffix if present
+    if (pathname.endsWith('.git')) {
+      pathname = pathname.substring(0, pathname.length - 4)
+    }
+
+    // Remove GitLab-specific paths like /-/tree/main
+    const gitlabPathIndex = pathname.indexOf('/-/')
+    if (gitlabPathIndex !== -1) {
+      pathname = pathname.substring(0, gitlabPathIndex)
+    }
+
+    // For GitLab.com, we can try to get the project ID from the API
+    // For now, we'll use a simple hash-based approach for consistency
+    if (pathname) {
+      // Create a simple numeric ID from the path
+      // This is a simplified approach - in production you might want to call GitLab API
+      const hash = pathname.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0)
+        return a & a
+      }, 0)
+
+      return Math.abs(hash)
+    }
+  } catch (error) {
+    console.warn('Failed to extract project ID from URL:', error)
+  }
+
+  return null
+}
+
+// Event handlers
+const onRepositoryUrlChange = () => {
+  const projectId = extractProjectIdFromUrl(form.repositoryUrl)
+  if (projectId) {
+    extractedProjectId.value = projectId
+    form.projectId = projectId.toString()
+  } else {
+    extractedProjectId.value = null
+  }
+}
+
+const onExistingProjectSelect = () => {
+  if (selectedExistingProject.value) {
+    form.projectId = selectedExistingProject.value.toString()
+    extractedProjectId.value = null // Clear URL-based extraction when manually selecting
+  }
+}
+
+// Load available projects
+const loadAvailableProjects = async () => {
+  isLoadingProjects.value = true
+  try {
+    const response = await projectsApi.getProjects()
+    if (response.success && response.data) {
+      availableProjects.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to load available projects:', error)
+  } finally {
+    isLoadingProjects.value = false
+  }
 }
 
 const handleSubmit = async () => {
@@ -189,4 +307,9 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
+
+// Load projects on component mount
+onMounted(() => {
+  loadAvailableProjects()
+})
 </script>

@@ -24,8 +24,21 @@ logger.info(f"FastAPI application startup: Attempting to load model '{MODEL_NAME
 logger.info("This may take a while if the model needs to be downloaded...")
 start_time = time.time()
 try:
-    # trust_remote_code is needed for Qodo models
-    model_instance = SentenceTransformer(MODEL_NAME, trust_remote_code=("Qodo" in MODEL_NAME), device=DEVICE)
+    # Try loading with trust_remote_code parameter (for sentence-transformers >= 2.3.0)
+    # Fall back to loading without it for older versions
+    try:
+        # trust_remote_code is needed for Qodo models
+        model_instance = SentenceTransformer(MODEL_NAME, trust_remote_code=("Qodo" in MODEL_NAME), device=DEVICE)
+        logger.info(f"Model loaded with trust_remote_code parameter")
+    except TypeError as te:
+        if "trust_remote_code" in str(te):
+            logger.warning(f"trust_remote_code parameter not supported in this sentence-transformers version. Trying without it...")
+            # Fallback for older sentence-transformers versions
+            model_instance = SentenceTransformer(MODEL_NAME, device=DEVICE)
+            logger.info(f"Model loaded without trust_remote_code parameter (fallback mode)")
+        else:
+            raise te
+
     end_time = time.time()
     logger.info(f"Model '{MODEL_NAME}' loaded successfully on device '{DEVICE}' in {end_time - start_time:.2f} seconds.")
 except Exception as e:
