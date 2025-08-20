@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
-import { adminAuth } from './admin-auth';
+import { adminAuth } from './admin-auth.js';
 
 dotenv.config();
 
