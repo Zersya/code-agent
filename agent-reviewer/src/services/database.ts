@@ -505,9 +505,11 @@ class DatabaseService {
 
   async saveEmbeddings(embeddings: CodeEmbedding[]): Promise<void> {
     if (embeddings.length === 0) {
+      console.log('saveEmbeddings called with empty array, skipping');
       return;
     }
 
+    console.log(`saveEmbeddings called with ${embeddings.length} embeddings for project ${embeddings[0]?.projectId}`);
     const client = await this.pool.connect();
 
     try {
@@ -587,6 +589,7 @@ class DatabaseService {
 
       // Commit the transaction
       await client.query('COMMIT');
+      console.log(`Successfully saved ${embeddings.length} embeddings to database for project ${embeddings[0]?.projectId}`);
     } catch (error) {
       // Rollback the transaction in case of error
       await client.query('ROLLBACK');

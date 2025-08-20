@@ -244,8 +244,8 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     }
 
     // Get all files from the source branch
-    console.log(`Fetching files for GitLab project ${gitlabProjectId} at branch ${sourceBranch}`);
-    const files = await gitlabService.getAllFiles(gitlabProjectId, sourceBranch);
+    console.log(`Fetching files for project ${projectId} at branch ${sourceBranch}`);
+    const files = await gitlabService.getAllFiles(projectId, sourceBranch);
 
     if (files.length === 0) {
       console.log('No files found, skipping');

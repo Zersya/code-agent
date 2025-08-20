@@ -640,6 +640,17 @@ export class QueueService {
 
       console.log(`Generated ${embeddings.length} embeddings, saving to database`);
 
+      // Log detailed information about the embeddings being saved
+      if (embeddings.length > 0) {
+        console.log(`Saving embeddings for project ${projectId}:`);
+        console.log(`- Repository URL: ${repositoryUrl}`);
+        console.log(`- Commit ID: ${commitId}`);
+        console.log(`- Branch: ${branch}`);
+        console.log(`- Sample file paths: ${embeddings.slice(0, 3).map(e => e.filePath).join(', ')}`);
+      } else {
+        console.warn(`No embeddings generated for project ${projectId}. This might indicate an issue with file processing or filtering.`);
+      }
+
       // Save embeddings to database
       await dbService.saveEmbeddings(embeddings);
 

@@ -54,7 +54,11 @@ export class GitLabService {
 
       return response.data;
     } catch (error) {
-      console.error(`Error fetching file content for ${filePath}:`, error);
+      console.error(`Error fetching file content for ${filePath} in project ${projectId} at ref ${ref}:`, error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error(`GitLab API response status: ${axiosError.response?.status}, message: ${axiosError.response?.statusText}`);
+      }
       return '';
     }
   }

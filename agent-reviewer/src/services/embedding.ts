@@ -665,6 +665,18 @@ export class EmbeddingService {
 
     console.log(`Found ${validFiles.length} valid files for embedding after all filtering steps`);
 
+    if (validFiles.length === 0) {
+      console.warn(`No valid files found for embedding for project ${projectId}:`);
+      console.warn(`- Total files received: ${files.length}`);
+      console.warn(`- Files after extension filtering: ${extensionFilteredFiles.length}`);
+      console.warn(`- Files after content filtering: ${validFiles.length}`);
+      if (files.length > 0) {
+        console.warn(`- Sample file paths: ${files.slice(0, 5).map(f => f.path).join(', ')}`);
+        console.warn(`- Sample file extensions: ${files.slice(0, 5).map(f => path.extname(f.path) || '[no extension]').join(', ')}`);
+      }
+      return [];
+    }
+
     // Process files in batches
     for (let i = 0; i < validFiles.length; i += batchSize) {
       const batch = validFiles.slice(i, i + batchSize);
