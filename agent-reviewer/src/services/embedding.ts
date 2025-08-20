@@ -104,6 +104,14 @@ const qodoApi = axios.create({
   },
 });
 
+// Separate axios instance for health checks (base service URL without /v1/embeddings)
+const qodoHealthApi = axios.create({
+  baseURL: QODO_EMBED_API_URL.replace('/v1/embeddings', ''),
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 export class EmbeddingService {
   private circuitBreakerState: CircuitBreakerState = {
     state: 'CLOSED',
@@ -132,7 +140,7 @@ export class EmbeddingService {
 
     try {
       // First check basic health endpoint
-      const healthResponse = await qodoApi.get('/health');
+      const healthResponse = await qodoHealthApi.get('/health');
       result.modelLoaded = healthResponse.data?.model_status === 'loaded';
 
       if (!result.modelLoaded) {
