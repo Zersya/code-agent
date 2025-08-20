@@ -39,7 +39,7 @@ class OpenRouterProvider implements LlmProvider {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000', // Required by OpenRouter
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:9080', // Required by OpenRouter
       },
     });
   }

@@ -32,7 +32,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "${DASHBOARD_PORT:-3000}:80"
+      - "${DASHBOARD_PORT:-3030}:3000"
     depends_on:
       - agent-reviewer-backend
     restart: unless-stopped
