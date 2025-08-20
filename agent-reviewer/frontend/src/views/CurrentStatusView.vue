@@ -198,7 +198,7 @@ const jobColumns = [
   { key: 'priority', label: 'Priority', sortable: false },
   { key: 'attempts', label: 'Attempts', sortable: false },
   { key: 'isReembedding', label: 'Type', sortable: false },
-  { key: 'createdAt', label: 'Created', sortable: false, type: 'date', format: 'MMM dd, HH:mm' }
+  { key: 'createdAt', label: 'Created', sortable: false, type: 'date' as const, format: 'MMM dd, HH:mm' }
 ]
 
 const successRate = computed(() => {

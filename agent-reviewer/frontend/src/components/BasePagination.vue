@@ -46,7 +46,7 @@
           <template v-for="page in visiblePages" :key="page">
             <button
               v-if="page !== '...'"
-              @click="$emit('page-change', page)"
+              @click="$emit('page-change', page as any)"
               :class="[
                 'relative inline-flex items-center px-4 py-2 border text-sm font-medium',
                 page === currentPage

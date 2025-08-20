@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue/dist/vue.js'
+import { ref } from 'vue'
 import type { ReviewRecord, PaginationParams, FilterParams } from '@/types'
 import { reviewsApi } from '@/services/api'
 

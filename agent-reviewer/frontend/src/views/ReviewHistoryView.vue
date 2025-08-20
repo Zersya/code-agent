@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useReviewsStore } from '@/stores/reviews'
 import { projectsApi } from '@/services/api'
 import type { Project } from '@/types'
@@ -180,9 +180,9 @@ const columns = [
   { key: 'projectName', label: 'Project', sortable: true },
   { key: 'mergeRequestIid', label: 'MR', sortable: true },
   { key: 'lastReviewedCommitSha', label: 'Commit', sortable: false },
-  { key: 'reviewedAt', label: 'Reviewed At', sortable: true, type: 'date' },
+  { key: 'reviewedAt', label: 'Reviewed At', sortable: true, type: 'date' as const },
   { key: 'status', label: 'Status', sortable: true },
-  { key: 'criticalIssuesCount', label: 'Issues', sortable: true, type: 'number' },
+  { key: 'criticalIssuesCount', label: 'Issues', sortable: true, type: 'number' as const },
   { key: 'reviewerType', label: 'Type', sortable: true }
 ]
 
@@ -201,7 +201,7 @@ const applyFilters = async () => {
     limit: reviewsStore.pagination.limit,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
-    ...filters
+    ...filters as any
   })
 }
 
@@ -225,20 +225,20 @@ const handleSort = async (column: string) => {
   await applyFilters()
 }
 
-const handlePageChange = async (page: number) => {
+const handlePageChange = async (page: number): Promise<void> => {
   await reviewsStore.fetchReviews({
     page,
     limit: reviewsStore.pagination.limit,
     sortBy: sortBy.value,
     sortOrder: sortOrder.value,
-    ...filters
+    ...filters as any
   })
 }
 
 const exportReviews = async () => {
   isExporting.value = true
   try {
-    await reviewsStore.exportReviews(filters)
+    await reviewsStore.exportReviews(filters as any)
   } finally {
     isExporting.value = false
   }

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue/dist/vue.js'
+import { ref } from 'vue'
 import type { AnalyticsData } from '@/types'
 import { analyticsApi } from '@/services/api'
 
