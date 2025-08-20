@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
+import { adminAuth } from './admin-auth';
 
 dotenv.config();
 
@@ -16,6 +17,13 @@ if (!API_KEY) {
  * This middleware verifies that the token matches our configured API key
  */
 export const apiAuth = (req: Request, res: Response, next: NextFunction): void => {
+  // If request has authorization header, delegate to adminAuth middleware
+  if (req.headers.authorization) {
+    adminAuth(req, res, next);
+    return;
+  }
+
+
   // Skip authentication if API key is not configured
   if (!API_KEY) {
     console.warn('API authentication skipped: API_KEY not configured');
