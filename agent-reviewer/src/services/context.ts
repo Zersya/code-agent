@@ -378,7 +378,7 @@ export class ContextService {
       const detectionResult = documentationService.detectFrameworks(changes);
       const frameworks = detectionResult.frameworks.length > 0
         ? detectionResult.frameworks
-        : validSources.map(s => s.framework);
+        : validSources.map((s: any) => s.framework);
 
       // Generate embeddings for the changes to find relevant documentation
       const relevantSections: DocumentationEmbedding[] = [];
@@ -413,7 +413,7 @@ export class ContextService {
         frameworks,
         totalSections: relevantSections.length,
         averageRelevanceScore,
-        sources: validSources
+        sources: validSources as any
       };
     } catch (error) {
       console.error(`Error getting documentation context for project ${projectId}:`, error);

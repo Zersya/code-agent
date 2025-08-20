@@ -109,7 +109,7 @@ export const getReviewHistory = async (req: Request, res: Response): Promise<voi
       FROM merge_request_reviews mrr
       LEFT JOIN projects p ON mrr.project_id = p.project_id
       ${whereClause}
-      ORDER BY mrr.${pagination.sortBy} ${pagination.sortOrder.toUpperCase()}
+      ORDER BY mrr.${pagination.sortBy} ${pagination?.sortOrder?.toUpperCase()}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
