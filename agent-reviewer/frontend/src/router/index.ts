@@ -5,6 +5,8 @@ import DashboardView from '@/views/DashboardView.vue'
 import ReviewHistoryView from '@/views/ReviewHistoryView.vue'
 import CurrentStatusView from '@/views/CurrentStatusView.vue'
 import AnalyticsView from '@/views/AnalyticsView.vue'
+import RepositoryEmbeddingView from '@/views/RepositoryEmbeddingView.vue'
+import DocumentationManagementView from '@/views/DocumentationManagementView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
@@ -41,6 +43,16 @@ const router = createRouter({
           path: '/analytics',
           name: 'Analytics',
           component: AnalyticsView
+        },
+        {
+          path: '/repository-embedding',
+          name: 'RepositoryEmbedding',
+          component: RepositoryEmbeddingView
+        },
+        {
+          path: '/documentation',
+          name: 'DocumentationManagement',
+          component: DocumentationManagementView
         }
       ]
     },

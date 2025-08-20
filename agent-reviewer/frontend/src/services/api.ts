@@ -1,16 +1,24 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios'
-import type { 
-  LoginCredentials, 
-  AuthResponse, 
-  ReviewRecord, 
-  PaginationParams, 
-  FilterParams, 
+import type {
+  LoginCredentials,
+  AuthResponse,
+  ReviewRecord,
+  PaginationParams,
+  FilterParams,
   ApiResponse,
   QueueStats,
   QueueJob,
   SystemHealth,
   AnalyticsData,
-  Project
+  Project,
+  RepositoryEmbeddingRequest,
+  RepositoryEmbeddingResponse,
+  RepositoryEmbeddingStatus,
+  DocumentationSource,
+  DocumentationSourceRequest,
+  DocumentationSourceResponse,
+  DocumentationEmbeddingRequest,
+  ProjectDocumentationMapping
 } from '@/types'
 
 class ApiClient {
@@ -148,6 +156,45 @@ export const analyticsApi = {
 export const projectsApi = {
   getProjects: (): Promise<ApiResponse<Project[]>> =>
     apiClient.get<Project[]>('/projects'),
+}
+
+// Repository Embedding API
+export const repositoryApi = {
+  embedRepository: (data: RepositoryEmbeddingRequest): Promise<ApiResponse<RepositoryEmbeddingResponse>> =>
+    apiClient.post<RepositoryEmbeddingResponse>('/repositories/embed', data),
+
+  getEmbeddingStatus: (processingId: string): Promise<ApiResponse<RepositoryEmbeddingStatus>> =>
+    apiClient.get<RepositoryEmbeddingStatus>(`/repositories/status/${processingId}`),
+
+  getQueueStatus: (params?: PaginationParams): Promise<ApiResponse<{ stats: QueueStats; jobs: QueueJob[] }>> =>
+    apiClient.get<{ stats: QueueStats; jobs: QueueJob[] }>('/queue/status', params),
+}
+
+// Documentation API
+export const documentationApi = {
+  getSources: (params?: { framework?: string; active?: boolean }): Promise<DocumentationSourceResponse> =>
+    apiClient.get<DocumentationSourceResponse>('/documentation/sources', params),
+
+  getSource: (id: string): Promise<DocumentationSourceResponse> =>
+    apiClient.get<DocumentationSourceResponse>(`/documentation/sources/${id}`),
+
+  addSource: (data: DocumentationSourceRequest): Promise<DocumentationSourceResponse> =>
+    apiClient.post<DocumentationSourceResponse>('/documentation/sources', data),
+
+  updateSource: (id: string, data: Partial<DocumentationSourceRequest>): Promise<DocumentationSourceResponse> =>
+    apiClient.put<DocumentationSourceResponse>(`/documentation/sources/${id}`, data),
+
+  deleteSource: (id: string): Promise<ApiResponse<void>> =>
+    apiClient.delete<void>(`/documentation/sources/${id}`),
+
+  reembedSource: (id: string): Promise<ApiResponse<{ message: string }>> =>
+    apiClient.post<{ message: string }>(`/documentation/sources/${id}/reembed`),
+
+  getProjectMappings: (projectId: number): Promise<ApiResponse<ProjectDocumentationMapping[]>> =>
+    apiClient.get<ProjectDocumentationMapping[]>(`/projects/${projectId}/documentation`),
+
+  mapProjectToDocumentation: (projectId: number, data: { sourceId: string; priority: number; isEnabled: boolean }): Promise<ApiResponse<ProjectDocumentationMapping>> =>
+    apiClient.post<ProjectDocumentationMapping>(`/projects/${projectId}/documentation`, data),
 }
 
 export default apiClient

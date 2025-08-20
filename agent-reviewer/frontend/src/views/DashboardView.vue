@@ -146,13 +146,78 @@
         </div>
       </div>
 
+      <!-- Embedding System Overview -->
+      <div v-if="analyticsStore.analytics.embeddingMetrics" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Code Embeddings Card -->
+        <div class="card">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Code Embeddings</h3>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="text-center">
+                <div class="text-2xl font-bold text-blue-600">
+                  {{ analyticsStore.analytics.embeddingMetrics.codeEmbeddings.totalFiles.toLocaleString() }}
+                </div>
+                <div class="text-sm text-gray-500">Total Files</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-green-600">
+                  {{ analyticsStore.analytics.embeddingMetrics.codeEmbeddings.totalProjects.toLocaleString() }}
+                </div>
+                <div class="text-sm text-gray-500">Projects</div>
+              </div>
+            </div>
+            <div class="mt-4">
+              <router-link
+                to="/repository-embedding"
+                class="text-primary-600 hover:text-primary-800 text-sm font-medium"
+              >
+                Manage Repository Embeddings →
+              </router-link>
+            </div>
+          </div>
+        </div>
+
+        <!-- Documentation Embeddings Card -->
+        <div class="card">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Documentation Embeddings</h3>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600">
+                  {{ analyticsStore.analytics.embeddingMetrics.documentationEmbeddings.totalSections.toLocaleString() }}
+                </div>
+                <div class="text-sm text-gray-500">Total Sections</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-indigo-600">
+                  {{ analyticsStore.analytics.embeddingMetrics.documentationEmbeddings.totalSources.toLocaleString() }}
+                </div>
+                <div class="text-sm text-gray-500">Sources</div>
+              </div>
+            </div>
+            <div class="mt-4">
+              <router-link
+                to="/documentation"
+                class="text-primary-600 hover:text-primary-800 text-sm font-medium"
+              >
+                Manage Documentation Sources →
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Quick Actions -->
       <div class="card">
         <div class="px-6 py-4 border-b border-gray-200">
           <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
         </div>
         <div class="p-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <router-link
               to="/reviews"
               class="btn btn-secondary btn-md w-full justify-center"
@@ -170,6 +235,18 @@
               class="btn btn-secondary btn-md w-full justify-center"
             >
               View Analytics
+            </router-link>
+            <router-link
+              to="/repository-embedding"
+              class="btn btn-secondary btn-md w-full justify-center"
+            >
+              Repository Embedding
+            </router-link>
+            <router-link
+              to="/documentation"
+              class="btn btn-secondary btn-md w-full justify-center"
+            >
+              Documentation
             </router-link>
             <button
               @click="refreshData"

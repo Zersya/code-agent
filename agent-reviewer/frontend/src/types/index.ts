@@ -210,3 +210,79 @@ export interface ApiResponse<T> {
     totalPages: number
   }
 }
+
+// Repository Embedding Types
+export interface RepositoryEmbeddingRequest {
+  projectId: number
+  repositoryUrl: string
+  priority?: 'high' | 'normal' | 'low'
+}
+
+export interface RepositoryEmbeddingResponse {
+  message: string
+  processingId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying'
+}
+
+export interface RepositoryEmbeddingStatus {
+  processingId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying'
+  repositoryUrl: string
+  createdAt: string
+  updatedAt: string
+  startedAt?: string
+  completedAt?: string
+  attempts: number
+  maxAttempts: number
+  error?: string
+}
+
+// Documentation Management Types
+export interface DocumentationSource {
+  id: string
+  name: string
+  description: string
+  url: string
+  framework: string
+  version?: string
+  isActive: boolean
+  refreshIntervalDays: number
+  lastFetchedAt?: string
+  lastEmbeddedAt?: string
+  fetchStatus: 'pending' | 'fetching' | 'completed' | 'failed'
+  fetchError?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DocumentationSourceRequest {
+  name: string
+  description?: string
+  url: string
+  framework: string
+  version?: string
+  isActive?: boolean
+  refreshIntervalDays?: number
+}
+
+export interface DocumentationSourceResponse {
+  success: boolean
+  source?: DocumentationSource
+  sources?: DocumentationSource[]
+  total?: number
+  message?: string
+  error?: string
+}
+
+export interface DocumentationEmbeddingRequest {
+  sourceId: string
+}
+
+export interface ProjectDocumentationMapping {
+  projectId: number
+  sourceId: string
+  isEnabled: boolean
+  priority: number
+  createdAt: string
+  updatedAt: string
+}
