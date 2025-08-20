@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from typing import List, Union, Optional # Added Optional
@@ -62,32 +62,33 @@ async def create_embeddings(request: EmbeddingRequest):
     global model_instance
     if model_instance is None:
         logger.error("Model is not loaded or failed to load. Cannot process embedding request.")
-        # from fastapi import HTTPException
-        # raise HTTPException(status_code=503, detail="Model not available")
-        # For now, returning an empty response or a specific error structure:
-        requested_model_name = request.model if request.model else MODEL_NAME
-        return EmbeddingResponse(data=[], model=requested_model_name, usage=UsageData(prompt_tokens=0, total_tokens=0))
+        raise HTTPException(status_code=503, detail="Model not available")
 
     input_texts = [request.input] if isinstance(request.input, str) else request.input
-    
-    # Generate embeddings
-    embeddings = model_instance.encode(input_texts)
 
-    response_data: List[EmbeddingData] = []
-    for i, emb_vector in enumerate(embeddings):
-        response_data.append(EmbeddingData(embedding=emb_vector.tolist(), index=i))
+    try:
+        # Generate embeddings with error handling
+        embeddings = model_instance.encode(input_texts)
 
-    # Basic token counting (very approximate)
-    prompt_tokens = sum(len(text.split()) for text in input_texts)
-    total_tokens = prompt_tokens
-    
-    current_model_name = request.model if request.model else MODEL_NAME
+        response_data: List[EmbeddingData] = []
+        for i, emb_vector in enumerate(embeddings):
+            response_data.append(EmbeddingData(embedding=emb_vector.tolist(), index=i))
 
-    return EmbeddingResponse(
-        data=response_data,
-        model=current_model_name,
-        usage=UsageData(prompt_tokens=prompt_tokens, total_tokens=total_tokens)
-    )
+        # Basic token counting (very approximate)
+        prompt_tokens = sum(len(text.split()) for text in input_texts)
+        total_tokens = prompt_tokens
+
+        current_model_name = request.model if request.model else MODEL_NAME
+
+        return EmbeddingResponse(
+            data=response_data,
+            model=current_model_name,
+            usage=UsageData(prompt_tokens=prompt_tokens, total_tokens=total_tokens)
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating embeddings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
 
 # --- Health Check (Updated) ---
 @app.get("/health")
