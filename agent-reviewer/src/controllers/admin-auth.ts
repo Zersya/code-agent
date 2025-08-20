@@ -84,7 +84,9 @@ export const getAdminUser = async (req: AuthenticatedRequest, res: Response): Pr
 
     res.json({
       success: true,
-      user: req.user
+      data: {
+        user: req.user
+      }
     });
   } catch (error) {
     console.error('Get admin user error:', error);

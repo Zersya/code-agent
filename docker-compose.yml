@@ -97,7 +97,7 @@ services:
     build:
       context: ./agent-reviewer/frontend
       dockerfile: Dockerfile
-    container_name: agent_reviewer_dashboard
+    container_name: agent_reviewer
     ports:
       - "${DASHBOARD_PORT:-3030}:3000"
     depends_on:
