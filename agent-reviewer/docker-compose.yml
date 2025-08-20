@@ -1,12 +1,10 @@
 version: '3.8'
 
 services:
-  webhook-server:
+  agent-reviewer-backend:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
     environment:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
@@ -16,6 +14,8 @@ services:
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - API_KEY=${API_KEY}
       - APP_URL=${APP_URL}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET}
       - QODO_EMBED_API_KEY=${QODO_EMBED_API_KEY}
       - QODO_EMBED_API_URL=${QODO_EMBED_API_URL}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -24,8 +24,22 @@ services:
     volumes:
       - ./temp:/app/temp
     restart: unless-stopped
+    networks:
+      - agent-reviewer-network
 
-networks: 
-  default:
-    name: qodo_network
+  agent-reviewer-dashboard:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    depends_on:
+      - agent-reviewer-backend
+    restart: unless-stopped
+    networks:
+      - agent-reviewer-network
+
+networks:
+  agent-reviewer-network:
+    driver: bridge
 

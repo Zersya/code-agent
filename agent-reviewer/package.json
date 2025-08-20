@@ -13,14 +13,17 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
+    "test:dashboard": "node test-dashboard.js",
     "setup:documentation": "ts-node scripts/setup-documentation.ts"
   },
   "dependencies": {
     "@notionhq/client": "^2.3.0",
     "axios": "^1.9.0",
     "cors": "^2.8.5",
+    "date-fns": "^3.0.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pg": "^8.11.3",
     "pg-format": "^1.0.4",
@@ -29,6 +32,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.5",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.15.17",
     "@types/pg": "^8.10.9",

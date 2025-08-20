@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { webhookAuth } from './middleware/webhook-auth.js';
 import { apiAuth } from './middleware/api-auth.js';
+import { adminAuth } from './middleware/admin-auth.js';
 import { processWebhook } from './controllers/webhook.js';
 import { processRepository, getRepositoryStatus, getQueueStatus } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
@@ -17,6 +18,9 @@ import {
   mapProjectToDocumentation,
   getProjectDocumentationMappings
 } from './controllers/documentation.js';
+import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.js';
+import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
+import { getAnalytics, getSystemHealth } from './controllers/admin-analytics.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 import { monitoringService } from './services/monitoring.js';
@@ -112,6 +116,20 @@ app.get('/api/webhook/stats', apiAuth, async (_req, res) => {
     res.status(500).json({ error: 'Failed to get webhook statistics' });
   }
 });
+
+// Admin Dashboard API endpoints
+// Authentication endpoints
+app.post('/api/auth/login', adminLogin);
+app.post('/api/auth/logout', adminAuth, adminLogout);
+app.get('/api/auth/me', adminAuth, getAdminUser);
+
+// Review history endpoints
+app.get('/api/reviews', adminAuth, getReviewHistory);
+app.get('/api/reviews/export', adminAuth, exportReviewHistory);
+
+// Analytics endpoints
+app.get('/api/analytics', adminAuth, getAnalytics);
+app.get('/api/system/health', adminAuth, getSystemHealth);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

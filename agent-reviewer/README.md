@@ -15,6 +15,7 @@ A webhook integration that listens for GitLab repository events, fetches code, g
 - **Merge Request Approval**: Automatically approves merge requests that meet quality standards
 - **Automatic Re-embedding**: Automatically re-embeds projects when merge requests are successfully merged
 - **Emoji-Triggered Re-reviews**: Automatically triggers re-reviews when developers add emoji reactions to bot comments
+- **Admin Dashboard**: Comprehensive web-based dashboard for monitoring and managing the review system
 
 ## Prerequisites
 
@@ -78,6 +79,49 @@ A webhook integration that listens for GitLab repository events, fetches code, g
    ```bash
    npm run build
    ```
+
+## Admin Dashboard
+
+The system includes a comprehensive web-based admin dashboard for monitoring and managing the review automation system.
+
+### Dashboard Features
+
+- **Overview Dashboard**: System health, key metrics, and quick actions
+- **Review History**: Complete history with filtering, search, and export capabilities
+- **Current Status**: Real-time system status and queue monitoring
+- **Analytics**: Review trends, performance metrics, and insights
+
+### Accessing the Dashboard
+
+1. **With Docker Compose** (Recommended):
+   ```bash
+   docker-compose up -d
+   ```
+   Access at: **http://localhost:8080**
+   - All frontend routes (/, /login, /reviews, etc.) served directly
+   - All API routes (/api/*, /webhook, /health) automatically proxied to backend
+   - Single unified interface - no need to access backend directly
+
+2. **Manual Setup** (Development):
+   ```bash
+   # Start backend
+   npm run start:webhook
+
+   # Start frontend (in another terminal)
+   cd frontend
+   npm run dev
+   ```
+   Access at: http://localhost:5173 (with proxy to backend)
+
+### Authentication
+
+Login using the admin secret key configured in your `.env` file:
+```bash
+ADMIN_SECRET_KEY='your-secure-admin-key'
+JWT_SECRET='your-jwt-secret'
+```
+
+For detailed deployment instructions, see [DASHBOARD_DEPLOYMENT.md](./DASHBOARD_DEPLOYMENT.md).
 
 ## Usage
 

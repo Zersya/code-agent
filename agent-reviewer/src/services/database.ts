@@ -26,6 +26,13 @@ class DatabaseService {
   }
 
   /**
+   * Execute a query with parameters
+   */
+  async query(text: string, params?: any[]) {
+    return await this.pool.query(text, params);
+  }
+
+  /**
    * Check if content contains binary data that might cause database issues
    */
   private containsBinaryData(content: string): boolean {
