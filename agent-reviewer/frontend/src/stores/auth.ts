@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { User, LoginCredentials, AuthResponse } from '@/types'
+import { ref, computed } from 'vue/dist/vue.js'
+import type { User, LoginCredentials } from '@/types'
 import { authApi } from '@/services/api'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -52,8 +52,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response = await authApi.me()
-      if (response.success && response.user) {
-        user.value = response.user
+      if (response.success && response.data?.user) {
+        user.value = response.data.user
         return true
       } else {
         await logout()

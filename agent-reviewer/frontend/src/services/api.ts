@@ -96,6 +96,10 @@ class ApiClient {
       return this.handleError(error)
     }
   }
+
+  async getRaw(url: string, params?: any, config?: any): Promise<any> {
+    return this.client.get(url, { params, ...config })
+  }
 }
 
 const apiClient = new ApiClient()
@@ -118,8 +122,7 @@ export const reviewsApi = {
     apiClient.get<ReviewRecord[]>('/reviews', params),
   
   exportReviews: async (params: FilterParams): Promise<string> => {
-    const response = await apiClient.client.get('/reviews/export', { 
-      params,
+    const response = await apiClient.getRaw('/reviews/export', params, {
       responseType: 'text'
     })
     return response.data

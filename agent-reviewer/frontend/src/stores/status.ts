@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref } from 'vue/dist/vue.js'
 import type { QueueJob, QueueStats, SystemHealth } from '@/types'
 import { statusApi } from '@/services/api'
 

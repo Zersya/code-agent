@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { ReviewRecord, PaginationParams, FilterParams, ApiResponse } from '@/types'
+import { ref } from 'vue/dist/vue.js'
+import type { ReviewRecord, PaginationParams, FilterParams } from '@/types'
 import { reviewsApi } from '@/services/api'
 
 export const useReviewsStore = defineStore('reviews', () => {
@@ -14,7 +14,7 @@ export const useReviewsStore = defineStore('reviews', () => {
     totalPages: 0
   })
 
-  const fetchReviews = async (params: PaginationParams & FilterParams = {}) => {
+  const fetchReviews = async (params: PaginationParams & FilterParams = { page: 1, limit: 20 }) => {
     isLoading.value = true
     error.value = null
 

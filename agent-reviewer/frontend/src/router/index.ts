@@ -1,5 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import LoginView from '@/views/LoginView.vue'
+import DashboardView from '@/views/DashboardView.vue'
+import ReviewHistoryView from '@/views/ReviewHistoryView.vue'
+import CurrentStatusView from '@/views/CurrentStatusView.vue'
+import AnalyticsView from '@/views/AnalyticsView.vue'
+import NotFoundView from '@/views/NotFoundView.vue'
+import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -7,48 +14,48 @@ const router = createRouter({
     {
       path: '/login',
       name: 'Login',
-      component: () => import('@/views/LoginView.vue'),
+      component: LoginView,
       meta: { requiresGuest: true }
     },
     {
       path: '/',
-      component: () => import('@/layouts/DashboardLayout.vue'),
+      component: DashboardLayout,
       meta: { requiresAuth: true },
       children: [
         {
           path: '',
           name: 'Dashboard',
-          component: () => import('@/views/DashboardView.vue')
+          component: DashboardView
         },
         {
           path: '/reviews',
           name: 'ReviewHistory',
-          component: () => import('@/views/ReviewHistoryView.vue')
+          component: ReviewHistoryView
         },
         {
           path: '/status',
           name: 'CurrentStatus',
-          component: () => import('@/views/CurrentStatusView.vue')
+          component: CurrentStatusView
         },
         {
           path: '/analytics',
           name: 'Analytics',
-          component: () => import('@/views/AnalyticsView.vue')
+          component: AnalyticsView
         }
       ]
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
-      component: () => import('@/views/NotFoundView.vue')
+      component: NotFoundView
     }
   ]
 })
 
 // Navigation guards
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
-  
+
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
