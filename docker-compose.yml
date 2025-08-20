@@ -111,7 +111,7 @@ services:
     environment:
       - HF_HOME=/cache/huggingface
       - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B
-      - DEVICE=cpu
+      - DEVICE=cuda
     volumes:
       - huggingface_cache_vol:/cache/huggingface
     networks:
@@ -128,6 +128,8 @@ services:
     # --- GPU Support (optional) ---
     deploy:
       resources:
+        limits:
+          memory: 4G
         reservations:
           devices:
             - driver: nvidia
