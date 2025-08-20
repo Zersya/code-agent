@@ -5,6 +5,7 @@ import { analyticsApi } from '@/services/api'
 
 export const useAnalyticsStore = defineStore('analytics', () => {
   const analytics = ref<AnalyticsData>({
+    // Basic metrics
     totalReviews: 0,
     approvalRate: 0,
     averageReviewTime: 0,
@@ -12,8 +13,22 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     reviewsThisWeek: 0,
     reviewsThisMonth: 0,
     criticalIssuesTotal: 0,
+
+    // Enhanced productivity metrics
+    reviewFrequency: {
+      totalReviews: 0,
+      activeDays: 0,
+      avgReviewsPerDay: 0
+    },
+
+    // Project insights
     topProjects: [],
+    projectActivity: [],
+
+    // Trend analysis
     reviewTrends: [],
+
+    // Issue categorization
     issueCategories: []
   })
   const isLoading = ref(false)

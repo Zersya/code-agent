@@ -175,26 +175,106 @@
       </BaseCard>
     </div>
 
-    <!-- Activity Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Enhanced Productivity Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <BaseCard title="Review Frequency">
+        <div class="text-center">
+          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay?.toFixed(1) || '0' }}</p>
+          <p class="text-sm text-gray-600">Reviews per day</p>
+          <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.reviewFrequency?.activeDays || 0 }} active days</p>
+        </div>
+      </BaseCard>
+
       <BaseCard title="Today">
         <div class="text-center">
-          <p class="text-3xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsToday }}</p>
+          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsToday }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
         </div>
       </BaseCard>
 
       <BaseCard title="This Week">
         <div class="text-center">
-          <p class="text-3xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisWeek }}</p>
+          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisWeek }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
         </div>
       </BaseCard>
 
       <BaseCard title="This Month">
         <div class="text-center">
-          <p class="text-3xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisMonth }}</p>
+          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisMonth }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
+        </div>
+      </BaseCard>
+    </div>
+
+    <!-- Project Activity Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <BaseCard title="Project Performance">
+        <div class="space-y-4">
+          <div v-if="analyticsStore.analytics.projectActivity?.length === 0" class="text-center text-gray-500 py-8">
+            <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p>No project activity data available</p>
+          </div>
+          <div v-else>
+            <div v-for="project in analyticsStore.analytics.projectActivity?.slice(0, 5)" :key="project.projectName" class="border-b border-gray-200 pb-3 last:border-b-0">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</h4>
+                <span class="text-sm font-semibold text-primary-600">{{ project.reviewCount }} reviews</span>
+              </div>
+              <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
+                <div>
+                  <span class="font-medium">Avg Review Time:</span>
+                  <span class="ml-1">{{ project.avgReviewTime?.toFixed(1) || '0' }}m</span>
+                </div>
+                <div>
+                  <span class="font-medium">Active Days:</span>
+                  <span class="ml-1">{{ project.activeDays }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </BaseCard>
+
+      <BaseCard title="Review Efficiency">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+            <div>
+              <p class="text-sm font-medium text-green-800">Average Review Time</p>
+              <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.averageReviewTime }}m</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+            <div>
+              <p class="text-sm font-medium text-blue-800">Approval Rate</p>
+              <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.approvalRate?.toFixed(1) }}%</p>
+            </div>
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+            <div>
+              <p class="text-sm font-medium text-purple-800">Total Reviews</p>
+              <p class="text-2xl font-bold text-purple-600">{{ analyticsStore.analytics.reviewFrequency?.totalReviews || 0 }}</p>
+            </div>
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+          </div>
         </div>
       </BaseCard>
     </div>

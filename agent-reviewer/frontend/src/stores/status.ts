@@ -28,11 +28,12 @@ export const useStatusStore = defineStore('status', () => {
 
     try {
       const response = await statusApi.getQueueStatus()
-      
+
       if (response.success && response.data) {
         queueStats.value = response.data.stats
         queueJobs.value = response.data.jobs
       } else {
+        console.error('Failed to fetch queue status:', response.message)
         error.value = response.message || 'Failed to fetch queue status'
       }
     } catch (err) {

@@ -76,6 +76,7 @@ export interface SystemHealth {
 }
 
 export interface AnalyticsData {
+  // Basic metrics
   totalReviews: number
   approvalRate: number
   averageReviewTime: number
@@ -83,17 +84,36 @@ export interface AnalyticsData {
   reviewsThisWeek: number
   reviewsThisMonth: number
   criticalIssuesTotal: number
+
+  // Enhanced productivity metrics
+  reviewFrequency: {
+    totalReviews: number
+    activeDays: number
+    avgReviewsPerDay: number
+  }
+
+  // Project insights
   topProjects: Array<{
     projectName: string
     reviewCount: number
     approvalRate: number
   }>
+  projectActivity: Array<{
+    projectName: string
+    reviewCount: number
+    avgReviewTime: number
+    activeDays: number
+  }>
+
+  // Trend analysis
   reviewTrends: Array<{
     date: string
     reviews: number
     approvals: number
     criticalIssues: number
   }>
+
+  // Issue categorization
   issueCategories: Array<{
     category: string
     count: number

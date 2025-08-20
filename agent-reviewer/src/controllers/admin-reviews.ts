@@ -17,8 +17,25 @@ interface PaginationParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+// Map frontend camelCase field names to database snake_case column names with proper table prefixes
+const SORTABLE_COLUMNS: Record<string, string> = {
+  'reviewedAt': 'mrr.reviewed_at',
+  'createdAt': 'mrr.created_at',
+  'updatedAt': 'mrr.updated_at',
+  'projectName': 'p.name',
+  'mergeRequestIid': 'mrr.merge_request_iid',
+  'lastReviewedCommitSha': 'mrr.last_reviewed_commit_sha',
+  'status': 'status', // This is a computed field in SELECT
+  'criticalIssuesCount': 'criticalIssuesCount', // This is a computed field in SELECT
+  'reviewerType': 'reviewerType' // This is a computed field in SELECT
+};
+
+// Default sortable columns that are safe to use
+const DEFAULT_SORT_COLUMN = 'mrr.reviewed_at';
+
 /**
  * Get review history with pagination and filtering
+ * Includes SQL injection protection through column name validation
  */
 export const getReviewHistory = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -34,11 +51,19 @@ export const getReviewHistory = async (req: Request, res: Response): Promise<voi
       search
     } = req.query;
 
+    // Validate and map sortBy parameter to prevent SQL injection
+    const requestedSortBy = sortBy as string;
+    const mappedSortBy = SORTABLE_COLUMNS[requestedSortBy] || DEFAULT_SORT_COLUMN;
+
+    // Validate sortOrder parameter
+    const validSortOrder = (sortOrder as string)?.toLowerCase();
+    const safeSortOrder = (validSortOrder === 'asc' || validSortOrder === 'desc') ? validSortOrder : 'desc';
+
     const pagination: PaginationParams = {
       page: parseInt(page as string),
       limit: Math.min(parseInt(limit as string), 100), // Max 100 items per page
-      sortBy: sortBy as string,
-      sortOrder: sortOrder as 'asc' | 'desc'
+      sortBy: mappedSortBy,
+      sortOrder: safeSortOrder as 'asc' | 'desc'
     };
 
     const filters: ReviewFilters = {
@@ -109,7 +134,7 @@ export const getReviewHistory = async (req: Request, res: Response): Promise<voi
       FROM merge_request_reviews mrr
       LEFT JOIN projects p ON mrr.project_id = p.project_id
       ${whereClause}
-      ORDER BY mrr.${pagination.sortBy} ${pagination?.sortOrder?.toUpperCase()}
+      ORDER BY ${pagination.sortBy} ${pagination?.sortOrder?.toUpperCase()}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 

@@ -11,7 +11,6 @@
     <div v-if="analyticsStore.isLoading || statusStore.isLoading" class="flex justify-center items-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
     </div>
-
     <!-- Error state -->
     <div v-else-if="analyticsStore.error || statusStore.error" class="rounded-md bg-danger-50 p-4 mb-6">
       <div class="flex">
