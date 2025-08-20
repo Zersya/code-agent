@@ -53,8 +53,17 @@ const router = createRouter({
 })
 
 // Navigation guards
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // Initialize authentication state if needed
+  if (authStore.token && !authStore.user) {
+    try {
+      await authStore.initialize()
+    } catch (error) {
+      console.error('Authentication initialization failed in router guard:', error)
+    }
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')

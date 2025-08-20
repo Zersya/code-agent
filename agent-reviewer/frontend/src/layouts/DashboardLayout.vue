@@ -153,11 +153,8 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-onMounted(async () => {
-  // Check if user is authenticated on mount
-  const isAuthenticated = await authStore.checkAuth()
-  if (!isAuthenticated) {
-    router.push('/login')
-  }
+onMounted(() => {
+  // Authentication is handled at the app and router level
+  // No need for additional checks here
 })
 </script>

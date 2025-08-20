@@ -69,6 +69,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  const initialize = async (): Promise<void> => {
+    // If we have a token but no user data, try to restore the session
+    if (token.value && !user.value) {
+      await checkAuth()
+    }
+  }
+
   return {
     user,
     token,
@@ -78,6 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     checkAuth,
-    clearError
+    clearError,
+    initialize
   }
 })

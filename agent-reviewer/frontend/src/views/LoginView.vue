@@ -89,5 +89,10 @@ const handleLogin = async () => {
 
 onMounted(() => {
   authStore.clearError()
+
+  // If user is already authenticated, redirect to dashboard
+  if (authStore.isAuthenticated) {
+    router.push('/')
+  }
 })
 </script>

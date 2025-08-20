@@ -175,6 +175,7 @@ networks:
   llm-network:
     name: llm-network # Explicitly names the network
     driver: bridge    # Default driver
+    external: true   # Not external
   qodo_network:
     name: qodo_network # Explicitly names the network
     driver: bridge    # Default driver
