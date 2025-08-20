@@ -1,6 +1,18 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+# Core web framework dependencies
+fastapi==0.100.0
+uvicorn[standard]==0.22.0
+pydantic==1.10.12
+
+# ML/AI dependencies - tested compatible versions
+numpy==1.24.3
+torch==2.0.1
+transformers==4.30.2
 sentence-transformers==2.2.2
-torch==2.1.0
-transformers==4.35.2
-pydantic==2.5.0
+huggingface-hub==0.15.1
+
+# Supporting dependencies
+tokenizers==0.13.3
+safetensors==0.3.1
+tqdm==4.65.0
+requests==2.31.0
+packaging==23.1
