@@ -119,6 +119,68 @@ export interface AnalyticsData {
     count: number
     percentage: number
   }>
+
+  // Embedding system metrics
+  embeddingMetrics: {
+    codeEmbeddings: {
+      totalFiles: number
+      totalProjects: number
+      languageDistribution: Array<{
+        language: string
+        fileCount: number
+        percentage: number
+      }>
+      coverageByProject: Array<{
+        projectName: string
+        embeddedFiles: number
+        lastEmbedded: string | null
+      }>
+      recentActivity: Array<{
+        date: string
+        filesEmbedded: number
+      }>
+      avgFilesPerProject: number
+      lastUpdated: string | null
+    }
+    documentationEmbeddings: {
+      totalSections: number
+      totalSources: number
+      frameworkDistribution: Array<{
+        framework: string
+        sectionCount: number
+        percentage: number
+      }>
+      sourceHealth: Array<{
+        sourceName: string
+        status: string
+        lastUpdated: string | null
+      }>
+      lastUpdated: string | null
+    }
+    embeddingJobs: {
+      totalJobs: number
+      successRate: number
+      avgProcessingTime: number
+      recentJobs: Array<{
+        id: string
+        status: string
+        createdAt: string
+      }>
+      jobsByStatus: {
+        pending: number
+        processing: number
+        completed: number
+        failed: number
+        retrying: number
+      }
+    }
+    systemHealth: {
+      embeddingCoverage: number
+      documentationCoverage: number
+      processingEfficiency: number
+      lastEmbeddingTime: string | null
+    }
+  }
 }
 
 export interface PaginationParams {

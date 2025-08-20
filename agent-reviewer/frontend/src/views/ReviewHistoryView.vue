@@ -86,7 +86,7 @@
         <template #cell-mergeRequestIid="{ value, item }">
           <a
             v-if="item.projectId"
-            :href="`https://gitlab.com/project/${item.projectId}/-/merge_requests/${value}`"
+            :href="`https://repopo.transtrack.id/project/${item.projectId}/-/merge_requests/${value}`"
             target="_blank"
             class="text-primary-600 hover:text-primary-800 font-medium"
           >

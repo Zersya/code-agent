@@ -100,8 +100,11 @@ export const getQueueStatus = async (req: Request, res: Response): Promise<void>
     const recentJobs = await queueService.getRecentJobs(limit, offset);
 
     res.status(200).json({
-      stats,
-      jobs: recentJobs,
+      success: true,
+      data: {
+        stats,
+        jobs: recentJobs
+      },
       pagination: {
         page,
         limit,
@@ -111,6 +114,10 @@ export const getQueueStatus = async (req: Request, res: Response): Promise<void>
     });
   } catch (error) {
     console.error('Error getting queue status:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch queue status',
+      message: error instanceof Error ? error.message : 'Internal server error'
+    });
   }
 };

@@ -1,7 +1,268 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/database.js';
 import { queueService } from '../services/queue.js';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
+
+/**
+ * Get comprehensive embedding system metrics
+ */
+async function getEmbeddingMetrics(dateFrom: Date, dateTo: Date) {
+  try {
+    // Check if tables exist first
+    const tablesExistQuery = `
+      SELECT
+        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'embeddings')) as embeddings_exists,
+        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'documentation_embeddings')) as doc_embeddings_exists,
+        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'embedding_jobs')) as jobs_exists
+    `;
+    const tablesResult = await dbService.query(tablesExistQuery);
+    const { embeddings_exists, doc_embeddings_exists, jobs_exists } = tablesResult.rows[0];
+
+    // Initialize default metrics
+    const metrics = {
+      codeEmbeddings: {
+        totalFiles: 0,
+        totalProjects: 0,
+        languageDistribution: [] as Array<{language: string, fileCount: number, percentage: number}>,
+        coverageByProject: [] as Array<{projectName: string, embeddedFiles: number, lastEmbedded: string | null}>,
+        recentActivity: [] as Array<{date: string, filesEmbedded: number}>,
+        avgFilesPerProject: 0,
+        lastUpdated: null as string | null
+      },
+      documentationEmbeddings: {
+        totalSections: 0,
+        totalSources: 0,
+        frameworkDistribution: [] as Array<{framework: string, sectionCount: number, percentage: number}>,
+        sourceHealth: [] as Array<{sourceName: string, status: string, lastUpdated: string | null}>,
+        lastUpdated: null as string | null
+      },
+      embeddingJobs: {
+        totalJobs: 0,
+        successRate: 0,
+        avgProcessingTime: 0,
+        recentJobs: [] as Array<{id: string, status: string, createdAt: string}>,
+        jobsByStatus: {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0,
+          retrying: 0
+        }
+      },
+      systemHealth: {
+        embeddingCoverage: 0,
+        documentationCoverage: 0,
+        processingEfficiency: 0,
+        lastEmbeddingTime: null as string | null
+      }
+    };
+
+    // Get code embeddings metrics if table exists
+    if (embeddings_exists) {
+      // Total files and projects
+      const codeStatsQuery = `
+        SELECT
+          COUNT(*) as total_files,
+          COUNT(DISTINCT project_id) as total_projects,
+          MAX(updated_at) as last_updated
+        FROM embeddings
+      `;
+      const codeStatsResult = await dbService.query(codeStatsQuery);
+      const codeStats = codeStatsResult.rows[0];
+
+      metrics.codeEmbeddings.totalFiles = parseInt(codeStats.total_files);
+      metrics.codeEmbeddings.totalProjects = parseInt(codeStats.total_projects);
+      metrics.codeEmbeddings.lastUpdated = codeStats.last_updated;
+      metrics.codeEmbeddings.avgFilesPerProject = metrics.codeEmbeddings.totalProjects > 0
+        ? Math.round(metrics.codeEmbeddings.totalFiles / metrics.codeEmbeddings.totalProjects)
+        : 0;
+
+      // Language distribution
+      const languageDistQuery = `
+        SELECT
+          language,
+          COUNT(*) as file_count,
+          ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) as percentage
+        FROM embeddings
+        WHERE language IS NOT NULL
+        GROUP BY language
+        ORDER BY file_count DESC
+        LIMIT 10
+      `;
+      const languageResult = await dbService.query(languageDistQuery);
+      metrics.codeEmbeddings.languageDistribution = languageResult.rows.map(row => ({
+        language: row.language,
+        fileCount: parseInt(row.file_count),
+        percentage: parseFloat(row.percentage)
+      }));
+
+      // Coverage by project
+      const projectCoverageQuery = `
+        SELECT
+          p.name as project_name,
+          COUNT(e.id) as embedded_files,
+          MAX(e.updated_at) as last_embedded
+        FROM projects p
+        LEFT JOIN embeddings e ON p.project_id = e.project_id
+        GROUP BY p.project_id, p.name
+        ORDER BY embedded_files DESC
+        LIMIT 10
+      `;
+      const projectCoverageResult = await dbService.query(projectCoverageQuery);
+      metrics.codeEmbeddings.coverageByProject = projectCoverageResult.rows.map(row => ({
+        projectName: row.project_name || 'Unknown Project',
+        embeddedFiles: parseInt(row.embedded_files),
+        lastEmbedded: row.last_embedded
+      }));
+
+      // Recent embedding activity
+      const recentActivityQuery = `
+        SELECT
+          DATE(updated_at) as date,
+          COUNT(*) as files_embedded
+        FROM embeddings
+        WHERE updated_at BETWEEN $1 AND $2
+        GROUP BY DATE(updated_at)
+        ORDER BY date DESC
+        LIMIT 30
+      `;
+      const recentActivityResult = await dbService.query(recentActivityQuery, [dateFrom, dateTo]);
+      metrics.codeEmbeddings.recentActivity = recentActivityResult.rows.map(row => ({
+        date: format(new Date(row.date), 'yyyy-MM-dd'),
+        filesEmbedded: parseInt(row.files_embedded)
+      }));
+    }
+
+    // Get documentation embeddings metrics if table exists
+    if (doc_embeddings_exists) {
+      // Total sections and sources
+      const docStatsQuery = `
+        SELECT
+          COUNT(*) as total_sections,
+          COUNT(DISTINCT source_id) as total_sources,
+          MAX(updated_at) as last_updated
+        FROM documentation_embeddings
+      `;
+      const docStatsResult = await dbService.query(docStatsQuery);
+      const docStats = docStatsResult.rows[0];
+
+      metrics.documentationEmbeddings.totalSections = parseInt(docStats.total_sections);
+      metrics.documentationEmbeddings.totalSources = parseInt(docStats.total_sources);
+      metrics.documentationEmbeddings.lastUpdated = docStats.last_updated;
+
+      // Framework distribution
+      const frameworkDistQuery = `
+        SELECT
+          framework,
+          COUNT(*) as section_count,
+          ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) as percentage
+        FROM documentation_embeddings
+        WHERE framework IS NOT NULL
+        GROUP BY framework
+        ORDER BY section_count DESC
+      `;
+      const frameworkResult = await dbService.query(frameworkDistQuery);
+      metrics.documentationEmbeddings.frameworkDistribution = frameworkResult.rows.map(row => ({
+        framework: row.framework,
+        sectionCount: parseInt(row.section_count),
+        percentage: parseFloat(row.percentage)
+      }));
+    }
+
+    // Get embedding jobs metrics if table exists
+    if (jobs_exists) {
+      // Total jobs and success rate
+      const jobStatsQuery = `
+        SELECT
+          COUNT(*) as total_jobs,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_jobs,
+          ROUND(AVG(EXTRACT(EPOCH FROM (completed_at - started_at))/60), 2) as avg_processing_minutes
+        FROM embedding_jobs
+        WHERE created_at BETWEEN $1 AND $2
+      `;
+      const jobStatsResult = await dbService.query(jobStatsQuery, [dateFrom, dateTo]);
+      const jobStats = jobStatsResult.rows[0];
+
+      metrics.embeddingJobs.totalJobs = parseInt(jobStats.total_jobs);
+      metrics.embeddingJobs.successRate = jobStats.total_jobs > 0
+        ? Math.round((parseInt(jobStats.completed_jobs) / parseInt(jobStats.total_jobs)) * 100)
+        : 0;
+      metrics.embeddingJobs.avgProcessingTime = parseFloat(jobStats.avg_processing_minutes) || 0;
+
+      // Jobs by status
+      const jobStatusQuery = `
+        SELECT status, COUNT(*) as count
+        FROM embedding_jobs
+        GROUP BY status
+      `;
+      const jobStatusResult = await dbService.query(jobStatusQuery);
+      jobStatusResult.rows.forEach(row => {
+        const status = row.status.toLowerCase();
+        const count = parseInt(row.count);
+        if (status in metrics.embeddingJobs.jobsByStatus) {
+          (metrics.embeddingJobs.jobsByStatus as any)[status] = count;
+        }
+      });
+    }
+
+    // Calculate system health metrics
+    if (embeddings_exists) {
+      metrics.systemHealth.embeddingCoverage = metrics.codeEmbeddings.totalProjects > 0
+        ? Math.round((metrics.codeEmbeddings.totalFiles / (metrics.codeEmbeddings.totalProjects * 100)) * 100)
+        : 0;
+    }
+
+    if (doc_embeddings_exists) {
+      metrics.systemHealth.documentationCoverage = metrics.documentationEmbeddings.totalSources > 0 ? 100 : 0;
+    }
+
+    if (jobs_exists) {
+      metrics.systemHealth.processingEfficiency = metrics.embeddingJobs.successRate;
+    }
+
+    return metrics;
+  } catch (error) {
+    console.error('Error getting embedding metrics:', error);
+    // Return default metrics on error
+    return {
+      codeEmbeddings: {
+        totalFiles: 0,
+        totalProjects: 0,
+        languageDistribution: [],
+        coverageByProject: [],
+        recentActivity: [],
+        avgFilesPerProject: 0,
+        lastUpdated: null
+      },
+      documentationEmbeddings: {
+        totalSections: 0,
+        totalSources: 0,
+        frameworkDistribution: [],
+        sourceHealth: [],
+        lastUpdated: null
+      },
+      embeddingJobs: {
+        totalJobs: 0,
+        successRate: 0,
+        avgProcessingTime: 0,
+        recentJobs: [],
+        jobsByStatus: {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0,
+          retrying: 0
+        }
+      },
+      systemHealth: {
+        embeddingCoverage: 0,
+        documentationCoverage: 0,
+        processingEfficiency: 0,
+        lastEmbeddingTime: null
+      }
+    };
+  }
+}
 
 /**
  * Get analytics data for the dashboard
@@ -124,6 +385,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     `;
     const projectActivityResult = await dbService.query(projectActivityQuery, [dateFrom, dateTo]);
 
+    // Get embedding system metrics
+    const embeddingMetrics = await getEmbeddingMetrics(dateFrom, dateTo);
+
     // Issue categories (enhanced with actual data when available)
     const issueCategories = [
       { category: 'Code Quality', count: 0, percentage: 0 },
@@ -170,6 +434,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
       // Issue categorization
       issueCategories,
 
+      // Embedding system metrics
+      embeddingMetrics,
+
       // System health
       queueStats
     };
@@ -191,7 +458,7 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 /**
  * Get system health status
  */
-export const getSystemHealth = async (req: Request, res: Response): Promise<void> => {
+export const getSystemHealth = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Check database health
     let databaseHealth: 'healthy' | 'unhealthy' = 'healthy';

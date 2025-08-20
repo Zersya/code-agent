@@ -29,7 +29,46 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     reviewTrends: [],
 
     // Issue categorization
-    issueCategories: []
+    issueCategories: [],
+
+    // Embedding system metrics
+    embeddingMetrics: {
+      codeEmbeddings: {
+        totalFiles: 0,
+        totalProjects: 0,
+        languageDistribution: [],
+        coverageByProject: [],
+        recentActivity: [],
+        avgFilesPerProject: 0,
+        lastUpdated: null
+      },
+      documentationEmbeddings: {
+        totalSections: 0,
+        totalSources: 0,
+        frameworkDistribution: [],
+        sourceHealth: [],
+        lastUpdated: null
+      },
+      embeddingJobs: {
+        totalJobs: 0,
+        successRate: 0,
+        avgProcessingTime: 0,
+        recentJobs: [],
+        jobsByStatus: {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0,
+          retrying: 0
+        }
+      },
+      systemHealth: {
+        embeddingCoverage: 0,
+        documentationCoverage: 0,
+        processingEfficiency: 0,
+        lastEmbeddingTime: null
+      }
+    }
   })
   const isLoading = ref(false)
   const error = ref<string | null>(null)

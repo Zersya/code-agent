@@ -279,6 +279,163 @@
       </BaseCard>
     </div>
 
+    <!-- Embedding System Metrics -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Embedding System Analytics</h2>
+
+      <!-- Embedding Overview Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <BaseCard title="Code Embeddings">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalFiles?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Files embedded</p>
+            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalProjects || 0 }} projects</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Documentation">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSections?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Doc sections</p>
+            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSources || 0 }} sources</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Processing Jobs">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-purple-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.totalJobs?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Total jobs</p>
+            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.successRate || 0 }}% success rate</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="System Health">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-orange-600">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.processingEfficiency || 0 }}%</p>
+            <p class="text-sm text-gray-600">Efficiency</p>
+            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.embeddingCoverage || 0 }}% coverage</p>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- Embedding Details Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Language Distribution -->
+        <BaseCard title="Language Distribution">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No language data available</p>
+            </div>
+            <div v-else>
+              <div v-for="lang in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.slice(0, 8)" :key="lang.language" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 rounded-full" :class="getLanguageColor(lang.language)"></div>
+                  <span class="text-sm font-medium text-gray-900">{{ lang.language }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-20 bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-blue-600 h-2 rounded-full"
+                      :style="{ width: lang.percentage + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-sm text-gray-600 w-12 text-right">{{ lang.fileCount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Project Coverage -->
+        <BaseCard title="Project Coverage">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <p>No project coverage data available</p>
+            </div>
+            <div v-else>
+              <div v-for="project in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.slice(0, 6)" :key="project.projectName" class="border-b border-gray-200 pb-3 last:border-b-0">
+                <div class="flex items-center justify-between mb-1">
+                  <h4 class="text-sm font-medium text-gray-900 truncate">{{ project.projectName }}</h4>
+                  <span class="text-sm font-semibold text-blue-600">{{ project.embeddedFiles }} files</span>
+                </div>
+                <div class="text-xs text-gray-500">
+                  Last updated: {{ project.lastEmbedded ? formatDate(project.lastEmbedded) : 'Never' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- Embedding Jobs Status -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Job Status Distribution -->
+        <BaseCard title="Embedding Jobs Status">
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="text-center p-3 bg-green-50 rounded-lg">
+                <p class="text-lg font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.completed || 0 }}</p>
+                <p class="text-xs text-green-800">Completed</p>
+              </div>
+              <div class="text-center p-3 bg-blue-50 rounded-lg">
+                <p class="text-lg font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.processing || 0 }}</p>
+                <p class="text-xs text-blue-800">Processing</p>
+              </div>
+              <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                <p class="text-lg font-bold text-yellow-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.pending || 0 }}</p>
+                <p class="text-xs text-yellow-800">Pending</p>
+              </div>
+              <div class="text-center p-3 bg-red-50 rounded-lg">
+                <p class="text-lg font-bold text-red-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.failed || 0 }}</p>
+                <p class="text-xs text-red-800">Failed</p>
+              </div>
+            </div>
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Average Processing Time</span>
+                <span class="text-sm font-semibold text-gray-900">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime?.toFixed(1) || '0' }}m</span>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Documentation Frameworks -->
+        <BaseCard title="Documentation Frameworks">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p>No documentation frameworks available</p>
+            </div>
+            <div v-else>
+              <div v-for="framework in analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution" :key="framework.framework" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span class="text-sm font-medium text-gray-900 capitalize">{{ framework.framework }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-16 bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-green-600 h-2 rounded-full"
+                      :style="{ width: framework.percentage + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-sm text-gray-600 w-8 text-right">{{ framework.sectionCount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+    </div>
+
     <!-- Error Alert -->
     <BaseAlert
       v-if="analyticsStore.error"
@@ -324,6 +481,36 @@ const getTrendWidth = (value: number) => {
 
 const formatTrendDate = (dateStr: string) => {
   return format(new Date(dateStr), 'MMM dd')
+}
+
+const formatDate = (dateStr: string) => {
+  return format(new Date(dateStr), 'MMM dd, yyyy')
+}
+
+const getLanguageColor = (language: string) => {
+  const colors: Record<string, string> = {
+    'javascript': 'bg-yellow-500',
+    'typescript': 'bg-blue-500',
+    'python': 'bg-green-500',
+    'java': 'bg-red-500',
+    'go': 'bg-cyan-500',
+    'rust': 'bg-orange-500',
+    'php': 'bg-purple-500',
+    'ruby': 'bg-red-400',
+    'c++': 'bg-blue-600',
+    'c#': 'bg-purple-600',
+    'swift': 'bg-orange-400',
+    'kotlin': 'bg-purple-400',
+    'dart': 'bg-blue-400',
+    'vue': 'bg-green-400',
+    'html': 'bg-orange-300',
+    'css': 'bg-blue-300',
+    'scss': 'bg-pink-400',
+    'json': 'bg-gray-500',
+    'yaml': 'bg-red-300',
+    'markdown': 'bg-gray-600'
+  }
+  return colors[language.toLowerCase()] || 'bg-gray-400'
 }
 
 const handleDateRangeChange = () => {

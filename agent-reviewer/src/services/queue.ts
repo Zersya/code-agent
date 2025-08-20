@@ -307,6 +307,28 @@ export class QueueService {
     const client = await dbService.getClient();
 
     try {
+      // Check if embedding_jobs table exists
+      const tableExistsResult = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'embedding_jobs'
+        );
+      `);
+
+      if (!tableExistsResult.rows[0].exists) {
+        console.warn('embedding_jobs table does not exist, returning empty stats');
+        return {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0,
+          retrying: 0,
+          total: 0,
+          activeJobs: this.activeJobs.size
+        };
+      }
+
       const result = await client.query(`
         SELECT status, COUNT(*) as count
         FROM embedding_jobs
@@ -357,6 +379,20 @@ export class QueueService {
     const client = await dbService.getClient();
 
     try {
+      // Check if embedding_jobs table exists
+      const tableExistsResult = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'embedding_jobs'
+        );
+      `);
+
+      if (!tableExistsResult.rows[0].exists) {
+        console.warn('embedding_jobs table does not exist, returning empty jobs list');
+        return [];
+      }
+
       const result = await client.query(`
         SELECT
           id, repository_url as "repositoryUrl", processing_id as "processingId",
