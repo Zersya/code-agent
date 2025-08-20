@@ -26,13 +26,11 @@ services:
       retries: 5
       start_period: 30s
 
-  agent-reviewer:
+  agent-reviewer-backend:
     build:
       context: ./agent-reviewer # Assuming Dockerfile for webhook-server is in the same directory as this docker-compose.yml
       dockerfile: Dockerfile # This refers to the Dockerfile in the Canvas
-    container_name: agent_reviewer
-    ports:
-      - "4100:3000"
+    container_name: agent_reviewer_backend
     environment:
       - PORT=3000
       # Database connection to containerized PostgreSQL (internal port is always 5432)
@@ -45,7 +43,6 @@ services:
       - APP_URL=${APP_URL}
       - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
       - JWT_SECRET=${JWT_SECRET}
-      - DASHBOARD_PORT=3000
       - QODO_EMBED_API_KEY=${QODO_EMBED_API_KEY}
       # Ensure this URL points to the service name and port of qodo-embed-api
       - QODO_EMBED_API_URL=${QODO_EMBED_API_URL}
@@ -86,7 +83,7 @@ services:
       - REVIEW_DOMAIN_SCOPE=${REVIEW_DOMAIN_SCOPE}
       - CRITICAL_ISSUE_THRESHOLD=${CRITICAL_ISSUE_THRESHOLD}
     volumes:
-      - ./temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
+      - ./agent-reviewer/temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
     restart: unless-stopped
     depends_on:
       postgres:
@@ -94,6 +91,21 @@ services:
     networks:
       - qodo_network # Assigns this service to the qodo_network
       - llm-network # Assigns this service to the llm_network
+      - proxy
+
+  agent-reviewer-dashboard:
+    build:
+      context: ./agent-reviewer/frontend
+      dockerfile: Dockerfile
+    container_name: agent_reviewer_dashboard
+    ports:
+      - "${DASHBOARD_PORT:-3000}:80"
+    depends_on:
+      - agent-reviewer-backend
+    restart: unless-stopped
+    networks:
+      - qodo_network
+      - llm-network
       - proxy
 
   qodo-embed-api:
