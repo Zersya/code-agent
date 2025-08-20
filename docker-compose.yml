@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile # This refers to the Dockerfile in the Canvas
     container_name: agent_reviewer_backend
     environment:
-      - PORT=3000
+      - PORT=${PORT:-9080}
       # Database connection to containerized PostgreSQL (internal port is always 5432)
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-repopo_reviewer}
       - GITLAB_API_TOKEN=${GITLAB_API_TOKEN}
@@ -99,7 +99,7 @@ services:
       dockerfile: Dockerfile
     container_name: agent_reviewer_dashboard
     ports:
-      - "${DASHBOARD_PORT:-3000}:80"
+      - "${DASHBOARD_PORT:-9080}:80"
     depends_on:
       - agent-reviewer-backend
     restart: unless-stopped

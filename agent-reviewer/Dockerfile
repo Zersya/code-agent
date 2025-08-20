@@ -38,10 +38,10 @@ RUN mkdir -p ./temp
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=9080
 
 # Expose the port
-EXPOSE 3000
+EXPOSE 9080
 
 # Start the webhook server
 CMD ["node", "dist/webhook-server.js"]

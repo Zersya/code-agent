@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - PORT=3000
+      - PORT=${PORT:-9080}
       - DATABASE_URL=${DATABASE_URL}
       - GITLAB_API_TOKEN=${GITLAB_API_TOKEN}
       - GITLAB_API_URL=${GITLAB_API_URL}
@@ -32,7 +32,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "${DASHBOARD_PORT:-8080}:80"
+      - "${DASHBOARD_PORT:-3000}:80"
     depends_on:
       - agent-reviewer-backend
     restart: unless-stopped
