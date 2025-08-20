@@ -79,6 +79,8 @@
         <BasePagination
           :current-page="pagination.page"
           :total-pages="pagination.totalPages"
+          :total="pagination.total"
+          :per-page="pagination.limit"
           @page-change="handlePageChange"
         />
       </div>
@@ -97,7 +99,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="error"
+      type="danger"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"
@@ -106,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { formatDistanceToNow } from 'date-fns'
 import BaseCard from './BaseCard.vue'
 import BaseButton from './BaseButton.vue'
@@ -126,10 +128,6 @@ interface Pagination {
   total: number
   totalPages: number
 }
-
-const emit = defineEmits<{
-  viewJob: [processingId: string]
-}>()
 
 const queueData = ref<QueueData | null>(null)
 const pagination = ref<Pagination | null>(null)

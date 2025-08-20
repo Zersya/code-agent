@@ -130,7 +130,7 @@
             <!-- Error Message -->
             <BaseAlert
               v-if="source.fetchError"
-              type="error"
+              type="danger"
               :message="source.fetchError"
               class="mt-3"
             />
@@ -177,10 +177,10 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="error"
+      type="danger"
       :message="errorMessage"
       class="mt-4"
-      @dismiss="errorMessage = ''"
+      @dismiss="$emit('error-dismissed')"
     />
   </BaseCard>
 </template>
@@ -207,13 +207,6 @@ const props = withDefaults(defineProps<Props>(), {
   errorMessage: ''
 })
 
-const emit = defineEmits<{
-  addNew: []
-  edit: [source: DocumentationSource]
-  delete: [sourceId: string]
-  reembed: [sourceId: string]
-  refresh: []
-}>()
 
 const searchQuery = ref('')
 const frameworkFilter = ref('')

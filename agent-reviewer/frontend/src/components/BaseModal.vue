@@ -74,7 +74,7 @@
 import { computed, watch } from 'vue'
 
 interface Props {
-  show: boolean
+  show?: boolean
   title?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   closeOnBackdrop?: boolean

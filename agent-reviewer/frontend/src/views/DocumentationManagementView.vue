@@ -30,6 +30,7 @@
       @delete="handleDelete"
       @reembed="handleReembed"
       @refresh="fetchSources"
+      @error-dismissed="errorMessage = ''"
     />
 
     <!-- Delete Confirmation Modal -->
@@ -104,7 +105,7 @@
 
     <BaseAlert
       v-if="globalErrorMessage"
-      type="error"
+      type="danger"
       :message="globalErrorMessage"
       @dismiss="globalErrorMessage = ''"
     />

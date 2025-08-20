@@ -134,7 +134,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="error"
+      type="danger"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"

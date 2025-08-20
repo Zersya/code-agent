@@ -86,7 +86,7 @@
 
     <!-- Job Details Modal -->
     <BaseModal
-      v-if="showJobModal"
+      :show="showJobModal"
       title="Embedding Job Details"
       @close="showJobModal = false"
     >
@@ -107,7 +107,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="error"
+      type="danger"
       :message="errorMessage"
       @dismiss="errorMessage = ''"
     />

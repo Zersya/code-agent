@@ -14,10 +14,8 @@ import type {
   RepositoryEmbeddingRequest,
   RepositoryEmbeddingResponse,
   RepositoryEmbeddingStatus,
-  DocumentationSource,
   DocumentationSourceRequest,
   DocumentationSourceResponse,
-  DocumentationEmbeddingRequest,
   ProjectDocumentationMapping
 } from '@/types'
 
