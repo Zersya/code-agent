@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from typing import List, Union, Optional # Added Optional
@@ -24,21 +24,8 @@ logger.info(f"FastAPI application startup: Attempting to load model '{MODEL_NAME
 logger.info("This may take a while if the model needs to be downloaded...")
 start_time = time.time()
 try:
-    # Try loading with trust_remote_code parameter (for sentence-transformers >= 2.3.0)
-    # Fall back to loading without it for older versions
-    try:
-        # trust_remote_code is needed for Qodo models
-        model_instance = SentenceTransformer(MODEL_NAME, trust_remote_code=("Qodo" in MODEL_NAME), device=DEVICE)
-        logger.info(f"Model loaded with trust_remote_code parameter")
-    except TypeError as te:
-        if "trust_remote_code" in str(te):
-            logger.warning(f"trust_remote_code parameter not supported in this sentence-transformers version. Trying without it...")
-            # Fallback for older sentence-transformers versions
-            model_instance = SentenceTransformer(MODEL_NAME, device=DEVICE)
-            logger.info(f"Model loaded without trust_remote_code parameter (fallback mode)")
-        else:
-            raise te
-
+    # trust_remote_code is needed for Qodo models
+    model_instance = SentenceTransformer(MODEL_NAME, trust_remote_code=("Qodo" in MODEL_NAME), device=DEVICE)
     end_time = time.time()
     logger.info(f"Model '{MODEL_NAME}' loaded successfully on device '{DEVICE}' in {end_time - start_time:.2f} seconds.")
 except Exception as e:
@@ -75,33 +62,32 @@ async def create_embeddings(request: EmbeddingRequest):
     global model_instance
     if model_instance is None:
         logger.error("Model is not loaded or failed to load. Cannot process embedding request.")
-        raise HTTPException(status_code=503, detail="Model not available")
+        # from fastapi import HTTPException
+        # raise HTTPException(status_code=503, detail="Model not available")
+        # For now, returning an empty response or a specific error structure:
+        requested_model_name = request.model if request.model else MODEL_NAME
+        return EmbeddingResponse(data=[], model=requested_model_name, usage=UsageData(prompt_tokens=0, total_tokens=0))
 
     input_texts = [request.input] if isinstance(request.input, str) else request.input
+    
+    # Generate embeddings
+    embeddings = model_instance.encode(input_texts)
 
-    try:
-        # Generate embeddings with error handling
-        embeddings = model_instance.encode(input_texts)
+    response_data: List[EmbeddingData] = []
+    for i, emb_vector in enumerate(embeddings):
+        response_data.append(EmbeddingData(embedding=emb_vector.tolist(), index=i))
 
-        response_data: List[EmbeddingData] = []
-        for i, emb_vector in enumerate(embeddings):
-            response_data.append(EmbeddingData(embedding=emb_vector.tolist(), index=i))
+    # Basic token counting (very approximate)
+    prompt_tokens = sum(len(text.split()) for text in input_texts)
+    total_tokens = prompt_tokens
+    
+    current_model_name = request.model if request.model else MODEL_NAME
 
-        # Basic token counting (very approximate)
-        prompt_tokens = sum(len(text.split()) for text in input_texts)
-        total_tokens = prompt_tokens
-
-        current_model_name = request.model if request.model else MODEL_NAME
-
-        return EmbeddingResponse(
-            data=response_data,
-            model=current_model_name,
-            usage=UsageData(prompt_tokens=prompt_tokens, total_tokens=total_tokens)
-        )
-
-    except Exception as e:
-        logger.error(f"Error generating embeddings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
+    return EmbeddingResponse(
+        data=response_data,
+        model=current_model_name,
+        usage=UsageData(prompt_tokens=prompt_tokens, total_tokens=total_tokens)
+    )
 
 # --- Health Check (Updated) ---
 @app.get("/health")
