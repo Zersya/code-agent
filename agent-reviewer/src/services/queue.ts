@@ -798,6 +798,82 @@ export class QueueService {
   }
 
   /**
+   * Cancel a job by setting its status to FAILED with a cancellation message
+   */
+  async cancelJob(processingId: string): Promise<{ success: boolean; message: string; job?: EmbeddingJob }> {
+    try {
+      // Get the job by processing ID
+      const job = await this.getJobByProcessingId(processingId);
+
+      if (!job) {
+        return { success: false, message: 'Job not found' };
+      }
+
+      // Validate that the job can be cancelled
+      if (job.status !== JobStatus.PENDING && job.status !== JobStatus.PROCESSING && job.status !== JobStatus.RETRYING && job.status !== JobStatus.DELAYED) {
+        return { success: false, message: `Job cannot be cancelled. Current status: ${job.status}` };
+      }
+
+      // If job is currently processing, remove it from active jobs
+      if (job.status === JobStatus.PROCESSING) {
+        this.activeJobs.delete(job.id);
+      }
+
+      // Set job status to failed with cancellation message
+      job.status = JobStatus.FAILED;
+      job.error = 'Job cancelled by user';
+      job.updatedAt = new Date();
+      job.completedAt = new Date();
+
+      // Save the updated job
+      await this.saveJob(job);
+
+      console.log(`Job ${processingId} has been cancelled`);
+
+      return { success: true, message: 'Job cancelled successfully', job };
+    } catch (error) {
+      console.error(`Error cancelling job ${processingId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Delete a job permanently from the database
+   */
+  async deleteJob(processingId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Get the job by processing ID
+      const job = await this.getJobByProcessingId(processingId);
+
+      if (!job) {
+        return { success: false, message: 'Job not found' };
+      }
+
+      // If job is currently processing, remove it from active jobs first
+      if (job.status === JobStatus.PROCESSING) {
+        this.activeJobs.delete(job.id);
+      }
+
+      // Delete the job from the database
+      const client = await dbService.getClient();
+      await client.query('DELETE FROM embedding_jobs WHERE processing_id = $1', [processingId]);
+
+      console.log(`Job ${processingId} has been deleted permanently`);
+
+      return { success: true, message: 'Job deleted successfully' };
+    } catch (error) {
+      console.error(`Error deleting job ${processingId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Retry a failed documentation job by resetting its status to PENDING
    */
   async retryDocumentationJob(processingId: string): Promise<{ success: boolean; message: string; job?: DocumentationJob }> {

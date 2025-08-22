@@ -6,7 +6,7 @@ import { webhookAuth } from './middleware/webhook-auth.js';
 import { apiAuth } from './middleware/api-auth.js';
 import { adminAuth } from './middleware/admin-auth.js';
 import { processWebhook } from './controllers/webhook.js';
-import { processRepository, getRepositoryStatus, getQueueStatus, retryRepositoryJob } from './controllers/repository.js';
+import { processRepository, getRepositoryStatus, getQueueStatus, retryRepositoryJob, cancelRepositoryJob, deleteRepositoryJob } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
 import {
   addDocumentationSource,
@@ -90,6 +90,8 @@ app.post('/webhook', webhookAuth, processWebhook);
 app.post('/api/repositories/embed', apiAuth, processRepository);
 app.get('/api/repositories/status/:processingId', apiAuth, getRepositoryStatus);
 app.post('/api/repositories/retry/:processingId', apiAuth, retryRepositoryJob);
+app.post('/api/repositories/cancel/:processingId', apiAuth, cancelRepositoryJob);
+app.delete('/api/repositories/job/:processingId', apiAuth, deleteRepositoryJob);
 app.get('/api/queue/status', apiAuth, getQueueStatus);
 
 // Code search API

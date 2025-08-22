@@ -230,6 +230,18 @@
       </BaseTable>
     </BaseCard>
 
+    <!-- Success Alert -->
+    <BaseAlert
+      v-if="statusStore.successMessage"
+      type="success"
+      :show="!!statusStore.successMessage"
+      title="Success"
+      :message="statusStore.successMessage"
+      dismissible
+      @dismiss="statusStore.clearSuccessMessage"
+      class="mt-6"
+    />
+
     <!-- Error Alert -->
     <BaseAlert
       v-if="statusStore.error"
@@ -272,7 +284,7 @@
           <BaseButton
             variant="danger"
             @click="handleDelete"
-            :loading="!!(jobToDelete && deletingJobs.has(jobToDelete))"
+            :loading="jobToDelete && deletingJobs.has(jobToDelete)"
           >
             Delete Job
           </BaseButton>
@@ -366,6 +378,7 @@ const handleRetry = async (processingId: string) => {
     if (response.success) {
       // Show success message
       statusStore.clearError()
+      statusStore.setSuccessMessage('Job queued for retry successfully!')
 
       // Refresh the status to get updated job list
       await refreshStatus()
@@ -389,6 +402,7 @@ const handleCancel = async (processingId: string) => {
     if (response.success) {
       // Show success message
       statusStore.clearError()
+      statusStore.setSuccessMessage('Job cancelled successfully!')
 
       // Refresh the status to get updated job list
       await refreshStatus()
@@ -412,6 +426,7 @@ const handleReembed = async (repositoryUrl: string, processingId: string) => {
     if (response.success) {
       // Show success message
       statusStore.clearError()
+      statusStore.setSuccessMessage('Re-embedding started successfully!')
 
       // Refresh the status to get updated job list
       await refreshStatus()
@@ -442,6 +457,7 @@ const handleDelete = async () => {
     if (response.success) {
       // Show success message
       statusStore.clearError()
+      statusStore.setSuccessMessage('Job deleted successfully!')
 
       // Refresh the status to get updated job list
       await refreshStatus()

@@ -21,6 +21,7 @@ export const useStatusStore = defineStore('status', () => {
   })
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const successMessage = ref<string | null>(null)
 
   const fetchQueueStatus = async () => {
     isLoading.value = true
@@ -66,15 +67,30 @@ export const useStatusStore = defineStore('status', () => {
     error.value = null
   }
 
+  const setSuccessMessage = (message: string) => {
+    successMessage.value = message
+    // Auto-clear success message after 5 seconds
+    setTimeout(() => {
+      successMessage.value = null
+    }, 5000)
+  }
+
+  const clearSuccessMessage = () => {
+    successMessage.value = null
+  }
+
   return {
     queueJobs,
     queueStats,
     systemHealth,
     isLoading,
     error,
+    successMessage,
     fetchQueueStatus,
     fetchSystemHealth,
     refreshStatus,
-    clearError
+    clearError,
+    setSuccessMessage,
+    clearSuccessMessage
   }
 })

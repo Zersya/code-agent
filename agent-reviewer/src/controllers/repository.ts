@@ -164,3 +164,84 @@ export const retryRepositoryJob = async (req: Request, res: Response): Promise<v
     });
   }
 };
+
+/**
+ * Cancel a repository embedding job
+ */
+export const cancelRepositoryJob = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { processingId } = req.params;
+
+    if (!processingId) {
+      res.status(400).json({
+        success: false,
+        error: 'Processing ID is required'
+      });
+      return;
+    }
+
+    // Attempt to cancel the job
+    const result = await queueService.cancelJob(processingId);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          processingId,
+          status: result.job?.status,
+          updatedAt: result.job?.updatedAt
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error cancelling repository job:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Delete a repository embedding job
+ */
+export const deleteRepositoryJob = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { processingId } = req.params;
+
+    if (!processingId) {
+      res.status(400).json({
+        success: false,
+        error: 'Processing ID is required'
+      });
+      return;
+    }
+
+    // Attempt to delete the job
+    const result = await queueService.deleteJob(processingId);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error deleting repository job:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
