@@ -35,7 +35,7 @@
 
     <!-- Delete Confirmation Modal -->
     <BaseModal
-      v-if="showDeleteModal"
+      :show="showDeleteModal"
       title="Delete Documentation Source"
       @close="showDeleteModal = false"
     >
@@ -66,7 +66,7 @@
 
     <!-- Re-embed Confirmation Modal -->
     <BaseModal
-      v-if="showReembedModal"
+      :show="showReembedModal"
       title="Re-embed Documentation Source"
       @close="showReembedModal = false"
     >
