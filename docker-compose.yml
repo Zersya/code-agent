@@ -122,7 +122,7 @@ services:
     restart: unless-stopped
     environment:
       - HF_HOME=/cache/huggingface
-      - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B
+      - MODEL_NAME=Qwen/Qwen3-Embedding-0.6B
       - DEVICE=cuda
     volumes:
       - huggingface_cache_vol:/cache/huggingface

@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-MODEL_NAME = os.getenv("MODEL_NAME", "Qodo/Qodo-Embed-1-1.5B")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
 DEVICE = os.getenv("DEVICE", "cpu") # Can be 'cuda' if GPU is available
 
 app = FastAPI()
@@ -25,7 +25,7 @@ logger.info("This may take a while if the model needs to be downloaded...")
 start_time = time.time()
 try:
     # trust_remote_code is needed for Qodo models
-    model_instance = SentenceTransformer(MODEL_NAME, trust_remote_code=("Qodo" in MODEL_NAME), device=DEVICE)
+    model_instance = SentenceTransformer(MODEL_NAME, device=DEVICE)
     end_time = time.time()
     logger.info(f"Model '{MODEL_NAME}' loaded successfully on device '{DEVICE}' in {end_time - start_time:.2f} seconds.")
 except Exception as e:

@@ -168,7 +168,7 @@ CREATE TABLE embeddings (
   repository_url TEXT,
   file_path TEXT NOT NULL,
   content TEXT,
-  embedding vector(1536), -- Uses pgvector extension
+  embedding vector(1024), -- Uses pgvector extension
   language TEXT,
   commit_id TEXT NOT NULL,
   branch TEXT,

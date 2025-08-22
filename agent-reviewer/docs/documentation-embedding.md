@@ -60,7 +60,7 @@ CREATE TABLE documentation_embeddings (
   section TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
-  embedding vector(1536), -- or JSONB if pgvector not available
+  embedding vector(1024), -- or JSONB if pgvector not available
   url TEXT,
   framework TEXT NOT NULL,
   version TEXT,

@@ -285,7 +285,7 @@ describe('Context Service', () => {
 
   describe('Performance considerations', () => {
     test('should handle context with various embedding sizes', () => {
-      const embeddingSizes = [128, 256, 512, 768, 1024, 1536];
+      const embeddingSizes = [128, 256, 512, 768, 1024, 1024];
 
       embeddingSizes.forEach(size => {
         const mockFile = {

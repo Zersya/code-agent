@@ -122,7 +122,7 @@ describe('Database Service', () => {
       const testVectors = [
         [0.1, 0.2, 0.3], // Small vector
         new Array(128).fill(0).map((_, i) => i / 128), // Medium vector
-        new Array(1536).fill(0).map((_, i) => Math.random()), // Large vector (OpenAI size)
+        new Array(1024).fill(0).map((_, i) => Math.random()), // Large vector (OpenAI size)
       ];
 
       testVectors.forEach((vector, index) => {

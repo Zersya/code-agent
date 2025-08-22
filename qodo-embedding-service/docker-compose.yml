@@ -12,7 +12,7 @@ services:
       # This path will be backed by the named volume.
       - HF_HOME=/cache/huggingface
       # You can also set other relevant env vars here if needed:
-      - MODEL_NAME=Qodo/Qodo-Embed-1-1.5B # Already in main.py with getenv
+      - MODEL_NAME=Qwen/Qwen3-Embedding-0.6B # Already in main.py with getenv
       - DEVICE=cpu # Already in main.py with getenv
       # - TRANSFORMERS_CACHE=/cache/huggingface/hub # More specific, HF_HOME is usually sufficient
     volumes:
