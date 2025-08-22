@@ -68,6 +68,22 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         processingEfficiency: 0,
         lastEmbeddingTime: null
       }
+    },
+
+    // Merge request metrics (optional)
+    mergeRequestMetrics: {
+      totalMRs: 0,
+      mergedMRs: 0,
+      closedMRs: 0,
+      openMRs: 0,
+      successRate: 0,
+      avgMergeTime: 0,
+      mrsByStatus: { opened: 0, merged: 0, closed: 0 },
+      mrsByUser: [],
+      mrsByProject: [],
+      mergeTimeTrends: [],
+      dailyMRCreation: [],
+      repopoVsGitlab: { repopo_count: 0, gitlab_count: 0 }
     }
   })
   const isLoading = ref(false)

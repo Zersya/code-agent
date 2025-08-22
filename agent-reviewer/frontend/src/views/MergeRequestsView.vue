@@ -25,7 +25,7 @@
     </div>
 
     <!-- Error Alert -->
-    <BaseAlert v-if="mrStore.error" type="error" @dismiss="mrStore.clearError">
+    <BaseAlert v-if="mrStore.error" type="danger" @dismiss="mrStore.clearError">
       {{ mrStore.error }}
     </BaseAlert>
 
@@ -116,10 +116,10 @@
         <!-- Pagination -->
         <div class="mt-6">
           <BasePagination
-            v-model:page="currentPage"
+            :current-page="currentPage"
             :total-pages="mrStore.pagination.totalPages"
-            :has-next="mrStore.pagination.hasNext"
-            :has-prev="mrStore.pagination.hasPrev"
+            :total="mrStore.pagination.total"
+            :per-page="mrStore.pagination.limit"
             @page-change="handlePageChange"
           />
         </div>
@@ -165,7 +165,7 @@ const mergeTimeTrends = computed(() => {
   return []
 })
 
-let debounceTimer: number | null = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const debouncedApplyFilters = () => {
   if (debounceTimer) {

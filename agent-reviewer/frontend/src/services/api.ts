@@ -16,7 +16,10 @@ import type {
   RepositoryEmbeddingStatus,
   DocumentationSourceRequest,
   DocumentationSourceResponse,
-  ProjectDocumentationMapping
+  ProjectDocumentationMapping,
+  MergeRequestDetails,
+  UserMRStatistics,
+  MergeRequestListParams
 } from '@/types'
 
 class ApiClient {

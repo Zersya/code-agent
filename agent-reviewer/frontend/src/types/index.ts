@@ -181,6 +181,42 @@ export interface AnalyticsData {
       lastEmbeddingTime: string | null
     }
   }
+
+  // Merge request metrics (optional, may not be available)
+  mergeRequestMetrics?: {
+    totalMRs: number
+    mergedMRs: number
+    closedMRs: number
+    openMRs: number
+    successRate: number
+    avgMergeTime: number
+    mrsByStatus: {
+      opened: number
+      merged: number
+      closed: number
+    }
+    mrsByUser: Array<{
+      username: string
+      total_mrs: number
+      merged_mrs: number
+      success_rate: number
+      avg_merge_time_hours: number
+    }>
+    mrsByProject: Array<{
+      project_id: number
+      project_name: string
+      total_mrs: number
+      merged_mrs: number
+      success_rate: number
+      avg_merge_time_hours: number
+    }>
+    mergeTimeTrends: TimeSeriesData[]
+    dailyMRCreation: TimeSeriesData[]
+    repopoVsGitlab: {
+      repopo_count: number
+      gitlab_count: number
+    }
+  }
 }
 
 export interface PaginationParams {
