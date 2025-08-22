@@ -163,11 +163,29 @@
         </template>
 
         <template #cell-actions="{ item }">
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-1 flex-wrap gap-1">
+            <!-- Cancel Button for pending/processing jobs -->
             <BaseButton
+              v-if="item.status === 'pending' || item.status === 'processing'"
+              @click="handleCancel(item.processingId)"
+              :loading="cancelingJobs.has(item.processingId)"
+              size="xs"
+              variant="secondary"
+              class="text-orange-600 border-orange-300 hover:bg-orange-50"
+            >
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Cancel
+            </BaseButton>
+
+            <!-- Retry Button for failed jobs -->
+            <BaseButton
+              v-if="item.status === 'failed'"
               @click="handleRetry(item.processingId)"
               :loading="retryingJobs.has(item.processingId)"
               size="xs"
+              variant="secondary"
               class="text-primary-600 border-primary-300 hover:bg-primary-50"
             >
               <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,6 +193,38 @@
               </svg>
               Retry
             </BaseButton>
+
+            <!-- Re-embed Button for completed jobs -->
+            <BaseButton
+              v-if="item.status === 'completed'"
+              @click="handleReembed(item.repositoryUrl, item.processingId)"
+              :loading="reembeddingJobs.has(item.processingId)"
+              size="xs"
+              variant="secondary"
+              class="text-green-600 border-green-300 hover:bg-green-50"
+            >
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Re-embed
+            </BaseButton>
+
+            <!-- Delete Button for all jobs -->
+            <BaseButton
+              @click="confirmDelete(item.processingId)"
+              :loading="deletingJobs.has(item.processingId)"
+              size="xs"
+              variant="secondary"
+              class="text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </BaseButton>
+
+            <!-- Show dash if no actions available -->
+            <span v-if="item.status !== 'pending' && item.status !== 'processing' && item.status !== 'failed' && item.status !== 'completed'" class="text-gray-400 text-xs">-</span>
           </div>
         </template>
       </BaseTable>
@@ -191,6 +241,44 @@
       @dismiss="statusStore.clearError"
       class="mt-6"
     />
+
+    <!-- Delete Confirmation Modal -->
+    <BaseModal
+      v-if="showDeleteConfirm"
+      title="Confirm Delete"
+      @close="cancelDelete"
+    >
+      <div class="p-6">
+        <div class="flex items-center mb-4">
+          <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+        </div>
+        <div class="text-center">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">Delete Job</h3>
+          <p class="text-sm text-gray-500 mb-6">
+            Are you sure you want to delete this job? This action cannot be undone and will permanently remove the job from the system.
+          </p>
+        </div>
+        <div class="flex justify-end space-x-3">
+          <BaseButton
+            variant="secondary"
+            @click="cancelDelete"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton
+            variant="danger"
+            @click="handleDelete"
+            :loading="jobToDelete && deletingJobs.has(jobToDelete)"
+          >
+            Delete Job
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -203,10 +291,16 @@ import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseTable from '@/components/BaseTable.vue'
 import BaseAlert from '@/components/BaseAlert.vue'
+import BaseModal from '@/components/BaseModal.vue'
 
 const statusStore = useStatusStore()
 const lastUpdated = ref(format(new Date(), 'HH:mm:ss'))
 const retryingJobs = ref(new Set<string>())
+const cancelingJobs = ref(new Set<string>())
+const reembeddingJobs = ref(new Set<string>())
+const deletingJobs = ref(new Set<string>())
+const showDeleteConfirm = ref(false)
+const jobToDelete = ref<string | null>(null)
 
 let refreshInterval: NodeJS.Timeout
 
@@ -284,6 +378,91 @@ const handleRetry = async (processingId: string) => {
   } finally {
     retryingJobs.value.delete(processingId)
   }
+}
+
+const handleCancel = async (processingId: string) => {
+  try {
+    cancelingJobs.value.add(processingId)
+
+    const response = await repositoryApi.cancelJob(processingId)
+
+    if (response.success) {
+      // Show success message
+      statusStore.clearError()
+
+      // Refresh the status to get updated job list
+      await refreshStatus()
+    } else {
+      statusStore.error = response.message || 'Failed to cancel job'
+    }
+  } catch (error: any) {
+    console.error('Error canceling job:', error)
+    statusStore.error = error.message || 'Failed to cancel job'
+  } finally {
+    cancelingJobs.value.delete(processingId)
+  }
+}
+
+const handleReembed = async (repositoryUrl: string, processingId: string) => {
+  try {
+    reembeddingJobs.value.add(processingId)
+
+    const response = await repositoryApi.reembedRepository(repositoryUrl, 'normal')
+
+    if (response.success) {
+      // Show success message
+      statusStore.clearError()
+
+      // Refresh the status to get updated job list
+      await refreshStatus()
+    } else {
+      statusStore.error = response.message || 'Failed to start re-embedding'
+    }
+  } catch (error: any) {
+    console.error('Error starting re-embedding:', error)
+    statusStore.error = error.message || 'Failed to start re-embedding'
+  } finally {
+    reembeddingJobs.value.delete(processingId)
+  }
+}
+
+const confirmDelete = (processingId: string) => {
+  jobToDelete.value = processingId
+  showDeleteConfirm.value = true
+}
+
+const handleDelete = async () => {
+  if (!jobToDelete.value) return
+
+  try {
+    deletingJobs.value.add(jobToDelete.value)
+
+    const response = await repositoryApi.deleteJob(jobToDelete.value)
+
+    if (response.success) {
+      // Show success message
+      statusStore.clearError()
+
+      // Refresh the status to get updated job list
+      await refreshStatus()
+    } else {
+      statusStore.error = response.message || 'Failed to delete job'
+    }
+  } catch (error: any) {
+    console.error('Error deleting job:', error)
+    statusStore.error = error.message || 'Failed to delete job'
+  } finally {
+    if (jobToDelete.value) {
+      deletingJobs.value.delete(jobToDelete.value)
+    }
+    showDeleteConfirm.value = false
+    jobToDelete.value = null
+  }
+}
+
+const cancelDelete = () => {
+  showDeleteConfirm.value = false
+  jobToDelete.value = null
 }
 
 const refreshStatus = async () => {

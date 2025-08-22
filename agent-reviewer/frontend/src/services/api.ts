@@ -167,6 +167,19 @@ export const repositoryApi = {
   retryJob: (processingId: string): Promise<ApiResponse<{ processingId: string; status: string; updatedAt: string }>> =>
     apiClient.post<{ processingId: string; status: string; updatedAt: string }>(`/repositories/retry/${processingId}`),
 
+  cancelJob: (processingId: string): Promise<ApiResponse<{ processingId: string; status: string; updatedAt: string }>> =>
+    apiClient.post<{ processingId: string; status: string; updatedAt: string }>(`/repositories/cancel/${processingId}`),
+
+  deleteJob: (processingId: string): Promise<ApiResponse<void>> =>
+    apiClient.delete<void>(`/repositories/job/${processingId}`),
+
+  reembedRepository: (repositoryUrl: string, priority?: 'high' | 'normal' | 'low'): Promise<ApiResponse<RepositoryEmbeddingResponse>> =>
+    apiClient.post<RepositoryEmbeddingResponse>('/repositories/embed', {
+      repositoryUrl,
+      priority: priority || 'normal',
+      isReembedding: true
+    }),
+
   getQueueStatus: (params?: PaginationParams): Promise<ApiResponse<{ stats: QueueStats; jobs: QueueJob[] }>> =>
     apiClient.get<{ stats: QueueStats; jobs: QueueJob[] }>('/queue/status', params),
 }
