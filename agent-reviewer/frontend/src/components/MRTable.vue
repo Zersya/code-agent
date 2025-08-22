@@ -57,7 +57,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { format } from 'date-fns'
 import BaseTable from './BaseTable.vue'
 import type { MergeRequestDetails } from '@/types'
 
