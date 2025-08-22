@@ -150,6 +150,25 @@ export const analyticsApi = {
     apiClient.get<AnalyticsData>('/analytics', dateRange),
 }
 
+// Merge Request API
+export const mergeRequestApi = {
+  getMergeRequests: (params: MergeRequestListParams): Promise<ApiResponse<MergeRequestDetails[]>> =>
+    apiClient.get<MergeRequestDetails[]>('/merge-requests', params),
+
+  getMergeRequest: (id: number): Promise<ApiResponse<MergeRequestDetails>> =>
+    apiClient.get<MergeRequestDetails>(`/merge-requests/${id}`),
+
+  getUserStatistics: (username: string): Promise<ApiResponse<UserMRStatistics>> =>
+    apiClient.get<UserMRStatistics>(`/users/${username}/mr-statistics`),
+
+  exportMergeRequests: async (params: MergeRequestListParams): Promise<string> => {
+    const response = await apiClient.getRaw('/merge-requests/export', params, {
+      responseType: 'text'
+    })
+    return response.data
+  },
+}
+
 // Projects API
 export const projectsApi = {
   getProjects: (): Promise<ApiResponse<Project[]>> =>

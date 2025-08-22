@@ -265,6 +265,199 @@ async function getEmbeddingMetrics(dateFrom: Date, dateTo: Date) {
 }
 
 /**
+ * Get merge request analytics metrics
+ */
+async function getMergeRequestMetrics(dateFrom: Date, dateTo: Date) {
+  try {
+    // Check if MR tracking table exists
+    const tableExistsQuery = `
+      SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'merge_request_tracking')
+    `;
+    const tableResult = await dbService.query(tableExistsQuery);
+    const tableExists = tableResult.rows[0].exists;
+
+    if (!tableExists) {
+      return {
+        totalMRs: 0,
+        mergedMRs: 0,
+        closedMRs: 0,
+        openMRs: 0,
+        successRate: 0,
+        avgMergeTime: 0,
+        mrsByStatus: { opened: 0, merged: 0, closed: 0 },
+        mrsByUser: [],
+        mrsByProject: [],
+        mergeTimeTrends: [],
+        dailyMRCreation: [],
+        repopoVsGitlab: { repopo_count: 0, gitlab_count: 0 }
+      };
+    }
+
+    // Get basic MR statistics
+    const basicStatsQuery = `
+      SELECT
+        COUNT(*) as total_mrs,
+        COUNT(CASE WHEN status = 'merged' THEN 1 END) as merged_mrs,
+        COUNT(CASE WHEN status = 'closed' AND merged_at IS NULL THEN 1 END) as closed_mrs,
+        COUNT(CASE WHEN status = 'opened' THEN 1 END) as open_mrs,
+        AVG(CASE
+          WHEN merged_at IS NOT NULL AND created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (merged_at - created_at)) / 3600
+        END) as avg_merge_time_hours
+      FROM merge_request_tracking
+      WHERE created_at BETWEEN $1 AND $2
+    `;
+    const basicStatsResult = await dbService.query(basicStatsQuery, [dateFrom, dateTo]);
+    const basicStats = basicStatsResult.rows[0];
+
+    const totalMRs = parseInt(basicStats.total_mrs) || 0;
+    const mergedMRs = parseInt(basicStats.merged_mrs) || 0;
+    const successRate = totalMRs > 0 ? Math.round((mergedMRs / totalMRs) * 100) : 0;
+
+    // Get MRs by status
+    const statusQuery = `
+      SELECT
+        status,
+        COUNT(*) as count
+      FROM merge_request_tracking
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY status
+    `;
+    const statusResult = await dbService.query(statusQuery, [dateFrom, dateTo]);
+    const mrsByStatus = statusResult.rows.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count);
+      return acc;
+    }, { opened: 0, merged: 0, closed: 0 });
+
+    // Get top users by MR activity
+    const userStatsQuery = `
+      SELECT
+        author_username as username,
+        COUNT(*) as total_mrs,
+        COUNT(CASE WHEN status = 'merged' THEN 1 END) as merged_mrs,
+        CASE
+          WHEN COUNT(*) > 0
+          THEN ROUND((COUNT(CASE WHEN status = 'merged' THEN 1 END)::decimal / COUNT(*)::decimal) * 100, 2)
+          ELSE 0
+        END as success_rate,
+        AVG(CASE
+          WHEN merged_at IS NOT NULL AND created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (merged_at - created_at)) / 3600
+        END) as avg_merge_time_hours
+      FROM merge_request_tracking
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY author_username
+      ORDER BY total_mrs DESC
+      LIMIT 10
+    `;
+    const userStatsResult = await dbService.query(userStatsQuery, [dateFrom, dateTo]);
+
+    // Get project statistics
+    const projectStatsQuery = `
+      SELECT
+        p.name as project_name,
+        mrt.project_id,
+        COUNT(*) as total_mrs,
+        COUNT(CASE WHEN mrt.status = 'merged' THEN 1 END) as merged_mrs,
+        CASE
+          WHEN COUNT(*) > 0
+          THEN ROUND((COUNT(CASE WHEN mrt.status = 'merged' THEN 1 END)::decimal / COUNT(*)::decimal) * 100, 2)
+          ELSE 0
+        END as success_rate,
+        AVG(CASE
+          WHEN mrt.merged_at IS NOT NULL AND mrt.created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at)) / 3600
+        END) as avg_merge_time_hours
+      FROM merge_request_tracking mrt
+      LEFT JOIN projects p ON mrt.project_id = p.project_id
+      WHERE mrt.created_at BETWEEN $1 AND $2
+      GROUP BY mrt.project_id, p.name
+      ORDER BY total_mrs DESC
+      LIMIT 10
+    `;
+    const projectStatsResult = await dbService.query(projectStatsQuery, [dateFrom, dateTo]);
+
+    // Get daily MR creation trends
+    const dailyTrendsQuery = `
+      SELECT
+        DATE(created_at) as date,
+        COUNT(*) as value
+      FROM merge_request_tracking
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `;
+    const dailyTrendsResult = await dbService.query(dailyTrendsQuery, [dateFrom, dateTo]);
+
+    // Get Repopo vs GitLab statistics
+    const repopoStatsQuery = `
+      SELECT
+        is_repopo_event,
+        COUNT(*) as count
+      FROM merge_request_tracking
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY is_repopo_event
+    `;
+    const repopoStatsResult = await dbService.query(repopoStatsQuery, [dateFrom, dateTo]);
+    const repopoVsGitlab = repopoStatsResult.rows.reduce((acc, row) => {
+      if (row.is_repopo_event) {
+        acc.repopo_count = parseInt(row.count);
+      } else {
+        acc.gitlab_count = parseInt(row.count);
+      }
+      return acc;
+    }, { repopo_count: 0, gitlab_count: 0 });
+
+    return {
+      totalMRs,
+      mergedMRs: parseInt(basicStats.merged_mrs) || 0,
+      closedMRs: parseInt(basicStats.closed_mrs) || 0,
+      openMRs: parseInt(basicStats.open_mrs) || 0,
+      successRate,
+      avgMergeTime: parseFloat(basicStats.avg_merge_time_hours) || 0,
+      mrsByStatus,
+      mrsByUser: userStatsResult.rows.map(row => ({
+        username: row.username,
+        total_mrs: parseInt(row.total_mrs),
+        merged_mrs: parseInt(row.merged_mrs),
+        success_rate: parseFloat(row.success_rate),
+        avg_merge_time_hours: parseFloat(row.avg_merge_time_hours) || 0
+      })),
+      mrsByProject: projectStatsResult.rows.map(row => ({
+        project_id: row.project_id,
+        project_name: row.project_name || 'Unknown Project',
+        total_mrs: parseInt(row.total_mrs),
+        merged_mrs: parseInt(row.merged_mrs),
+        success_rate: parseFloat(row.success_rate),
+        avg_merge_time_hours: parseFloat(row.avg_merge_time_hours) || 0
+      })),
+      mergeTimeTrends: [], // Could be implemented later for more detailed time analysis
+      dailyMRCreation: dailyTrendsResult.rows.map(row => ({
+        date: format(new Date(row.date), 'yyyy-MM-dd'),
+        value: parseInt(row.value)
+      })),
+      repopoVsGitlab
+    };
+  } catch (error) {
+    console.error('Error getting MR metrics:', error);
+    return {
+      totalMRs: 0,
+      mergedMRs: 0,
+      closedMRs: 0,
+      openMRs: 0,
+      successRate: 0,
+      avgMergeTime: 0,
+      mrsByStatus: { opened: 0, merged: 0, closed: 0 },
+      mrsByUser: [],
+      mrsByProject: [],
+      mergeTimeTrends: [],
+      dailyMRCreation: [],
+      repopoVsGitlab: { repopo_count: 0, gitlab_count: 0 }
+    };
+  }
+}
+
+/**
  * Get analytics data for the dashboard
  */
 export const getAnalytics = async (req: Request, res: Response): Promise<void> => {
@@ -388,6 +581,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     // Get embedding system metrics
     const embeddingMetrics = await getEmbeddingMetrics(dateFrom, dateTo);
 
+    // Get merge request metrics
+    const mrMetrics = await getMergeRequestMetrics(dateFrom, dateTo);
+
     // Issue categories (enhanced with actual data when available)
     const issueCategories = [
       { category: 'Code Quality', count: 0, percentage: 0 },
@@ -436,6 +632,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
       // Embedding system metrics
       embeddingMetrics,
+
+      // Merge request metrics
+      mergeRequestMetrics: mrMetrics,
 
       // System health
       queueStats

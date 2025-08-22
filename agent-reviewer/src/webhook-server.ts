@@ -21,6 +21,7 @@ import {
 } from './controllers/documentation.js';
 import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.js';
 import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
+import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests } from './controllers/admin-merge-requests.js';
 import { getAnalytics, getSystemHealth } from './controllers/admin-analytics.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
@@ -131,6 +132,12 @@ app.get('/api/auth/me', adminAuth, getAdminUser);
 // Review history endpoints
 app.get('/api/reviews', adminAuth, getReviewHistory);
 app.get('/api/reviews/export', adminAuth, exportReviewHistory);
+
+// Merge request tracking endpoints
+app.get('/api/merge-requests', adminAuth, getMergeRequests);
+app.get('/api/merge-requests/export', adminAuth, exportMergeRequests);
+app.get('/api/merge-requests/:id', adminAuth, getMergeRequest);
+app.get('/api/users/:username/mr-statistics', adminAuth, getUserMRStatistics);
 
 // Analytics endpoints
 app.get('/api/analytics', adminAuth, getAnalytics);
