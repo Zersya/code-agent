@@ -272,7 +272,7 @@
           <BaseButton
             variant="danger"
             @click="handleDelete"
-            :loading="jobToDelete && deletingJobs.has(jobToDelete)"
+            :loading="!!(jobToDelete && deletingJobs.has(jobToDelete))"
           >
             Delete Job
           </BaseButton>
