@@ -169,7 +169,6 @@
               @click="handleRetry(item.processingId)"
               :loading="retryingJobs.has(item.processingId)"
               size="xs"
-              variant="outline"
               class="text-primary-600 border-primary-300 hover:bg-primary-50"
             >
               <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -21,7 +21,7 @@ import { computed } from 'vue'
 interface Props {
   type?: 'button' | 'submit' | 'reset'
   variant?: 'primary' | 'secondary' | 'danger' | 'success'
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   label?: string
   disabled?: boolean
   loading?: boolean
