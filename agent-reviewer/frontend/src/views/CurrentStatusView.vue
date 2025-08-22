@@ -165,7 +165,6 @@
         <template #cell-actions="{ item }">
           <div class="flex items-center space-x-2">
             <BaseButton
-              v-if="item.status === 'failed'"
               @click="handleRetry(item.processingId)"
               :loading="retryingJobs.has(item.processingId)"
               size="xs"
@@ -176,7 +175,6 @@
               </svg>
               Retry
             </BaseButton>
-            <span v-else class="text-gray-400 text-xs">-</span>
           </div>
         </template>
       </BaseTable>
