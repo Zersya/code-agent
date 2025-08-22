@@ -163,12 +163,18 @@ const handleStatusUpdated = (status: EmbeddingStatus) => {
 
 const handleRetry = async (processingId: string) => {
   try {
-    // Note: This would need to be implemented in the backend API
-    // For now, we'll just show a message
-    successMessage.value = `Retry requested for processing ID: ${processingId}`
+    const response = await repositoryApi.retryJob(processingId)
+
+    if (response.success) {
+      successMessage.value = `Job retry queued successfully! Processing ID: ${processingId}`
+      // Refresh the recent jobs list
+      await fetchRecentJobs()
+    } else {
+      errorMessage.value = response.message || 'Failed to retry the embedding job'
+    }
   } catch (error: any) {
     console.error('Error retrying job:', error)
-    errorMessage.value = 'Failed to retry the embedding job'
+    errorMessage.value = error.message || 'Failed to retry the embedding job'
   }
 }
 

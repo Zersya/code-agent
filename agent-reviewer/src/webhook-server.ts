@@ -6,7 +6,7 @@ import { webhookAuth } from './middleware/webhook-auth.js';
 import { apiAuth } from './middleware/api-auth.js';
 import { adminAuth } from './middleware/admin-auth.js';
 import { processWebhook } from './controllers/webhook.js';
-import { processRepository, getRepositoryStatus, getQueueStatus } from './controllers/repository.js';
+import { processRepository, getRepositoryStatus, getQueueStatus, retryRepositoryJob } from './controllers/repository.js';
 import { searchCode, listProjects } from './controllers/search.js';
 import {
   addDocumentationSource,
@@ -15,6 +15,7 @@ import {
   updateDocumentationSource,
   deleteDocumentationSource,
   reembedDocumentationSource,
+  retryDocumentationJob,
   mapProjectToDocumentation,
   getProjectDocumentationMappings
 } from './controllers/documentation.js';
@@ -88,6 +89,7 @@ app.post('/webhook', webhookAuth, processWebhook);
 // Repository embedding API
 app.post('/api/repositories/embed', apiAuth, processRepository);
 app.get('/api/repositories/status/:processingId', apiAuth, getRepositoryStatus);
+app.post('/api/repositories/retry/:processingId', apiAuth, retryRepositoryJob);
 app.get('/api/queue/status', apiAuth, getQueueStatus);
 
 // Code search API
@@ -101,6 +103,7 @@ app.get('/api/documentation/sources/:id', apiAuth, getDocumentationSource);
 app.put('/api/documentation/sources/:id', apiAuth, updateDocumentationSource);
 app.delete('/api/documentation/sources/:id', apiAuth, deleteDocumentationSource);
 app.post('/api/documentation/sources/:id/reembed', apiAuth, reembedDocumentationSource);
+app.post('/api/documentation/retry/:processingId', apiAuth, retryDocumentationJob);
 
 // Project documentation mapping API
 app.post('/api/projects/:projectId/documentation', apiAuth, mapProjectToDocumentation);

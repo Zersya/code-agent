@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { documentationService } from '../services/documentation.js';
 import { dbService } from '../services/database.js';
+import { queueService } from '../services/queue.js';
 import { DocumentationSource } from '../models/embedding.js';
 
 /**
@@ -227,6 +228,49 @@ export async function reembedDocumentationSource(req: Request, res: Response): P
     res.status(500).json({
       error: 'Failed to trigger documentation re-embedding',
       details: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/**
+ * Retry a failed documentation embedding job
+ */
+export async function retryDocumentationJob(req: Request, res: Response): Promise<void> {
+  try {
+    const { processingId } = req.params;
+
+    if (!processingId) {
+      res.status(400).json({
+        success: false,
+        error: 'Processing ID is required'
+      });
+      return;
+    }
+
+    // Attempt to retry the documentation job
+    const result = await queueService.retryDocumentationJob(processingId);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          processingId,
+          status: result.job?.status,
+          updatedAt: result.job?.updatedAt
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error retrying documentation job:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 }

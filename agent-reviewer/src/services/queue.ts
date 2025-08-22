@@ -755,6 +755,92 @@ export class QueueService {
   }
 
   /**
+   * Retry a failed job by resetting its status to PENDING
+   */
+  async retryJob(processingId: string): Promise<{ success: boolean; message: string; job?: EmbeddingJob }> {
+    try {
+      // Get the job by processing ID
+      const job = await this.getJobByProcessingId(processingId);
+
+      if (!job) {
+        return { success: false, message: 'Job not found' };
+      }
+
+      // Validate that the job can be retried
+      if (job.status !== JobStatus.FAILED) {
+        return { success: false, message: `Job cannot be retried. Current status: ${job.status}` };
+      }
+
+      // Reset job status and clear error
+      job.status = JobStatus.PENDING;
+      job.error = undefined;
+      job.updatedAt = new Date();
+      job.completedAt = undefined;
+
+      // Save the updated job
+      await this.saveJob(job);
+
+      console.log(`Job ${processingId} has been queued for retry`);
+
+      // Start processing if not already processing
+      if (!this.isProcessing) {
+        this.startProcessing();
+      }
+
+      return { success: true, message: 'Job queued for retry', job };
+    } catch (error) {
+      console.error(`Error retrying job ${processingId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Retry a failed documentation job by resetting its status to PENDING
+   */
+  async retryDocumentationJob(processingId: string): Promise<{ success: boolean; message: string; job?: DocumentationJob }> {
+    try {
+      // Get the documentation job by processing ID
+      const job = await this.getDocumentationJobByProcessingId(processingId);
+
+      if (!job) {
+        return { success: false, message: 'Documentation job not found' };
+      }
+
+      // Validate that the job can be retried
+      if (job.status !== JobStatus.FAILED) {
+        return { success: false, message: `Documentation job cannot be retried. Current status: ${job.status}` };
+      }
+
+      // Reset job status and clear error
+      job.status = JobStatus.PENDING;
+      job.error = undefined;
+      job.updatedAt = new Date();
+      job.completedAt = undefined;
+
+      // Save the updated job
+      await this.saveDocumentationJob(job);
+
+      console.log(`Documentation job ${processingId} has been queued for retry`);
+
+      // Start processing if not already processing
+      if (!this.isProcessing) {
+        this.startProcessing();
+      }
+
+      return { success: true, message: 'Documentation job queued for retry', job };
+    } catch (error) {
+      console.error(`Error retrying documentation job ${processingId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Get queue statistics for monitoring
    */
   async getQueueStatistics(): Promise<{

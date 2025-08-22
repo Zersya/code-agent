@@ -121,3 +121,46 @@ export const getQueueStatus = async (req: Request, res: Response): Promise<void>
     });
   }
 };
+
+/**
+ * Retry a failed repository embedding job
+ */
+export const retryRepositoryJob = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { processingId } = req.params;
+
+    if (!processingId) {
+      res.status(400).json({
+        success: false,
+        error: 'Processing ID is required'
+      });
+      return;
+    }
+
+    // Attempt to retry the job
+    const result = await queueService.retryJob(processingId);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          processingId,
+          status: result.job?.status,
+          updatedAt: result.job?.updatedAt
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error retrying repository job:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};

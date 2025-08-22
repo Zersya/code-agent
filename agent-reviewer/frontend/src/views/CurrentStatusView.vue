@@ -161,6 +161,25 @@
           </span>
           <span v-else class="text-gray-400 text-xs">Initial</span>
         </template>
+
+        <template #cell-actions="{ item }">
+          <div class="flex items-center space-x-2">
+            <BaseButton
+              v-if="item.status === 'failed'"
+              @click="handleRetry(item.processingId)"
+              :loading="retryingJobs.has(item.processingId)"
+              size="xs"
+              variant="outline"
+              class="text-primary-600 border-primary-300 hover:bg-primary-50"
+            >
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry
+            </BaseButton>
+            <span v-else class="text-gray-400 text-xs">-</span>
+          </div>
+        </template>
       </BaseTable>
     </BaseCard>
 
@@ -182,6 +201,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { format } from 'date-fns'
 import { useStatusStore } from '@/stores/status'
+import { repositoryApi } from '@/services/api'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseTable from '@/components/BaseTable.vue'
@@ -189,6 +209,7 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const statusStore = useStatusStore()
 const lastUpdated = ref(format(new Date(), 'HH:mm:ss'))
+const retryingJobs = ref(new Set<string>())
 
 let refreshInterval: NodeJS.Timeout
 
@@ -198,7 +219,8 @@ const jobColumns = [
   { key: 'priority', label: 'Priority', sortable: false },
   { key: 'attempts', label: 'Attempts', sortable: false },
   { key: 'isReembedding', label: 'Type', sortable: false },
-  { key: 'createdAt', label: 'Created', sortable: false, type: 'date' as const, format: 'MMM dd, HH:mm' }
+  { key: 'createdAt', label: 'Created', sortable: false, type: 'date' as const, format: 'MMM dd, HH:mm' },
+  { key: 'actions', label: 'Actions', sortable: false }
 ]
 
 const successRate = computed(() => {
@@ -242,6 +264,29 @@ const getPriorityLabel = (priority: number) => {
   if (priority <= 3) return 'High'
   if (priority <= 5) return 'Medium'
   return 'Low'
+}
+
+const handleRetry = async (processingId: string) => {
+  try {
+    retryingJobs.value.add(processingId)
+
+    const response = await repositoryApi.retryJob(processingId)
+
+    if (response.success) {
+      // Show success message
+      statusStore.clearError()
+
+      // Refresh the status to get updated job list
+      await refreshStatus()
+    } else {
+      statusStore.error = response.message || 'Failed to retry job'
+    }
+  } catch (error: any) {
+    console.error('Error retrying job:', error)
+    statusStore.error = error.message || 'Failed to retry job'
+  } finally {
+    retryingJobs.value.delete(processingId)
+  }
 }
 
 const refreshStatus = async () => {

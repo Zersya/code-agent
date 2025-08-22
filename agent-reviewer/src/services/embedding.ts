@@ -727,8 +727,7 @@ export class EmbeddingService {
 
         // Add a delay between batches to avoid rate limiting
         if (i + batchSize < validFiles.length) {
-          const delay = 2000; // 2 seconds between batches
-          console.log(`Waiting ${delay}ms before processing next batch`);
+          const delay = 100;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       } catch (batchError) {

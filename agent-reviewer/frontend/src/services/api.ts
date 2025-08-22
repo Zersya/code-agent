@@ -164,6 +164,9 @@ export const repositoryApi = {
   getEmbeddingStatus: (processingId: string): Promise<ApiResponse<RepositoryEmbeddingStatus>> =>
     apiClient.get<RepositoryEmbeddingStatus>(`/repositories/status/${processingId}`),
 
+  retryJob: (processingId: string): Promise<ApiResponse<{ processingId: string; status: string; updatedAt: string }>> =>
+    apiClient.post<{ processingId: string; status: string; updatedAt: string }>(`/repositories/retry/${processingId}`),
+
   getQueueStatus: (params?: PaginationParams): Promise<ApiResponse<{ stats: QueueStats; jobs: QueueJob[] }>> =>
     apiClient.get<{ stats: QueueStats; jobs: QueueJob[] }>('/queue/status', params),
 }
