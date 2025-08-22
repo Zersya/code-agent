@@ -24,7 +24,7 @@ interface Props {
   size?: 'xs' | 'sm' | 'md' | 'lg'
   label?: string
   disabled?: boolean
-  loading?: boolean
+  loading?: boolean | undefined
   fullWidth?: boolean
 }
 
