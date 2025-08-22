@@ -207,6 +207,16 @@ const props = withDefaults(defineProps<Props>(), {
   errorMessage: ''
 })
 
+// Define the events this component can emit
+defineEmits<{
+  addNew: []
+  edit: [source: DocumentationSource]
+  delete: [sourceId: string]
+  reembed: [sourceId: string]
+  refresh: []
+  'error-dismissed': []
+}>()
+
 
 const searchQuery = ref('')
 const frameworkFilter = ref('')
