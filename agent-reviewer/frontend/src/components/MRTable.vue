@@ -72,7 +72,7 @@ interface Emits {
   (e: 'sort', field: string): void
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   loading: false,
   sortBy: '',
   sortOrder: 'asc'
@@ -119,56 +119,6 @@ const getStatusLabel = (status: string): string => {
     default:
       return status
   }
-}
-
-const formatDate = (dateString: string): string => {
-  return format(new Date(dateString), 'MMM dd, yyyy')
-}
-
-const formatMergeTime = (hours: number): string => {
-  if (hours < 1) {
-    return `${Math.round(hours * 60)}m`
-  } else if (hours < 24) {
-    return `${Math.round(hours * 10) / 10}h`
-  } else {
-    const days = Math.floor(hours / 24)
-    const remainingHours = Math.round(hours % 24)
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
-  }
-}
-
-const getStatusBadgeClass = (status: string): string => {
-  switch (status) {
-    case 'opened':
-      return 'bg-blue-100 text-blue-800'
-    case 'merged':
-      return 'bg-green-100 text-green-800'
-    case 'closed':
-      return 'bg-gray-100 text-gray-800'
-    case 'locked':
-      return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-800'
-  }
-}
-
-const getStatusLabel = (status: string): string => {
-  switch (status) {
-    case 'opened':
-      return 'Open'
-    case 'merged':
-      return 'Merged'
-    case 'closed':
-      return 'Closed'
-    case 'locked':
-      return 'Locked'
-    default:
-      return status
-  }
-}
-
-const formatDate = (dateString: string): string => {
-  return format(new Date(dateString), 'MMM dd, yyyy')
 }
 
 const formatMergeTime = (hours: number): string => {

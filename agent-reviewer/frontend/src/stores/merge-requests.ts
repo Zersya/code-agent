@@ -39,8 +39,8 @@ export const useMergeRequestStore = defineStore('mergeRequests', () => {
         if (response.pagination) {
           pagination.value = {
             ...response.pagination,
-            hasNext: response.pagination.hasNext || false,
-            hasPrev: response.pagination.hasPrev || false
+            hasNext: response.pagination.page < response.pagination.totalPages,
+            hasPrev: response.pagination.page > 1
           }
         }
         // Update filters with the actual params used
