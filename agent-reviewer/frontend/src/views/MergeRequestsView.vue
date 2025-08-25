@@ -68,7 +68,7 @@
             <div class="relative">
               <select
                 id="project"
-                v-model="filters.project_id"
+                v-model="filters.projectId"
                 @change="applyFilters"
                 :disabled="projectsStore.isLoading"
                 class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200 disabled:bg-gray-50 disabled:text-gray-500"
@@ -248,7 +248,7 @@ const projectsStore = useProjectsStore()
 const filters = ref<MergeRequestListParams>({
   page: 1,
   limit: 20,
-  project_id: undefined,
+  projectId: undefined,
   authorUsername: '',
   status: '',
   search: ''
@@ -258,7 +258,7 @@ const currentPage = ref(1)
 
 // Filter helper computed properties
 const hasActiveFilters = computed(() => {
-  return !!(filters.value.project_id || 
+  return !!(filters.value.projectId || 
            filters.value.authorUsername || 
            filters.value.status || 
            filters.value.search)
@@ -266,7 +266,7 @@ const hasActiveFilters = computed(() => {
 
 const activeFiltersCount = computed(() => {
   let count = 0
-  if (filters.value.project_id) count++
+  if (filters.value.projectId) count++
   if (filters.value.authorUsername) count++
   if (filters.value.status) count++
   if (filters.value.search) count++
@@ -332,7 +332,7 @@ const clearAllFilters = () => {
   filters.value = {
     page: 1,
     limit: 20,
-    project_id: undefined,
+    projectId: undefined,
     authorUsername: '',
     status: '',
     search: ''

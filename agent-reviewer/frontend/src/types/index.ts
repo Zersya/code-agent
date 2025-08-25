@@ -419,7 +419,7 @@ export interface TimeSeriesData {
 export interface MergeRequestListParams {
   page?: number
   limit?: number
-  project_id?: number
+  projectId?: number
   authorUsername?: string
   status?: 'opened' | 'merged' | 'closed' | ''
   from_date?: string
