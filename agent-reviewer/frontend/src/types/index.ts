@@ -181,6 +181,42 @@ export interface AnalyticsData {
       lastEmbeddingTime: string | null
     }
   }
+
+  // Merge request metrics (optional, may not be available)
+  mergeRequestMetrics?: {
+    totalMRs: number
+    mergedMRs: number
+    closedMRs: number
+    openMRs: number
+    successRate: number
+    avgMergeTime: number
+    mrsByStatus: {
+      opened: number
+      merged: number
+      closed: number
+    }
+    mrsByUser: Array<{
+      username: string
+      total_mrs: number
+      merged_mrs: number
+      success_rate: number
+      avg_merge_time_hours: number
+    }>
+    mrsByProject: Array<{
+      project_id: number
+      project_name: string
+      total_mrs: number
+      merged_mrs: number
+      success_rate: number
+      avg_merge_time_hours: number
+    }>
+    mergeTimeTrends: TimeSeriesData[]
+    dailyMRCreation: TimeSeriesData[]
+    repopoVsGitlab: {
+      repopo_count: number
+      gitlab_count: number
+    }
+  }
 }
 
 export interface PaginationParams {
@@ -285,4 +321,108 @@ export interface ProjectDocumentationMapping {
   priority: number
   createdAt: string
   updatedAt: string
+}
+
+// Merge Request Types
+export interface MergeRequestDetails {
+  id: number
+  project_id: number
+  merge_request_iid: number
+  merge_request_id: number
+  title: string
+  description: string
+  author: {
+    id: number
+    username: string
+    name: string
+  }
+  source_branch: string
+  target_branch: string
+  status: 'opened' | 'merged' | 'closed' | 'locked'
+  action: 'open' | 'update' | 'close' | 'merge' | 'reopen'
+  created_at: string
+  updated_at: string
+  merged_at?: string
+  closed_at?: string
+  merge_time_hours?: number
+  repository_url: string
+  web_url: string
+  is_repopo_event: boolean
+  project_name?: string
+}
+
+export interface UserMRStatistics {
+  username: string
+  user_id: number
+  projects: ProjectMRStats[]
+  overall: {
+    total_mrs_created: number
+    total_mrs_merged: number
+    total_mrs_closed: number
+    total_mrs_rejected: number
+    success_rate: number
+    avg_merge_time_hours: number
+    last_mr_created_at?: string
+    last_mr_merged_at?: string
+  }
+}
+
+export interface ProjectMRStats {
+  project_id: number
+  project_name: string
+  total_mrs_created: number
+  total_mrs_merged: number
+  success_rate: number
+  avg_merge_time_hours: number
+}
+
+export interface MRAnalytics {
+  total_mrs: number
+  mrs_by_status: {
+    opened: number
+    merged: number
+    closed: number
+  }
+  mrs_by_user: UserBreakdown[]
+  mrs_by_project: ProjectBreakdown[]
+  merge_time_trends: TimeSeriesData[]
+  daily_mr_creation: TimeSeriesData[]
+  repopo_vs_gitlab: {
+    repopo_count: number
+    gitlab_count: number
+  }
+}
+
+export interface UserBreakdown {
+  username: string
+  total_mrs: number
+  merged_mrs: number
+  success_rate: number
+  avg_merge_time_hours: number
+}
+
+export interface ProjectBreakdown {
+  project_id: number
+  project_name: string
+  total_mrs: number
+  merged_mrs: number
+  success_rate: number
+  avg_merge_time_hours: number
+}
+
+export interface TimeSeriesData {
+  date: string
+  value: number
+  label?: string
+}
+
+export interface MergeRequestListParams {
+  page?: number
+  limit?: number
+  project_id?: number
+  author_username?: string
+  status?: 'opened' | 'merged' | 'closed'
+  from_date?: string
+  to_date?: string
+  search?: string
 }

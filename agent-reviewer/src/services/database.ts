@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
+import { MergeRequestTrackingRecord, UserMRStatisticsRecord } from '../models/merge-request.js';
 
 dotenv.config();
 
@@ -388,6 +389,55 @@ class DatabaseService {
         )
       `);
 
+      // Create merge request tracking table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS merge_request_tracking (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          merge_request_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          author_id INTEGER NOT NULL,
+          author_username TEXT NOT NULL,
+          author_name TEXT,
+          source_branch TEXT NOT NULL,
+          target_branch TEXT NOT NULL,
+          status TEXT NOT NULL,
+          action TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          merged_at TIMESTAMP WITH TIME ZONE,
+          closed_at TIMESTAMP WITH TIME ZONE,
+          merge_commit_sha TEXT,
+          repository_url TEXT,
+          web_url TEXT,
+          is_repopo_event BOOLEAN DEFAULT FALSE,
+          repopo_token TEXT,
+          UNIQUE(project_id, merge_request_iid)
+        )
+      `);
+
+      // Create user MR statistics table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_mr_statistics (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          username TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          total_mrs_created INTEGER DEFAULT 0,
+          total_mrs_merged INTEGER DEFAULT 0,
+          total_mrs_closed INTEGER DEFAULT 0,
+          total_mrs_rejected INTEGER DEFAULT 0,
+          avg_merge_time_hours DECIMAL(10,2),
+          last_mr_created_at TIMESTAMP WITH TIME ZONE,
+          last_mr_merged_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(user_id, project_id)
+        )
+      `);
+
 
       await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
@@ -413,6 +463,14 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_embeddings_framework ON documentation_embeddings(framework)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_project_id ON project_documentation_mappings(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_project_documentation_mappings_enabled ON project_documentation_mappings(is_enabled)');
+
+      // Merge request tracking indexes
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_tracking_author ON merge_request_tracking(author_username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_tracking_project ON merge_request_tracking(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_tracking_status ON merge_request_tracking(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_tracking_created_at ON merge_request_tracking(created_at)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_user_mr_stats_username ON user_mr_statistics(username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_user_mr_stats_project ON user_mr_statistics(project_id)');
 
       console.log('Database schema initialized');
     } catch (error) {
@@ -1936,6 +1994,110 @@ class DatabaseService {
       return result.rows as DocumentationSource[];
     } catch (error) {
       console.error('Error getting all documentation sources:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Merge Request Tracking Methods
+
+  /**
+   * Save merge request tracking data
+   */
+  async saveMergeRequestTracking(mrData: any): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        INSERT INTO merge_request_tracking (
+          project_id, merge_request_iid, merge_request_id, title, description,
+          author_id, author_username, author_name, source_branch, target_branch,
+          status, action, created_at, updated_at, merged_at, closed_at,
+          merge_commit_sha, repository_url, web_url, is_repopo_event, repopo_token
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        ON CONFLICT (project_id, merge_request_iid)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          status = EXCLUDED.status,
+          action = EXCLUDED.action,
+          updated_at = EXCLUDED.updated_at,
+          merged_at = EXCLUDED.merged_at,
+          closed_at = EXCLUDED.closed_at,
+          merge_commit_sha = EXCLUDED.merge_commit_sha
+      `, [
+        mrData.project_id, mrData.merge_request_iid, mrData.merge_request_id,
+        mrData.title, mrData.description, mrData.author_id, mrData.author_username,
+        mrData.author_name, mrData.source_branch, mrData.target_branch,
+        mrData.status, mrData.action, mrData.created_at, mrData.updated_at,
+        mrData.merged_at, mrData.closed_at, mrData.merge_commit_sha,
+        mrData.repository_url, mrData.web_url, mrData.is_repopo_event, mrData.repopo_token
+      ]);
+    } catch (error) {
+      console.error('Error saving merge request tracking data:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update user MR statistics
+   */
+  async updateUserMRStatistics(userId: number, username: string, projectId: number): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      // Calculate statistics from merge_request_tracking table
+      const statsResult = await client.query(`
+        SELECT
+          COUNT(*) as total_created,
+          COUNT(CASE WHEN status = 'merged' THEN 1 END) as total_merged,
+          COUNT(CASE WHEN status = 'closed' AND merged_at IS NULL THEN 1 END) as total_closed,
+          AVG(CASE
+            WHEN merged_at IS NOT NULL AND created_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (merged_at - created_at)) / 3600
+          END) as avg_merge_time_hours,
+          MAX(CASE WHEN action = 'open' THEN created_at END) as last_created,
+          MAX(merged_at) as last_merged
+        FROM merge_request_tracking
+        WHERE author_id = $1 AND project_id = $2
+      `, [userId, projectId]);
+
+      const stats = statsResult.rows[0];
+
+      await client.query(`
+        INSERT INTO user_mr_statistics (
+          user_id, username, project_id, total_mrs_created, total_mrs_merged,
+          total_mrs_closed, total_mrs_rejected, avg_merge_time_hours,
+          last_mr_created_at, last_mr_merged_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+        ON CONFLICT (user_id, project_id)
+        DO UPDATE SET
+          username = EXCLUDED.username,
+          total_mrs_created = EXCLUDED.total_mrs_created,
+          total_mrs_merged = EXCLUDED.total_mrs_merged,
+          total_mrs_closed = EXCLUDED.total_mrs_closed,
+          total_mrs_rejected = EXCLUDED.total_mrs_rejected,
+          avg_merge_time_hours = EXCLUDED.avg_merge_time_hours,
+          last_mr_created_at = EXCLUDED.last_mr_created_at,
+          last_mr_merged_at = EXCLUDED.last_mr_merged_at,
+          updated_at = NOW()
+      `, [
+        userId, username, projectId,
+        parseInt(stats.total_created) || 0,
+        parseInt(stats.total_merged) || 0,
+        parseInt(stats.total_closed) || 0,
+        0, // total_mrs_rejected - we'll calculate this later if needed
+        parseFloat(stats.avg_merge_time_hours) || null,
+        stats.last_created,
+        stats.last_merged
+      ]);
+    } catch (error) {
+      console.error('Error updating user MR statistics:', error);
       throw error;
     } finally {
       client.release();

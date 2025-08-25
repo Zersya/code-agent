@@ -7,6 +7,7 @@ import CurrentStatusView from '@/views/CurrentStatusView.vue'
 import AnalyticsView from '@/views/AnalyticsView.vue'
 import RepositoryEmbeddingView from '@/views/RepositoryEmbeddingView.vue'
 import DocumentationManagementView from '@/views/DocumentationManagementView.vue'
+import MergeRequestsView from '@/views/MergeRequestsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
@@ -53,6 +54,11 @@ const router = createRouter({
           path: '/documentation',
           name: 'DocumentationManagement',
           component: DocumentationManagementView
+        },
+        {
+          path: '/merge-requests',
+          name: 'MergeRequests',
+          component: MergeRequestsView
         }
       ]
     },

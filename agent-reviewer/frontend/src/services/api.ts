@@ -16,7 +16,10 @@ import type {
   RepositoryEmbeddingStatus,
   DocumentationSourceRequest,
   DocumentationSourceResponse,
-  ProjectDocumentationMapping
+  ProjectDocumentationMapping,
+  MergeRequestDetails,
+  UserMRStatistics,
+  MergeRequestListParams
 } from '@/types'
 
 class ApiClient {
@@ -148,6 +151,25 @@ export const statusApi = {
 export const analyticsApi = {
   getAnalytics: (dateRange?: { from: string; to: string }): Promise<ApiResponse<AnalyticsData>> =>
     apiClient.get<AnalyticsData>('/analytics', dateRange),
+}
+
+// Merge Request API
+export const mergeRequestApi = {
+  getMergeRequests: (params: MergeRequestListParams): Promise<ApiResponse<MergeRequestDetails[]>> =>
+    apiClient.get<MergeRequestDetails[]>('/merge-requests', params),
+
+  getMergeRequest: (id: number): Promise<ApiResponse<MergeRequestDetails>> =>
+    apiClient.get<MergeRequestDetails>(`/merge-requests/${id}`),
+
+  getUserStatistics: (username: string): Promise<ApiResponse<UserMRStatistics>> =>
+    apiClient.get<UserMRStatistics>(`/users/${username}/mr-statistics`),
+
+  exportMergeRequests: async (params: MergeRequestListParams): Promise<string> => {
+    const response = await apiClient.getRaw('/merge-requests/export', params, {
+      responseType: 'text'
+    })
+    return response.data
+  },
 }
 
 // Projects API
