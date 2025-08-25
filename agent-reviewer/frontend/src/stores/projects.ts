@@ -9,7 +9,7 @@ export const useProjectsStore = defineStore('projects', () => {
   const error = ref<string | null>(null)
   const lastFetched = ref<Date | null>(null)
 
-  const fetchProjects = async (forceRefresh = false) => {
+  const fetchProjects = async (forceRefresh = false, retryCount = 0) => {
     // Skip if we have data and it's recent (less than 5 minutes old)
     if (!forceRefresh && projects.value.length > 0 && lastFetched.value) {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
@@ -19,7 +19,9 @@ export const useProjectsStore = defineStore('projects', () => {
     }
 
     isLoading.value = true
-    error.value = null
+    if (retryCount === 0) {
+      error.value = null
+    }
 
     try {
       const response = await projectsApi.getProjects()
@@ -27,13 +29,38 @@ export const useProjectsStore = defineStore('projects', () => {
       if (response.success && response.data) {
         projects.value = response.data
         lastFetched.value = new Date()
+        error.value = null // Clear any previous errors on success
       } else {
-        error.value = response.message || 'Failed to fetch projects'
+        const errorMessage = response.message || 'Failed to fetch projects'
+        
+        // Retry up to 2 times with exponential backoff
+        if (retryCount < 2) {
+          const delay = Math.pow(2, retryCount) * 1000 // 1s, 2s delays
+          setTimeout(() => {
+            fetchProjects(forceRefresh, retryCount + 1)
+          }, delay)
+          return
+        }
+        
+        error.value = errorMessage
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch projects'
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects'
+      
+      // Retry up to 2 times for network errors
+      if (retryCount < 2) {
+        const delay = Math.pow(2, retryCount) * 1000 // 1s, 2s delays
+        setTimeout(() => {
+          fetchProjects(forceRefresh, retryCount + 1)
+        }, delay)
+        return
+      }
+      
+      error.value = errorMessage
     } finally {
-      isLoading.value = false
+      if (retryCount === 0 || error.value) {
+        isLoading.value = false
+      }
     }
   }
 

@@ -420,8 +420,8 @@ export interface MergeRequestListParams {
   page?: number
   limit?: number
   project_id?: number
-  author_username?: string
-  status?: 'opened' | 'merged' | 'closed'
+  authorUsername?: string
+  status?: 'opened' | 'merged' | 'closed' | ''
   from_date?: string
   to_date?: string
   search?: string
