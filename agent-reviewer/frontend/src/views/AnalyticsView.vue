@@ -119,7 +119,7 @@
     </div>
 
     <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-1 gap-6 mb-8">
       <!-- Review Trends Chart -->
       <BaseCard title="Review Trends">
         <div class="h-64 flex items-center justify-center">
@@ -560,10 +560,10 @@ const heatmapData = computed(() => {
     }
   }
   
-  // Flatten the grid row by row (each row represents a day of the week)
+  // Flatten the grid column by column (each column represents a week)
   const data = []
-  for (let day = 0; day < 7; day++) {
-    for (let week = 0; week < totalWeeks; week++) {
+  for (let week = 0; week < totalWeeks; week++) {
+    for (let day = 0; day < 7; day++) {
       if (grid[day][week]) {
         data.push(grid[day][week])
       }
