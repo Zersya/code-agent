@@ -525,6 +525,11 @@ const heatmapData = computed(() => {
   const today = new Date()
   const startDate = subDays(today, 364) // Show last year
   const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
+  const endWeek = startOfWeek(today, { weekStartsOn: 0 }) // End on today's week
+  
+  // Calculate the actual number of weeks needed
+  const totalDays = Math.ceil((endWeek.getTime() - startWeek.getTime()) / (1000 * 60 * 60 * 24)) + 7
+  const totalWeeks = Math.ceil(totalDays / 7)
   
   // Create a map of existing trend data for quick lookup
   const trendMap = new Map()
@@ -532,21 +537,25 @@ const heatmapData = computed(() => {
     trendMap.set(trend.date, trend.reviews)
   })
   
-  // Create a 2D array: 7 rows (days) x 53 columns (weeks)
-  const grid = Array(7).fill(null).map(() => Array(53).fill(null))
+  // Create a 2D array: 7 rows (days) x dynamic columns (weeks)
+  const grid = Array(7).fill(null).map(() => Array(totalWeeks).fill(null))
   
-  // Fill the grid with data
-  for (let week = 0; week < 53; week++) {
+  // Fill the grid with data up to today
+  for (let week = 0; week < totalWeeks; week++) {
     for (let day = 0; day < 7; day++) {
       const date = addDays(startWeek, week * 7 + day)
-      const dateStr = format(date, 'yyyy-MM-dd')
-      const reviews = trendMap.get(dateStr) || 0
       
-      grid[day][week] = {
-        date: format(date, 'MMM dd, yyyy'),
-        dateStr,
-        reviews,
-        dayOfWeek: day
+      // Only include dates up to today
+      if (date <= today) {
+        const dateStr = format(date, 'yyyy-MM-dd')
+        const reviews = trendMap.get(dateStr) || 0
+        
+        grid[day][week] = {
+          date: format(date, 'MMM dd, yyyy'),
+          dateStr,
+          reviews,
+          dayOfWeek: day
+        }
       }
     }
   }
@@ -554,7 +563,7 @@ const heatmapData = computed(() => {
   // Flatten the grid row by row (each row represents a day of the week)
   const data = []
   for (let day = 0; day < 7; day++) {
-    for (let week = 0; week < 53; week++) {
+    for (let week = 0; week < totalWeeks; week++) {
       if (grid[day][week]) {
         data.push(grid[day][week])
       }
@@ -565,11 +574,17 @@ const heatmapData = computed(() => {
 })
 
 const heatmapWeeks = computed(() => {
-  const weeks = []
-  const startDate = subDays(new Date(), 364)
+  const today = new Date()
+  const startDate = subDays(today, 364)
   const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
+  const endWeek = startOfWeek(today, { weekStartsOn: 0 }) // End on today's week
   
-  for (let i = 0; i < 53; i++) {
+  // Calculate the actual number of weeks needed
+  const totalDays = Math.ceil((endWeek.getTime() - startWeek.getTime()) / (1000 * 60 * 60 * 24)) + 7
+  const totalWeeks = Math.ceil(totalDays / 7)
+  
+  const weeks = []
+  for (let i = 0; i < totalWeeks; i++) {
     weeks.push(addDays(startWeek, i * 7))
   }
   
