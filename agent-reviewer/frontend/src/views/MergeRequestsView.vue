@@ -73,7 +73,7 @@
                 :disabled="projectsStore.isLoading"
                 class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200 disabled:bg-gray-50 disabled:text-gray-500"
               >
-                <option value="">All Projects</option>
+                <option :value="undefined">All Projects</option>
                 <option 
                   v-for="project in projectsStore.projects" 
                   :key="project.projectId" 
@@ -238,10 +238,10 @@ const projectsStore = useProjectsStore()
 
 const filters = ref<MergeRequestListParams>({
   page: 1,
-  per_page: 20,
-  project_id: '',
+  limit: 20,
+  project_id: undefined,
   author_username: '',
-  status: '',
+  status: undefined,
   search: ''
 })
 
@@ -320,11 +320,14 @@ const clearSearch = () => {
 }
 
 const clearAllFilters = () => {
-  filters.value.project_id = ''
-  filters.value.author_username = ''
-  filters.value.status = ''
-  filters.value.search = ''
-  filters.value.page = 1
+  filters.value = {
+    page: 1,
+    limit: 20,
+    project_id: undefined,
+    author_username: '',
+    status: undefined,
+    search: ''
+  }
   applyFilters()
 }
 
