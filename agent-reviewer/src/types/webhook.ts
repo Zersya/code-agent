@@ -100,6 +100,9 @@ export interface GitLabMergeRequestAttributes {
   author: GitLabUser;
   created_at: string;
   updated_at: string;
+  merged_at?: string;
+  closed_at?: string;
+  merge_commit_sha?: string;
   action?: string;
 }
 
