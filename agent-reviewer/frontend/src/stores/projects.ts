@@ -26,12 +26,28 @@ export const useProjectsStore = defineStore('projects', () => {
     try {
       const response = await projectsApi.getProjects()
       
-      if (response.success && response.data) {
-        projects.value = response.data
+      // Handle both wrapped ApiResponse format and direct array format
+      let projectsData: Project[] | null = null
+      
+      if (Array.isArray(response)) {
+        // Direct array format: Project[]
+        projectsData = response
+      } else if (response && typeof response === 'object') {
+        // Wrapped ApiResponse format: {success: boolean, data: Project[]}
+        if (response.success && response.data) {
+          projectsData = response.data
+        } else if (response.success === undefined && Array.isArray(response.data)) {
+          // Handle case where success field is missing but data exists
+          projectsData = response.data
+        }
+      }
+      
+      if (projectsData && Array.isArray(projectsData)) {
+        projects.value = projectsData
         lastFetched.value = new Date()
         error.value = null // Clear any previous errors on success
       } else {
-        const errorMessage = response.message || 'Failed to fetch projects'
+        const errorMessage = (response && typeof response === 'object' && !Array.isArray(response) && 'message' in response && response.message) || 'Failed to fetch projects'
         
         // Retry up to 2 times with exponential backoff
         if (retryCount < 2) {

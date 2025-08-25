@@ -174,7 +174,7 @@ export const mergeRequestApi = {
 
 // Projects API
 export const projectsApi = {
-  getProjects: (): Promise<ApiResponse<Project[]>> =>
+  getProjects: (): Promise<ApiResponse<Project[]> | Project[]> =>
     apiClient.get<Project[]>('/projects'),
 }
 
