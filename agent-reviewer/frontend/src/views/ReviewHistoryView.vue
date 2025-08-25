@@ -9,62 +9,104 @@
 
     <!-- Filters and Search -->
     <BaseCard class="mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <BaseInput
-          v-model="filters.search"
-          type="search"
-          placeholder="Search by project or MR ID..."
-          @input="debouncedSearch"
-        />
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium text-gray-900">Filters</h3>
+          <div class="text-sm text-gray-500">
+            {{ reviewsStore.pagination.total }} total reviews
+          </div>
+        </div>
+      </template>
+
+      <!-- Search and Main Filters -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+          <BaseInput
+            v-model="filters.search"
+            type="search"
+            placeholder="Search by project or MR ID..."
+            @input="debouncedSearch"
+          />
+        </div>
         
-        <select
-          v-model="filters.projectId"
-          class="input"
-          @change="applyFilters"
-        >
-          <option value="">All Projects</option>
-          <option v-for="project in projects" :key="project.projectId" :value="project.projectId">
-            {{ project.name }}
-          </option>
-        </select>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+          <BaseSelect
+            v-model="filters.projectId"
+            placeholder="All Projects"
+            @update:model-value="applyFilters"
+          >
+            <option value="">All Projects</option>
+            <option v-for="project in projects" :key="project.projectId" :value="project.projectId">
+              {{ project.name }}
+            </option>
+          </BaseSelect>
+        </div>
 
-        <BaseInput
-          v-model="filters.dateFrom"
-          type="date"
-          label="From Date"
-          @change="applyFilters"
-        />
-
-        <BaseInput
-          v-model="filters.dateTo"
-          type="date"
-          label="To Date"
-          @change="applyFilters"
-        />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <BaseSelect
+            v-model="filters.status"
+            placeholder="All Statuses"
+            @update:model-value="applyFilters"
+          >
+            <option value="">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="pending">Pending</option>
+          </BaseSelect>
+        </div>
       </div>
 
-      <div class="mt-4 flex justify-between items-center">
-        <div class="flex space-x-2">
-          <BaseButton
-            variant="secondary"
-            size="sm"
-            @click="clearFilters"
-          >
-            Clear Filters
-          </BaseButton>
-          <BaseButton
-            variant="primary"
-            size="sm"
-            @click="exportReviews"
-            :loading="isExporting"
-          >
-            Export CSV
-          </BaseButton>
+      <!-- Secondary Filters -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+          <BaseInput
+            v-model="filters.author"
+            placeholder="Filter by author..."
+            @input="debouncedSearch"
+          />
         </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+          <BaseInput
+            v-model="filters.dateFrom"
+            type="date"
+            @change="applyFilters"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+          <BaseInput
+            v-model="filters.dateTo"
+            type="date"
+            @change="applyFilters"
+          />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-between items-center pt-4 border-t border-gray-200">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          @click="clearFilters"
+        >
+          Clear All Filters
+        </BaseButton>
         
-        <div class="text-sm text-gray-500">
-          {{ reviewsStore.pagination.total }} total reviews
-        </div>
+        <BaseButton
+          variant="primary"
+          size="sm"
+          @click="exportReviews"
+          :loading="isExporting"
+        >
+          Export CSV
+        </BaseButton>
       </div>
     </BaseCard>
 
@@ -157,6 +199,7 @@ import { projectsApi } from '@/services/api'
 import type { Project } from '@/types'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseInput from '@/components/BaseInput.vue'
+import BaseSelect from '@/components/BaseSelect.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseTable from '@/components/BaseTable.vue'
 import BasePagination from '@/components/BasePagination.vue'
@@ -169,6 +212,8 @@ const isExporting = ref(false)
 const filters = reactive({
   search: '',
   projectId: '',
+  author: '',
+  status: '',
   dateFrom: '',
   dateTo: ''
 })
@@ -209,6 +254,8 @@ const clearFilters = async () => {
   Object.assign(filters, {
     search: '',
     projectId: '',
+    author: '',
+    status: '',
     dateFrom: '',
     dateTo: ''
   })
