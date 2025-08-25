@@ -26,9 +26,10 @@ export interface ReviewRecord {
   reviewedAt: string
   createdAt: string
   updatedAt: string
-  status: 'approved' | 'rejected' | 'pending'
+  status: 'pending' | 'reviewed' | 'approved' | 'rejected'
   criticalIssuesCount: number
-  reviewerType: 'auto' | 'manual'
+  fixesImplementedCount: number
+  reviewerType: 'automated' | 'manual'
 }
 
 export interface Project {
@@ -349,6 +350,13 @@ export interface MergeRequestDetails {
   web_url: string
   is_repopo_event: boolean
   project_name?: string
+  // Review tracking fields
+  review_status?: 'pending' | 'reviewed' | 'approved' | 'rejected'
+  reviewer_type?: 'automated' | 'manual'
+  critical_issues_count?: number
+  fixes_implemented_count?: number
+  last_reviewed_at?: string
+  last_reviewed_commit_sha?: string
 }
 
 export interface UserMRStatistics {

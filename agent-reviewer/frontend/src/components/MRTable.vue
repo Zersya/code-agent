@@ -36,6 +36,30 @@
       </span>
     </template>
 
+    <template #cell-review_status="{ value }">
+      <span :class="getReviewStatusBadgeClass(value)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
+        {{ getReviewStatusLabel(value) }}
+      </span>
+    </template>
+
+    <template #cell-reviewer_type="{ value }">
+      <span :class="getReviewerTypeBadgeClass(value)" class="inline-flex px-2 py-1 text-xs font-medium rounded-full">
+        {{ getReviewerTypeLabel(value) }}
+      </span>
+    </template>
+
+    <template #cell-critical_issues_count="{ value }">
+      <span :class="getCriticalIssuesClass(value)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
+        {{ value || 0 }}
+      </span>
+    </template>
+
+    <template #cell-fixes_implemented_count="{ value }">
+      <span class="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+        {{ value || 0 }}
+      </span>
+    </template>
+
     <template #cell-merge_time_hours="{ value }">
       {{ value ? formatMergeTime(value) : '-' }}
     </template>
@@ -83,7 +107,11 @@ const columns = computed(() => [
   { key: 'merge_request_iid', label: 'MR ID', sortable: true },
   { key: 'title', label: 'Title', sortable: true },
   { key: 'author', label: 'Author', sortable: false },
-  { key: 'status', label: 'Status', sortable: true },
+  { key: 'status', label: 'MR Status', sortable: true },
+  { key: 'review_status', label: 'Review Status', sortable: true },
+  { key: 'reviewer_type', label: 'Reviewer', sortable: true },
+  { key: 'critical_issues_count', label: 'Issues', sortable: true },
+  { key: 'fixes_implemented_count', label: 'Fixes', sortable: true },
   { key: 'created_at', label: 'Created', sortable: true, type: 'date' as const },
   { key: 'merge_time_hours', label: 'Merge Time', sortable: false },
   { key: 'is_repopo_event', label: 'Source', sortable: false },
@@ -117,6 +145,69 @@ const getStatusLabel = (status: string): string => {
       return 'Locked'
     default:
       return status
+  }
+}
+
+const getReviewStatusBadgeClass = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800'
+    case 'reviewed':
+      return 'bg-blue-100 text-blue-800'
+    case 'approved':
+      return 'bg-green-100 text-green-800'
+    case 'rejected':
+      return 'bg-red-100 text-red-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
+}
+
+const getReviewStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'pending':
+      return 'Pending'
+    case 'reviewed':
+      return 'Reviewed'
+    case 'approved':
+      return 'Approved'
+    case 'rejected':
+      return 'Rejected'
+    default:
+      return status || 'Not Reviewed'
+  }
+}
+
+const getReviewerTypeBadgeClass = (type: string): string => {
+  switch (type) {
+    case 'automated':
+      return 'bg-purple-100 text-purple-800'
+    case 'manual':
+      return 'bg-indigo-100 text-indigo-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
+}
+
+const getReviewerTypeLabel = (type: string): string => {
+  switch (type) {
+    case 'automated':
+      return '🤖 Auto'
+    case 'manual':
+      return '👤 Manual'
+    default:
+      return type || 'Unknown'
+  }
+}
+
+const getCriticalIssuesClass = (count: number): string => {
+  const numCount = Number(count) || 0
+  if (numCount === 0) {
+    return 'bg-green-100 text-green-800'
+  } else if (numCount <= 2) {
+    return 'bg-yellow-100 text-yellow-800'
+  } else {
+    return 'bg-red-100 text-red-800'
   }
 }
 

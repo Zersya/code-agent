@@ -1716,8 +1716,23 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       const mergeRequest = await gitlabService.getMergeRequest(projectId, mergeRequestIid);
       const currentCommitSha = mergeRequest.sha;
 
-      // Save the review history
-      await dbService.saveMergeRequestReview(projectId, mergeRequestIid, currentCommitSha, comment.id);
+      // Count critical issues in the review
+      const criticalIssuesCount = this.countCriticalIssues(reviewResult.reviewText);
+      
+      // Determine review status based on approval
+      const reviewStatus = reviewResult.shouldApprove ? 'approved' : 'reviewed';
+      
+      // Save the review history with enhanced tracking
+      await dbService.saveMergeRequestReview(
+        projectId, 
+        mergeRequestIid, 
+        currentCommitSha, 
+        comment.id,
+        'automated', // reviewer type
+        reviewStatus, // review status
+        criticalIssuesCount, // critical issues count
+        0 // fixes implemented count (will be updated later)
+      );
 
       // If the review indicates approval, approve the merge request
       if (reviewResult.shouldApprove) {
@@ -1829,8 +1844,23 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       // Add the re-review comment
       const comment = await gitlabService.addMergeRequestComment(projectId, mergeRequestIid, reviewComment);
 
-      // Update the review history with the new commit SHA
-      await dbService.saveMergeRequestReview(projectId, mergeRequestIid, currentCommitSha, comment.id);
+      // Count critical issues in the re-review
+      const criticalIssuesCount = this.countCriticalIssues(reviewResult);
+      
+      // Determine review status based on approval
+      const reviewStatus = shouldApprove ? 'approved' : 'reviewed';
+      
+      // Update the review history with the new commit SHA and enhanced tracking
+      await dbService.saveMergeRequestReview(
+        projectId, 
+        mergeRequestIid, 
+        currentCommitSha, 
+        comment.id,
+        'automated', // reviewer type
+        reviewStatus, // review status
+        criticalIssuesCount, // critical issues count
+        0 // fixes implemented count (will be updated later)
+      );
 
       // If the re-review indicates approval, approve the merge request
       if (shouldApprove) {
@@ -1845,6 +1875,45 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       console.error(`Error submitting re-review for merge request !${mergeRequestIid} in project ${projectId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Count critical issues in a review result
+   * @param reviewText The review text to analyze
+   * @returns The number of critical issues found
+   */
+  private countCriticalIssues(reviewText: string): number {
+    const criticalKeywords = [
+      'critical',
+      'security',
+      'vulnerability',
+      'bug',
+      'error',
+      'issue',
+      'problem',
+      'fix',
+      'broken',
+      'fail'
+    ];
+    
+    let count = 0;
+    const lowerText = reviewText.toLowerCase();
+    
+    // Count occurrences of critical keywords
+    criticalKeywords.forEach(keyword => {
+      const matches = lowerText.match(new RegExp(keyword, 'g'));
+      if (matches) {
+        count += matches.length;
+      }
+    });
+    
+    // Look for numbered lists that might indicate issues
+    const numberedIssues = lowerText.match(/\d+\./g);
+    if (numberedIssues) {
+      count += numberedIssues.length;
+    }
+    
+    return count;
   }
 
   /**

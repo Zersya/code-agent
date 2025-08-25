@@ -160,9 +160,16 @@ export const getMergeRequests = async (req: Request, res: Response): Promise<voi
           WHEN mrt.merged_at IS NOT NULL AND mrt.created_at IS NOT NULL 
           THEN EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at)) / 3600 
           ELSE NULL 
-        END as merge_time_hours
+        END as merge_time_hours,
+        mrr.status as review_status,
+        mrr.reviewer_type,
+        mrr.critical_issues_count,
+        mrr.fixes_implemented_count,
+        mrr.reviewed_at as last_reviewed_at,
+        mrr.last_reviewed_commit_sha
       FROM merge_request_tracking mrt
       LEFT JOIN projects p ON mrt.project_id = p.project_id
+      LEFT JOIN merge_request_reviews mrr ON mrt.project_id = mrr.project_id AND mrt.merge_request_iid = mrr.merge_request_iid
       ${whereClause}
       ORDER BY ${pagination.sortBy} ${pagination.sortOrder}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -239,9 +246,16 @@ export const getMergeRequest = async (req: Request, res: Response): Promise<void
           WHEN mrt.merged_at IS NOT NULL AND mrt.created_at IS NOT NULL 
           THEN EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at)) / 3600 
           ELSE NULL 
-        END as merge_time_hours
+        END as merge_time_hours,
+        mrr.status as review_status,
+        mrr.reviewer_type,
+        mrr.critical_issues_count,
+        mrr.fixes_implemented_count,
+        mrr.reviewed_at as last_reviewed_at,
+        mrr.last_reviewed_commit_sha
       FROM merge_request_tracking mrt
       LEFT JOIN projects p ON mrt.project_id = p.project_id
+      LEFT JOIN merge_request_reviews mrr ON mrt.project_id = mrr.project_id AND mrt.merge_request_iid = mrr.merge_request_iid
       WHERE mrt.id = $1
     `;
 
@@ -358,6 +372,92 @@ export const getUserMRStatistics = async (req: Request, res: Response): Promise<
 /**
  * Export merge requests as CSV
  */
+/**
+ * Update fixes implemented count for a merge request
+ */
+export const updateMergeRequestFixesCount = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, mergeRequestIid } = req.params;
+    const { fixesImplementedCount } = req.body;
+
+    const projectIdNum = parseInt(projectId);
+    const mergeRequestIidNum = parseInt(mergeRequestIid);
+    const fixesCount = parseInt(fixesImplementedCount);
+
+    if (isNaN(projectIdNum) || isNaN(mergeRequestIidNum) || isNaN(fixesCount)) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid parameters. Project ID, MR IID, and fixes count must be numbers.'
+      });
+      return;
+    }
+
+    if (fixesCount < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Fixes count cannot be negative.'
+      });
+      return;
+    }
+
+    await dbService.updateMergeRequestFixesCount(projectIdNum, mergeRequestIidNum, fixesCount);
+
+    res.json({
+      success: true,
+      message: `Updated fixes count to ${fixesCount} for MR !${mergeRequestIidNum} in project ${projectIdNum}`
+    });
+  } catch (error) {
+    console.error('Error updating merge request fixes count:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update fixes count'
+    });
+  }
+};
+
+/**
+ * Update review status for a merge request
+ */
+export const updateMergeRequestReviewStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, mergeRequestIid } = req.params;
+    const { status } = req.body;
+
+    const projectIdNum = parseInt(projectId);
+    const mergeRequestIidNum = parseInt(mergeRequestIid);
+
+    if (isNaN(projectIdNum) || isNaN(mergeRequestIidNum)) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid parameters. Project ID and MR IID must be numbers.'
+      });
+      return;
+    }
+
+    const validStatuses = ['pending', 'reviewed', 'approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+      return;
+    }
+
+    await dbService.updateMergeRequestReviewStatus(projectIdNum, mergeRequestIidNum, status);
+
+    res.json({
+      success: true,
+      message: `Updated review status to '${status}' for MR !${mergeRequestIidNum} in project ${projectIdNum}`
+    });
+  } catch (error) {
+    console.error('Error updating merge request review status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update review status'
+    });
+  }
+};
+
 export const exportMergeRequests = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
