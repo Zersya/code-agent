@@ -131,9 +131,9 @@
           </div>
           <div v-else class="w-full overflow-x-auto">
             <!-- GitHub-style contribution heatmap -->
-            <div class="min-w-max">
+            <div class="w-full">
               <!-- Month labels -->
-              <div class="flex mb-2 ml-8">
+              <div class="flex mb-2 ml-12">
                 <div v-for="month in heatmapMonths" :key="month.name" class="text-xs text-gray-500" :style="{ width: month.width + 'px', marginLeft: month.offset + 'px' }">
                   {{ month.name }}
                 </div>
@@ -141,23 +141,29 @@
               
               <div class="flex">
                 <!-- Day labels -->
-                <div class="flex flex-col justify-between text-xs text-gray-500 mr-2 h-20">
-                  <span>Mon</span>
-                  <span>Wed</span>
-                  <span>Fri</span>
+                <div class="flex flex-col text-xs text-gray-500 mr-2 w-10">
+                  <div class="h-3 mb-1 flex items-center">Sun</div>
+                  <div class="h-3 mb-1 flex items-center">Mon</div>
+                  <div class="h-3 mb-1 flex items-center">Tue</div>
+                  <div class="h-3 mb-1 flex items-center">Wed</div>
+                  <div class="h-3 mb-1 flex items-center">Thu</div>
+                  <div class="h-3 mb-1 flex items-center">Fri</div>
+                  <div class="h-3 mb-1 flex items-center">Sat</div>
                 </div>
                 
                 <!-- Heatmap grid -->
-                <div class="grid grid-rows-7 gap-1" :style="{ gridTemplateColumns: `repeat(${heatmapWeeks.length}, 12px)` }">
-                  <div 
-                    v-for="(day, index) in heatmapData" 
-                    :key="index"
-                    class="w-3 h-3 rounded-sm cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary-300"
-                    :class="getHeatmapColor(day.reviews)"
-                    :title="`${day.date}: ${day.reviews} reviews`"
-                    @mouseenter="showTooltip($event, day)"
-                    @mouseleave="hideTooltip"
-                  ></div>
+                <div class="flex-1">
+                  <div class="grid gap-1" :style="{ gridTemplateColumns: `repeat(${heatmapWeeks.length}, 12px)`, gridTemplateRows: 'repeat(7, 12px)' }">
+                    <div 
+                      v-for="(day, index) in heatmapData" 
+                      :key="index"
+                      class="w-3 h-3 rounded-sm cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary-300"
+                      :class="getHeatmapColor(day.reviews)"
+                      :title="`${day.date}: ${day.reviews} reviews`"
+                      @mouseenter="showTooltip($event, day)"
+                      @mouseleave="hideTooltip"
+                    ></div>
+                  </div>
                 </div>
               </div>
               
@@ -518,7 +524,7 @@ const tooltip = reactive({
 const heatmapData = computed(() => {
   const today = new Date()
   const startDate = subDays(today, 364) // Show last year
-  const data = []
+  const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
   
   // Create a map of existing trend data for quick lookup
   const trendMap = new Map()
@@ -526,18 +532,33 @@ const heatmapData = computed(() => {
     trendMap.set(trend.date, trend.reviews)
   })
   
-  // Generate data for each day in the past year
-  for (let i = 0; i < 365; i++) {
-    const date = addDays(startDate, i)
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const reviews = trendMap.get(dateStr) || 0
-    
-    data.push({
-      date: format(date, 'MMM dd, yyyy'),
-      dateStr,
-      reviews,
-      dayOfWeek: getDay(date)
-    })
+  // Create a 2D array: 7 rows (days) x 53 columns (weeks)
+  const grid = Array(7).fill(null).map(() => Array(53).fill(null))
+  
+  // Fill the grid with data
+  for (let week = 0; week < 53; week++) {
+    for (let day = 0; day < 7; day++) {
+      const date = addDays(startWeek, week * 7 + day)
+      const dateStr = format(date, 'yyyy-MM-dd')
+      const reviews = trendMap.get(dateStr) || 0
+      
+      grid[day][week] = {
+        date: format(date, 'MMM dd, yyyy'),
+        dateStr,
+        reviews,
+        dayOfWeek: day
+      }
+    }
+  }
+  
+  // Flatten the grid row by row (each row represents a day of the week)
+  const data = []
+  for (let day = 0; day < 7; day++) {
+    for (let week = 0; week < 53; week++) {
+      if (grid[day][week]) {
+        data.push(grid[day][week])
+      }
+    }
   }
   
   return data
@@ -546,7 +567,7 @@ const heatmapData = computed(() => {
 const heatmapWeeks = computed(() => {
   const weeks = []
   const startDate = subDays(new Date(), 364)
-  const startWeek = startOfWeek(startDate, { weekStartsOn: 1 }) // Monday start
+  const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
   
   for (let i = 0; i < 53; i++) {
     weeks.push(addDays(startWeek, i * 7))
