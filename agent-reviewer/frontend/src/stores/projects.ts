@@ -26,15 +26,19 @@ export const useProjectsStore = defineStore('projects', () => {
     try {
       const response = await projectsApi.getProjects()
       
-      // Handle both wrapped ApiResponse format and direct array format
+      // Handle different response formats
       let projectsData: Project[] | null = null
       
       if (Array.isArray(response)) {
         // Direct array format: Project[]
         projectsData = response
       } else if (response && typeof response === 'object') {
+        // Check for the actual API response format: {projects: Project[], count: number, timestamp: string}
+        if ('projects' in response && Array.isArray(response.projects)) {
+          projectsData = response.projects
+        }
         // Wrapped ApiResponse format: {success: boolean, data: Project[]}
-        if (response.success && response.data) {
+        else if (response.success && response.data) {
           projectsData = response.data
         } else if (response.success === undefined && Array.isArray(response.data)) {
           // Handle case where success field is missing but data exists
