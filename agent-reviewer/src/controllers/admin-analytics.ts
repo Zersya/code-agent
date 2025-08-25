@@ -389,6 +389,24 @@ async function getMergeRequestMetrics(dateFrom: Date, dateTo: Date) {
     `;
     const dailyTrendsResult = await dbService.query(dailyTrendsQuery, [dateFrom, dateTo]);
 
+    // Get merge time trends (daily average merge times for merged MRs)
+    const mergeTimeTrendsQuery = `
+      SELECT
+        DATE(merged_at) as date,
+        AVG(CASE
+          WHEN merged_at IS NOT NULL AND created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (merged_at - created_at)) / 3600
+        END) as value
+      FROM merge_request_tracking
+      WHERE merged_at BETWEEN $1 AND $2
+        AND status = 'merged'
+        AND merged_at IS NOT NULL
+        AND created_at IS NOT NULL
+      GROUP BY DATE(merged_at)
+      ORDER BY date
+    `;
+    const mergeTimeTrendsResult = await dbService.query(mergeTimeTrendsQuery, [dateFrom, dateTo]);
+
     // Get Repopo vs GitLab statistics
     const repopoStatsQuery = `
       SELECT
@@ -431,7 +449,10 @@ async function getMergeRequestMetrics(dateFrom: Date, dateTo: Date) {
         success_rate: parseFloat(row.success_rate),
         avg_merge_time_hours: parseFloat(row.avg_merge_time_hours) || 0
       })),
-      mergeTimeTrends: [], // Could be implemented later for more detailed time analysis
+      mergeTimeTrends: mergeTimeTrendsResult.rows.map(row => ({
+        date: format(new Date(row.date), 'yyyy-MM-dd'),
+        value: parseFloat(row.value) || 0
+      })),
       dailyMRCreation: dailyTrendsResult.rows.map(row => ({
         date: format(new Date(row.date), 'yyyy-MM-dd'),
         value: parseInt(row.value)

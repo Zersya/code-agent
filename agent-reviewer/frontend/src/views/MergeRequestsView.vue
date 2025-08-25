@@ -75,7 +75,7 @@
               >
                 <option :value="undefined">All Projects</option>
                 <option 
-                  v-for="project in projectsStore.projects" 
+                  v-for="project in uniqueProjects" 
                   :key="project.projectId" 
                   :value="project.projectId"
                 >
@@ -284,8 +284,19 @@ const overviewMetrics = computed(() => {
 })
 
 const mergeTimeTrends = computed(() => {
-  // This would be implemented with actual merge time trend data
-  return []
+  return analyticsStore.analytics.mergeRequestMetrics?.mergeTimeTrends || []
+})
+
+const uniqueProjects = computed(() => {
+  const projects = projectsStore.projects
+  const seen = new Set()
+  return projects.filter(project => {
+    if (seen.has(project.projectId)) {
+      return false
+    }
+    seen.add(project.projectId)
+    return true
+  })
 })
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null

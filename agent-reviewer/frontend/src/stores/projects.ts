@@ -47,7 +47,23 @@ export const useProjectsStore = defineStore('projects', () => {
       }
       
       if (projectsData && Array.isArray(projectsData)) {
-        projects.value = projectsData
+        // Debug: Log the raw projects data
+        console.log('Raw projects data:', projectsData)
+        console.log('Projects count:', projectsData.length)
+        
+        // Check for duplicates and deduplicate by projectId
+        const uniqueProjects = projectsData.reduce((acc, project) => {
+          const existingIndex = acc.findIndex(p => p.projectId === project.projectId)
+          if (existingIndex === -1) {
+            acc.push(project)
+          } else {
+            console.warn('Duplicate project found:', project.name, 'ID:', project.projectId)
+          }
+          return acc
+        }, [] as Project[])
+        
+        console.log('Unique projects count:', uniqueProjects.length)
+        projects.value = uniqueProjects
         lastFetched.value = new Date()
         error.value = null // Clear any previous errors on success
       } else {
