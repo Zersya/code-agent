@@ -269,7 +269,13 @@ const loadAvailableProjects = async () => {
   isLoadingProjects.value = true
   try {
     const response = await projectsApi.getProjects()
-    if (response.success && response.data) {
+    
+    // Handle both wrapped ApiResponse format and direct array format
+    if (Array.isArray(response)) {
+      // Direct array format: Project[]
+      availableProjects.value = response
+    } else if (response && typeof response === 'object' && response.success && response.data) {
+      // Wrapped ApiResponse format: {success: boolean, data: Project[]}
       availableProjects.value = response.data
     }
   } catch (error) {
