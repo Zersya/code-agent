@@ -387,6 +387,47 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
       return;
     }
 
+    // Update merge request tracking data with merged_at timestamp and merge_commit_sha
+    try {
+      const updateData = {
+        project_id: projectId,
+        merge_request_iid: mergeRequestIid,
+        merge_request_id: event.object_attributes.id,
+        title: event.object_attributes.title,
+        description: event.object_attributes.description,
+        author_id: event.object_attributes.author?.id || event.user?.id,
+        author_username: event.user?.username || event.object_attributes.author?.username,
+        author_name: event.user?.name || event.object_attributes.author?.name,
+        source_branch: event.object_attributes.source_branch,
+        target_branch: event.object_attributes.target_branch,
+        status: event.object_attributes.state,
+        action: event.object_attributes.action || 'merge',
+        created_at: new Date(event.object_attributes.created_at),
+        updated_at: new Date(event.object_attributes.updated_at),
+        merged_at: new Date(event.object_attributes.merged_at || new Date()),
+        closed_at: event.object_attributes.closed_at ? new Date(event.object_attributes.closed_at) : null,
+        merge_commit_sha: event.object_attributes.merge_commit_sha,
+        repository_url: event.project.web_url,
+        web_url: event.object_attributes.url,
+        is_repopo_event: false,
+        repopo_token: null
+      };
+
+      await dbService.saveMergeRequestTracking(updateData);
+      console.log(`Updated merge request tracking data for project ${projectId}, MR !${mergeRequestIid} with merged_at timestamp`);
+
+      // Update user statistics
+      if (updateData.author_id) {
+        await dbService.updateUserMRStatistics(
+          updateData.author_id,
+          updateData.author_username,
+          projectId
+        );
+      }
+    } catch (updateError) {
+      console.error(`Error updating merge request tracking data for MR !${mergeRequestIid}:`, updateError);
+    }
+
     // Trigger re-embedding for the project
     console.log(`Triggering re-embedding for project ${projectId} after successful merge to ${targetBranch}`);
 
@@ -407,6 +448,85 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
 }
 
 /**
+ * Process a Repopo merge completion event
+ * This function handles when a Repopo merge request is successfully merged
+ */
+async function processRepopoMergeCompletionEvent(event: RepopoWebhookEvent) {
+  try {
+    const projectId = event.project.id;
+    const mergeRequestIid = event.object_attributes.iid;
+    const targetBranch = event.object_attributes.target_branch;
+    const repositoryUrl = event.project.web_url;
+
+    console.log(`Processing Repopo merge completion event for project ${projectId}, MR !${mergeRequestIid}, target branch: ${targetBranch}`);
+
+    // Check if the merge was successful
+    if (event.object_attributes.state !== 'merged') {
+      console.log(`Merge request !${mergeRequestIid} is not in merged state (${event.object_attributes.state}), skipping`);
+      return;
+    }
+
+    // Update merge request tracking data with merged_at timestamp and merge_commit_sha for Repopo
+    try {
+      const updateData = {
+        project_id: projectId,
+        merge_request_iid: mergeRequestIid,
+        merge_request_id: event.object_attributes.id,
+        title: event.object_attributes.title,
+        description: event.object_attributes.description,
+        author_id: event.object_attributes.author?.id || event.user?.id,
+        author_username: event.user?.username || event.object_attributes.author?.username,
+        author_name: event.user?.name || event.object_attributes.author?.name,
+        source_branch: event.object_attributes.source_branch,
+        target_branch: event.object_attributes.target_branch,
+        status: event.object_attributes.state,
+        action: event.object_attributes.action || 'merge',
+        created_at: new Date(event.object_attributes.created_at),
+        updated_at: new Date(event.object_attributes.updated_at),
+        merged_at: new Date(event.object_attributes.merged_at || new Date()),
+        closed_at: event.object_attributes.closed_at ? new Date(event.object_attributes.closed_at) : null,
+        merge_commit_sha: event.object_attributes.merge_commit_sha,
+        repository_url: event.project.web_url,
+        web_url: event.object_attributes.url,
+        is_repopo_event: true,
+        repopo_token: event.repopo_token || null
+      };
+
+      await dbService.saveMergeRequestTracking(updateData);
+      console.log(`Updated Repopo merge request tracking data for project ${projectId}, MR !${mergeRequestIid} with merged_at timestamp`);
+
+      // Update user statistics
+      if (updateData.author_id) {
+        await dbService.updateUserMRStatistics(
+          updateData.author_id,
+          updateData.author_username,
+          projectId
+        );
+      }
+    } catch (updateError) {
+      console.error(`Error updating Repopo merge request tracking data for MR !${mergeRequestIid}:`, updateError);
+    }
+
+    // Trigger re-embedding for the project
+    console.log(`Triggering re-embedding for project ${projectId} after successful Repopo merge to ${targetBranch}`);
+
+    try {
+      const reEmbeddingSuccess = await embeddingService.triggerProjectReEmbedding(projectId, repositoryUrl, targetBranch);
+
+      if (reEmbeddingSuccess) {
+        console.log(`Successfully queued re-embedding for project ${projectId} after Repopo merge !${mergeRequestIid}`);
+      } else {
+        console.error(`Failed to queue re-embedding for project ${projectId} after Repopo merge !${mergeRequestIid}`);
+      }
+    } catch (reEmbeddingError) {
+      console.error(`Error triggering re-embedding for project ${projectId} after Repopo merge !${mergeRequestIid}:`, reEmbeddingError);
+    }
+  } catch (error) {
+    console.error('Error processing Repopo merge completion event:', error);
+  }
+}
+
+/**
  * Process a Repopo merge request event
  * This function handles merge request events from Repopo and triggers the review process
  */
@@ -414,7 +534,7 @@ async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
   try {
     // Handle merge completion events for Repopo as well
     if (event.object_attributes.action === 'merge') {
-      await processMergeCompletionEvent(event);
+      await processRepopoMergeCompletionEvent(event);
       return;
     }
 
