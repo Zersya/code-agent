@@ -117,6 +117,75 @@ class DatabaseService {
         const extensionCheck = await client.query(`
           SELECT 1 FROM pg_available_extensions WHERE name = 'vector'
         `);
+
+      // Add new columns to existing merge_request_reviews table if they don't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS critical_issues_count INTEGER DEFAULT 0
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS fixes_implemented_count INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Columns might already exist, ignore the error
+        console.log('Review tracking columns might already exist:', error);
+      }
+
+      // Add new columns to existing merge_request_reviews table if they don't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS critical_issues_count INTEGER DEFAULT 0
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS fixes_implemented_count INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Columns might already exist, ignore the error
+        console.log('Review tracking columns might already exist:', error);
+      }
+
+      // Add new columns to existing merge_request_reviews table if they don't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS critical_issues_count INTEGER DEFAULT 0
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS fixes_implemented_count INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Columns might already exist, ignore the error
+        console.log('Review tracking columns might already exist:', error);
+      }
         vectorExtensionAvailable = extensionCheck.rows.length > 0;
 
         if (vectorExtensionAvailable) {
@@ -180,6 +249,52 @@ class DatabaseService {
             )
           `);
 
+      // Add new columns to existing merge_request_reviews table if they don't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS critical_issues_count INTEGER DEFAULT 0
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS fixes_implemented_count INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Columns might already exist, ignore the error
+        console.log('Review tracking columns might already exist:', error);
+      }
+
+      // Add new columns to existing merge_request_reviews table if they don't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected'))
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS critical_issues_count INTEGER DEFAULT 0
+        `);
+        await client.query(`
+          ALTER TABLE merge_request_reviews
+          ADD COLUMN IF NOT EXISTS fixes_implemented_count INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Columns might already exist, ignore the error
+        console.log('Review tracking columns might already exist:', error);
+      }
+
           // Try to create a vector index
           try {
             await client.query('CREATE INDEX IF NOT EXISTS idx_embeddings_embedding ON embeddings USING ivfflat (embedding vector_cosine_ops)');
@@ -233,6 +348,10 @@ class DatabaseService {
           merge_request_iid INTEGER NOT NULL,
           last_reviewed_commit_sha TEXT NOT NULL,
           review_comment_id INTEGER,
+          reviewer_type TEXT NOT NULL DEFAULT 'automated' CHECK (reviewer_type IN ('automated', 'manual')),
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'rejected')),
+          critical_issues_count INTEGER DEFAULT 0,
+          fixes_implemented_count INTEGER DEFAULT 0,
           reviewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -1213,12 +1332,20 @@ class DatabaseService {
    * @param mergeRequestIid The IID of the merge request
    * @param lastReviewedCommitSha The SHA of the last reviewed commit
    * @param reviewCommentId The ID of the review comment (optional)
+   * @param reviewerType The type of reviewer (automated or manual)
+   * @param status The review status
+   * @param criticalIssuesCount The number of critical issues found
+   * @param fixesImplementedCount The number of fixes implemented
    */
   async saveMergeRequestReview(
     projectId: number,
     mergeRequestIid: number,
     lastReviewedCommitSha: string,
-    reviewCommentId?: number
+    reviewCommentId?: number,
+    reviewerType: 'automated' | 'manual' = 'automated',
+    status: 'pending' | 'reviewed' | 'approved' | 'rejected' = 'reviewed',
+    criticalIssuesCount: number = 0,
+    fixesImplementedCount: number = 0
   ): Promise<void> {
     const client = await this.pool.connect();
 
@@ -1226,18 +1353,23 @@ class DatabaseService {
       await client.query(`
         INSERT INTO merge_request_reviews (
           project_id, merge_request_iid, last_reviewed_commit_sha, review_comment_id,
+          reviewer_type, status, critical_issues_count, fixes_implemented_count,
           reviewed_at, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW())
         ON CONFLICT (project_id, merge_request_iid)
         DO UPDATE SET
           last_reviewed_commit_sha = EXCLUDED.last_reviewed_commit_sha,
           review_comment_id = EXCLUDED.review_comment_id,
+          reviewer_type = EXCLUDED.reviewer_type,
+          status = EXCLUDED.status,
+          critical_issues_count = EXCLUDED.critical_issues_count,
+          fixes_implemented_count = EXCLUDED.fixes_implemented_count,
           reviewed_at = EXCLUDED.reviewed_at,
           updated_at = EXCLUDED.updated_at
-      `, [projectId, mergeRequestIid, lastReviewedCommitSha, reviewCommentId]);
+      `, [projectId, mergeRequestIid, lastReviewedCommitSha, reviewCommentId, reviewerType, status, criticalIssuesCount, fixesImplementedCount]);
 
-      console.log(`Saved review history for MR !${mergeRequestIid} in project ${projectId}, last reviewed commit: ${lastReviewedCommitSha}`);
+      console.log(`Saved review history for MR !${mergeRequestIid} in project ${projectId}, reviewer: ${reviewerType}, status: ${status}`);
     } catch (error) {
       console.error('Error saving merge request review history:', error);
       throw error;
@@ -1258,6 +1390,10 @@ class DatabaseService {
     mergeRequestIid: number;
     lastReviewedCommitSha: string;
     reviewCommentId: number | null;
+    reviewerType: 'automated' | 'manual';
+    status: 'pending' | 'reviewed' | 'approved' | 'rejected';
+    criticalIssuesCount: number;
+    fixesImplementedCount: number;
     reviewedAt: Date;
     createdAt: Date;
     updatedAt: Date;
@@ -1272,6 +1408,10 @@ class DatabaseService {
           merge_request_iid as "mergeRequestIid",
           last_reviewed_commit_sha as "lastReviewedCommitSha",
           review_comment_id as "reviewCommentId",
+          reviewer_type as "reviewerType",
+          status,
+          critical_issues_count as "criticalIssuesCount",
+          fixes_implemented_count as "fixesImplementedCount",
           reviewed_at as "reviewedAt",
           created_at as "createdAt",
           updated_at as "updatedAt"
@@ -1286,6 +1426,64 @@ class DatabaseService {
       return result.rows[0];
     } catch (error) {
       console.error('Error getting merge request review history:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update fixes implemented count for a merge request review
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @param fixesImplementedCount The number of fixes implemented
+   */
+  async updateMergeRequestFixesCount(
+    projectId: number,
+    mergeRequestIid: number,
+    fixesImplementedCount: number
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE merge_request_reviews
+        SET fixes_implemented_count = $3, updated_at = NOW()
+        WHERE project_id = $1 AND merge_request_iid = $2
+      `, [projectId, mergeRequestIid, fixesImplementedCount]);
+
+      console.log(`Updated fixes count for MR !${mergeRequestIid} in project ${projectId}: ${fixesImplementedCount} fixes`);
+    } catch (error) {
+      console.error('Error updating merge request fixes count:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update review status for a merge request
+   * @param projectId The ID of the project
+   * @param mergeRequestIid The IID of the merge request
+   * @param status The new review status
+   */
+  async updateMergeRequestReviewStatus(
+    projectId: number,
+    mergeRequestIid: number,
+    status: 'pending' | 'reviewed' | 'approved' | 'rejected'
+  ): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query(`
+        UPDATE merge_request_reviews
+        SET status = $3, updated_at = NOW()
+        WHERE project_id = $1 AND merge_request_iid = $2
+      `, [projectId, mergeRequestIid, status]);
+
+      console.log(`Updated review status for MR !${mergeRequestIid} in project ${projectId}: ${status}`);
+    } catch (error) {
+      console.error('Error updating merge request review status:', error);
       throw error;
     } finally {
       client.release();

@@ -21,7 +21,7 @@ import {
 } from './controllers/documentation.js';
 import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.js';
 import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
-import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests } from './controllers/admin-merge-requests.js';
+import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests, updateMergeRequestFixesCount, updateMergeRequestReviewStatus } from './controllers/admin-merge-requests.js';
 import { getAnalytics, getSystemHealth } from './controllers/admin-analytics.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
@@ -138,6 +138,10 @@ app.get('/api/merge-requests', adminAuth, getMergeRequests);
 app.get('/api/merge-requests/export', adminAuth, exportMergeRequests);
 app.get('/api/merge-requests/:id', adminAuth, getMergeRequest);
 app.get('/api/users/:username/mr-statistics', adminAuth, getUserMRStatistics);
+
+// Merge request review tracking endpoints
+app.put('/api/projects/:projectId/merge-requests/:mergeRequestIid/fixes-count', adminAuth, updateMergeRequestFixesCount);
+app.put('/api/projects/:projectId/merge-requests/:mergeRequestIid/review-status', adminAuth, updateMergeRequestReviewStatus);
 
 // Analytics endpoints
 app.get('/api/analytics', adminAuth, getAnalytics);
