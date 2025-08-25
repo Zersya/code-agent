@@ -129,21 +129,59 @@
             </svg>
             <p>No trend data available</p>
           </div>
-          <div v-else class="w-full">
-            <!-- Simple trend visualization -->
-            <div class="space-y-2">
-              <div v-for="trend in recentTrends" :key="trend.date" class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">{{ formatTrendDate(trend.date) }}</span>
-                <div class="flex items-center space-x-2">
-                  <div class="w-20 bg-gray-200 rounded-full h-2">
-                    <div 
-                      class="bg-primary-600 h-2 rounded-full" 
-                      :style="{ width: getTrendWidth(trend.reviews) + '%' }"
-                    ></div>
-                  </div>
-                  <span class="text-sm font-medium text-gray-900">{{ trend.reviews }}</span>
+          <div v-else class="w-full overflow-x-auto">
+            <!-- GitHub-style contribution heatmap -->
+            <div class="min-w-max">
+              <!-- Month labels -->
+              <div class="flex mb-2 ml-8">
+                <div v-for="month in heatmapMonths" :key="month.name" class="text-xs text-gray-500" :style="{ width: month.width + 'px', marginLeft: month.offset + 'px' }">
+                  {{ month.name }}
                 </div>
               </div>
+              
+              <div class="flex">
+                <!-- Day labels -->
+                <div class="flex flex-col justify-between text-xs text-gray-500 mr-2 h-20">
+                  <span>Mon</span>
+                  <span>Wed</span>
+                  <span>Fri</span>
+                </div>
+                
+                <!-- Heatmap grid -->
+                <div class="grid grid-rows-7 gap-1" :style="{ gridTemplateColumns: `repeat(${heatmapWeeks.length}, 12px)` }">
+                  <div 
+                    v-for="(day, index) in heatmapData" 
+                    :key="index"
+                    class="w-3 h-3 rounded-sm cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary-300"
+                    :class="getHeatmapColor(day.reviews)"
+                    :title="`${day.date}: ${day.reviews} reviews`"
+                    @mouseenter="showTooltip($event, day)"
+                    @mouseleave="hideTooltip"
+                  ></div>
+                </div>
+              </div>
+              
+              <!-- Legend -->
+              <div class="flex items-center justify-end mt-3 text-xs text-gray-500">
+                <span class="mr-2">Less</span>
+                <div class="flex space-x-1">
+                  <div class="w-3 h-3 rounded-sm bg-gray-100"></div>
+                  <div class="w-3 h-3 rounded-sm bg-green-200"></div>
+                  <div class="w-3 h-3 rounded-sm bg-green-300"></div>
+                  <div class="w-3 h-3 rounded-sm bg-green-500"></div>
+                  <div class="w-3 h-3 rounded-sm bg-green-700"></div>
+                </div>
+                <span class="ml-2">More</span>
+              </div>
+            </div>
+            
+            <!-- Tooltip -->
+            <div 
+              v-if="tooltip.show"
+              class="absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg pointer-events-none"
+              :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+            >
+              {{ tooltip.content }}
             </div>
           </div>
         </div>
@@ -452,7 +490,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { format, subDays } from 'date-fns'
+import { format, subDays, startOfWeek, addDays, getDay, startOfYear, getWeek, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -467,6 +505,13 @@ const customDateRange = reactive({
   to: format(new Date(), 'yyyy-MM-dd')
 })
 
+const tooltip = reactive({
+  show: false,
+  x: 0,
+  y: 0,
+  content: ''
+})
+
 const recentTrends = computed(() => {
   return analyticsStore.analytics.reviewTrends.slice(-7) // Last 7 data points
 })
@@ -477,6 +522,98 @@ const maxTrendValue = computed(() => {
 
 const getTrendWidth = (value: number) => {
   return (value / maxTrendValue.value) * 100
+}
+
+// Heatmap computed properties
+const heatmapData = computed(() => {
+  const today = new Date()
+  const startDate = subDays(today, 364) // Show last year
+  const data = []
+  
+  // Create a map of existing trend data for quick lookup
+  const trendMap = new Map()
+  analyticsStore.analytics.reviewTrends.forEach(trend => {
+    trendMap.set(trend.date, trend.reviews)
+  })
+  
+  // Generate data for each day in the past year
+  for (let i = 0; i < 365; i++) {
+    const date = addDays(startDate, i)
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const reviews = trendMap.get(dateStr) || 0
+    
+    data.push({
+      date: format(date, 'MMM dd, yyyy'),
+      dateStr,
+      reviews,
+      dayOfWeek: getDay(date)
+    })
+  }
+  
+  return data
+})
+
+const heatmapWeeks = computed(() => {
+  const weeks = []
+  const startDate = subDays(new Date(), 364)
+  const startWeek = startOfWeek(startDate, { weekStartsOn: 1 }) // Monday start
+  
+  for (let i = 0; i < 53; i++) {
+    weeks.push(addDays(startWeek, i * 7))
+  }
+  
+  return weeks
+})
+
+const heatmapMonths = computed(() => {
+  const months = []
+  const today = new Date()
+  const startDate = subDays(today, 364)
+  
+  let currentMonth = getMonth(startDate)
+  let weekIndex = 0
+  
+  heatmapWeeks.value.forEach((week, index) => {
+    const weekMonth = getMonth(week)
+    if (weekMonth !== currentMonth && index > 0) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      months.push({
+        name: monthNames[weekMonth],
+        offset: weekIndex * 13, // 12px width + 1px gap
+        width: 24
+      })
+      currentMonth = weekMonth
+    }
+    weekIndex++
+  })
+  
+  return months
+})
+
+const maxHeatmapValue = computed(() => {
+  return Math.max(...heatmapData.value.map(d => d.reviews), 1)
+})
+
+const getHeatmapColor = (value: number) => {
+  if (value === 0) return 'bg-gray-100'
+  
+  const intensity = value / maxHeatmapValue.value
+  
+  if (intensity <= 0.25) return 'bg-green-200'
+  if (intensity <= 0.5) return 'bg-green-300'
+  if (intensity <= 0.75) return 'bg-green-500'
+  return 'bg-green-700'
+}
+
+const showTooltip = (event: MouseEvent, day: any) => {
+  tooltip.show = true
+  tooltip.x = event.clientX + 10
+  tooltip.y = event.clientY - 30
+  tooltip.content = `${day.date}: ${day.reviews} reviews`
+}
+
+const hideTooltip = () => {
+  tooltip.show = false
 }
 
 const formatTrendDate = (dateStr: string) => {

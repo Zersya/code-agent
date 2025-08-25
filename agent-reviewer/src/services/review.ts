@@ -1883,37 +1883,133 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
    * @returns The number of critical issues found
    */
   private countCriticalIssues(reviewText: string): number {
-    const criticalKeywords = [
-      'critical',
-      'security',
-      'vulnerability',
-      'bug',
-      'error',
-      'issue',
-      'problem',
-      'fix',
-      'broken',
-      'fail'
-    ];
+    console.log('🔢 Counting critical issues in review text...');
     
     let count = 0;
-    const lowerText = reviewText.toLowerCase();
     
-    // Count occurrences of critical keywords
-    criticalKeywords.forEach(keyword => {
-      const matches = lowerText.match(new RegExp(keyword, 'g'));
-      if (matches) {
-        count += matches.length;
-      }
-    });
-    
-    // Look for numbered lists that might indicate issues
-    const numberedIssues = lowerText.match(/\d+\./g);
-    if (numberedIssues) {
-      count += numberedIssues.length;
+    // Method 1: Count emoji-based critical issues (🔴)
+    const emojiCount = this.countCriticalIssuesByEmoji(reviewText);
+    if (emojiCount > 0) {
+      console.log(`📊 Found ${emojiCount} critical issues via emoji detection`);
+      return emojiCount;
     }
     
-    return count;
+    // Method 2: Count section-based critical issues (fallback)
+    const sectionCount = this.countCriticalIssuesBySection(reviewText);
+    console.log(`📋 Found ${sectionCount} critical issues via section detection`);
+    
+    return sectionCount;
+  }
+  
+  /**
+   * Count critical issues by looking for 🔴 emoji markers
+   * @param reviewText The review text to analyze
+   * @returns The number of critical issues found via emoji detection
+   */
+  private countCriticalIssuesByEmoji(reviewText: string): number {
+    if (!reviewText.includes('🔴')) {
+      return 0;
+    }
+    
+    // Find all lines with 🔴 emoji
+    const criticalLines = reviewText.split('\n').filter(line => line.includes('🔴'));
+    
+    let validIssueCount = 0;
+    
+    for (const line of criticalLines) {
+      const content = line.replace('🔴', '').trim();
+      
+      // Skip template placeholders or empty content
+      const isTemplate = content === '[Deskripsi masalah]' ||
+                        content === '' ||
+                        content.toLowerCase().includes('tidak ada') ||
+                        content.toLowerCase().includes('none') ||
+                        content.toLowerCase().includes('template') ||
+                        content.length < 5;
+      
+      if (isTemplate) {
+        continue;
+      }
+      
+      // Apply threshold-based validation
+      if (this.validateCriticalIssueByThreshold(content)) {
+        validIssueCount++;
+        console.log(`✅ Valid critical issue found: ${content.substring(0, 50)}...`);
+      } else {
+        console.log(`⚠️ Issue found but not critical under ${CRITICAL_ISSUE_THRESHOLD} threshold: ${content.substring(0, 50)}...`);
+      }
+    }
+    
+    return validIssueCount;
+  }
+  
+  /**
+   * Count critical issues by parsing section-based format
+   * @param reviewText The review text to analyze
+   * @returns The number of critical issues found via section detection
+   */
+  private countCriticalIssuesBySection(reviewText: string): number {
+    // Look for critical issue sections
+    const sectionPattern = /\*\*\s*isu\s+kritis\s*\*\*[^:]*:(.*?)(?=\n\*\*(?!\s*(?:masalah|cara\s+implementasi))|$)/gis;
+    const matches = reviewText.match(sectionPattern);
+    
+    if (!matches) {
+      return 0;
+    }
+    
+    let totalCount = 0;
+    
+    for (const match of matches) {
+      // Extract content after the section header
+      const content = match.replace(/\*\*\s*isu\s+kritis\s*\*\*[^:]*/i, '').replace(':', '').trim();
+      
+      // Skip if no substantial content
+      if (content.length <= 10 || 
+          content.toLowerCase().includes('tidak ada') || 
+          content.toLowerCase().includes('none')) {
+        continue;
+      }
+      
+      // Count individual issues within the section
+      // Look for bullet points, numbered lists, or 🔴 markers
+      const issueMarkers = [
+        /•\s*([^\n]+)/g,           // Bullet points
+        /\d+\.\s*([^\n]+)/g,      // Numbered lists
+        /🔴\s*([^\n]+)/g,         // Red circle emoji
+        /-\s*([^\n]+)/g           // Dash points
+      ];
+      
+      let sectionIssueCount = 0;
+      
+      for (const marker of issueMarkers) {
+        const issueMatches = content.match(marker);
+        if (issueMatches) {
+          for (const issueMatch of issueMatches) {
+            const issueContent = issueMatch.replace(/^[•\d\.-🔴]\s*/, '').trim();
+            
+            // Validate the issue content
+            if (issueContent.length > 5 && 
+                !issueContent.toLowerCase().includes('template') &&
+                this.validateCriticalIssueByThreshold(issueContent)) {
+              sectionIssueCount++;
+              console.log(`✅ Valid critical issue in section: ${issueContent.substring(0, 50)}...`);
+            }
+          }
+        }
+      }
+      
+      // If no specific markers found, treat the entire section as one issue if it's substantial
+      if (sectionIssueCount === 0 && content.length > 20) {
+        if (this.validateCriticalIssueByThreshold(content)) {
+          sectionIssueCount = 1;
+          console.log(`✅ Valid critical issue (whole section): ${content.substring(0, 50)}...`);
+        }
+      }
+      
+      totalCount += sectionIssueCount;
+    }
+    
+    return totalCount;
   }
 
   /**
