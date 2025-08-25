@@ -294,7 +294,13 @@ const exportReviews = async () => {
 const loadProjects = async () => {
   try {
     const response = await projectsApi.getProjects()
-    if (response.success && response.data) {
+    
+    // Handle both wrapped ApiResponse format and direct array format
+    if (Array.isArray(response)) {
+      // Direct array format: Project[]
+      projects.value = response
+    } else if (response && typeof response === 'object' && response.success && response.data) {
+      // Wrapped ApiResponse format: {success: boolean, data: Project[]}
       projects.value = response.data
     }
   } catch (error) {
