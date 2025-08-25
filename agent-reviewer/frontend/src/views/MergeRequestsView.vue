@@ -49,56 +49,147 @@
     </div>
 
     <!-- Filters -->
-    <BaseCard class="bg-white">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label for="project" class="block text-sm font-medium text-gray-700">Project</label>
-            <select
-              id="project"
-              v-model="filters.project_id"
-              @change="applyFilters"
-              class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            >
-              <option value="">All Projects</option>
-              <!-- Projects would be loaded from store -->
-            </select>
+    <BaseCard class="bg-white shadow-sm">
+      <div class="px-6 py-5">
+        <div class="mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Filters</h3>
+          <p class="mt-1 text-sm text-gray-500">Filter merge requests by project, author, status, or search terms</p>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <!-- Project Filter -->
+          <div class="space-y-1">
+            <label for="project" class="block text-sm font-medium text-gray-700">
+              <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              Project
+            </label>
+            <div class="relative">
+              <select
+                id="project"
+                v-model="filters.project_id"
+                @change="applyFilters"
+                :disabled="projectsStore.isLoading"
+                class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200 disabled:bg-gray-50 disabled:text-gray-500"
+              >
+                <option value="">All Projects</option>
+                <option 
+                  v-for="project in projectsStore.projects" 
+                  :key="project.projectId" 
+                  :value="project.projectId"
+                >
+                  {{ project.name }}
+                </option>
+              </select>
+              <div v-if="projectsStore.isLoading" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
+            <p v-if="projectsStore.error" class="text-xs text-red-600 mt-1">{{ projectsStore.error }}</p>
           </div>
-          <div>
-            <label for="author" class="block text-sm font-medium text-gray-700">Author</label>
-            <input
-              id="author"
-              v-model="filters.author_username"
-              @input="debouncedApplyFilters"
-              type="text"
-              placeholder="Username"
-              class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
+
+          <!-- Author Filter -->
+          <div class="space-y-1">
+            <label for="author" class="block text-sm font-medium text-gray-700">
+              <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Author
+            </label>
+            <div class="relative">
+              <input
+                id="author"
+                v-model="filters.author_username"
+                @input="debouncedApplyFilters"
+                type="text"
+                placeholder="Enter username..."
+                class="block w-full pl-3 pr-3 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200 placeholder-gray-400"
+              />
+              <div v-if="filters.author_username && mrStore.isLoading" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
           </div>
-          <div>
-            <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+
+          <!-- Status Filter -->
+          <div class="space-y-1">
+            <label for="status" class="block text-sm font-medium text-gray-700">
+              <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Status
+            </label>
             <select
               id="status"
               v-model="filters.status"
               @change="applyFilters"
-              class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200"
             >
               <option value="">All Statuses</option>
-              <option value="opened">Open</option>
-              <option value="merged">Merged</option>
-              <option value="closed">Closed</option>
+              <option value="opened" class="text-blue-600">🔵 Open</option>
+              <option value="merged" class="text-green-600">🟢 Merged</option>
+              <option value="closed" class="text-red-600">🔴 Closed</option>
             </select>
           </div>
-          <div>
-            <label for="search" class="block text-sm font-medium text-gray-700">Search</label>
-            <input
-              id="search"
-              v-model="filters.search"
-              @input="debouncedApplyFilters"
-              type="text"
-              placeholder="Title or MR ID"
-              class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
+
+          <!-- Search Filter -->
+          <div class="space-y-1">
+            <label for="search" class="block text-sm font-medium text-gray-700">
+              <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search
+            </label>
+            <div class="relative">
+              <input
+                id="search"
+                v-model="filters.search"
+                @input="debouncedApplyFilters"
+                type="text"
+                placeholder="Title, MR ID, or description..."
+                class="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm transition-colors duration-200 placeholder-gray-400"
+              />
+              <div v-if="filters.search" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  @click="clearSearch"
+                  class="text-gray-400 hover:text-gray-600 focus:outline-none"
+                  type="button"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="mt-6 flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <button
+              @click="clearAllFilters"
+              :disabled="!hasActiveFilters"
+              class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            >
+              <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear Filters
+            </button>
+            <span v-if="hasActiveFilters" class="text-sm text-gray-500">
+              {{ activeFiltersCount }} filter{{ activeFiltersCount !== 1 ? 's' : '' }} active
+            </span>
+          </div>
+          <div class="text-sm text-gray-500">
+            {{ mrStore.pagination.total || 0 }} merge request{{ (mrStore.pagination.total || 0) !== 1 ? 's' : '' }} found
           </div>
         </div>
       </div>
@@ -132,6 +223,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useMergeRequestStore } from '@/stores/merge-requests'
 import { useAnalyticsStore } from '@/stores/analytics'
+import { useProjectsStore } from '@/stores/projects'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseAlert from '@/components/BaseAlert.vue'
 import BasePagination from '@/components/BasePagination.vue'
@@ -142,13 +234,35 @@ import type { MergeRequestListParams } from '@/types'
 
 const mrStore = useMergeRequestStore()
 const analyticsStore = useAnalyticsStore()
+const projectsStore = useProjectsStore()
 
 const filters = ref<MergeRequestListParams>({
   page: 1,
-  limit: 20
+  per_page: 20,
+  project_id: '',
+  author_username: '',
+  status: '',
+  search: ''
 })
 
 const currentPage = ref(1)
+
+// Filter helper computed properties
+const hasActiveFilters = computed(() => {
+  return !!(filters.value.project_id || 
+           filters.value.author_username || 
+           filters.value.status || 
+           filters.value.search)
+})
+
+const activeFiltersCount = computed(() => {
+  let count = 0
+  if (filters.value.project_id) count++
+  if (filters.value.author_username) count++
+  if (filters.value.status) count++
+  if (filters.value.search) count++
+  return count
+})
 
 const overviewMetrics = computed(() => {
   const mrMetrics = analyticsStore.analytics.mergeRequestMetrics
@@ -199,6 +313,21 @@ const exportData = () => {
   mrStore.exportMergeRequests(filters.value)
 }
 
+// Filter action methods
+const clearSearch = () => {
+  filters.value.search = ''
+  applyFilters()
+}
+
+const clearAllFilters = () => {
+  filters.value.project_id = ''
+  filters.value.author_username = ''
+  filters.value.status = ''
+  filters.value.search = ''
+  filters.value.page = 1
+  applyFilters()
+}
+
 // Watch for page changes from pagination component
 watch(currentPage, (newPage) => {
   if (newPage !== filters.value.page) {
@@ -209,6 +338,7 @@ watch(currentPage, (newPage) => {
 onMounted(async () => {
   // Load initial data
   await Promise.all([
+    projectsStore.fetchProjects(),
     mrStore.fetchMergeRequests(filters.value),
     analyticsStore.fetchAnalytics()
   ])
