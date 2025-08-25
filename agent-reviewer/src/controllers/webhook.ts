@@ -51,10 +51,17 @@ export const processWebhook = async (req: Request, res: Response) => {
       if (event.object_kind === 'push') {
         await processPushEvent(event);
       } else if (event.object_kind === 'merge_request') {
+        const mrEvent = event as GitLabMergeRequestEvent;
+        const repopoToken = isRepopoEvent ? extractRepopoToken(req) : null;
+
+        // Save MR tracking data first
+        await saveMergeRequestTrackingData(mrEvent, isRepopoEvent, repopoToken);
+
+        // Then process the event normally
         if (isRepopoEvent) {
           await processRepopoMergeRequestEvent(event as RepopoWebhookEvent);
         } else {
-          await processMergeRequestEvent(event as GitLabMergeRequestEvent);
+          await processMergeRequestEvent(mrEvent);
         }
       } else if (event.object_kind === 'note') {
         await processNoteEvent(event as GitLabNoteEvent);
@@ -99,6 +106,59 @@ function isRepopoWebhook(req: Request): boolean {
   const repopoUserAgent = req.headers['user-agent'] && req.headers['user-agent'].includes('Repopo');
 
   return Boolean(repopoToken || hasRepopoFields || repopoReferer || repopoUserAgent);
+}
+
+/**
+ * Extract Repopo token from request
+ */
+function extractRepopoToken(req: Request): string | null {
+  const token = req.headers['x-repopo-token'] || req.query.repopo_token || req.body?.repopo_token;
+  return token ? String(token) : null;
+}
+
+/**
+ * Save merge request tracking data
+ */
+async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRepopo: boolean, repopoToken?: string | null) {
+  try {
+    const trackingData = {
+      project_id: event.project.id,
+      merge_request_iid: event.object_attributes.iid,
+      merge_request_id: event.object_attributes.id,
+      title: event.object_attributes.title,
+      description: event.object_attributes.description,
+      author_id: event.object_attributes.author?.id || event.user.id,
+      author_username: event.user.username,
+      author_name: event.user.name,
+      source_branch: event.object_attributes.source_branch,
+      target_branch: event.object_attributes.target_branch,
+      status: event.object_attributes.state,
+      action: event.object_attributes.action || 'unknown',
+      created_at: new Date(event.object_attributes.created_at),
+      updated_at: new Date(event.object_attributes.updated_at),
+      merged_at: null, // Will be updated when merge event is processed
+      closed_at: null, // Will be updated when close event is processed
+      merge_commit_sha: null, // Will be updated when merge event is processed
+      repository_url: event.project.web_url,
+      web_url: event.object_attributes.url,
+      is_repopo_event: isRepopo,
+      repopo_token: repopoToken
+    };
+
+    await dbService.saveMergeRequestTracking(trackingData);
+
+    // Update user statistics
+    await dbService.updateUserMRStatistics(
+      event.object_attributes.author?.id || event.user.id,
+      event.user.username,
+      event.project.id
+    );
+
+    console.log(`Saved MR tracking data for project ${event.project.id}, MR !${event.object_attributes.iid}`);
+  } catch (error) {
+    console.error('Error saving MR tracking data:', error);
+    // Don't throw error to avoid breaking existing functionality
+  }
 }
 
 /**
