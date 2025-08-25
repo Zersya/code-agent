@@ -490,7 +490,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { format, subDays, startOfWeek, addDays, getDay, startOfYear, getWeek, getMonth } from 'date-fns'
+import { format, subDays, startOfWeek, addDays, getDay, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -512,17 +512,7 @@ const tooltip = reactive({
   content: ''
 })
 
-const recentTrends = computed(() => {
-  return analyticsStore.analytics.reviewTrends.slice(-7) // Last 7 data points
-})
 
-const maxTrendValue = computed(() => {
-  return Math.max(...analyticsStore.analytics.reviewTrends.map(t => t.reviews), 1)
-})
-
-const getTrendWidth = (value: number) => {
-  return (value / maxTrendValue.value) * 100
-}
 
 // Heatmap computed properties
 const heatmapData = computed(() => {
@@ -566,7 +556,7 @@ const heatmapWeeks = computed(() => {
 })
 
 const heatmapMonths = computed(() => {
-  const months = []
+  const months: Array<{ name: string; offset: number; width: number }> = []
   const today = new Date()
   const startDate = subDays(today, 364)
   
@@ -616,9 +606,7 @@ const hideTooltip = () => {
   tooltip.show = false
 }
 
-const formatTrendDate = (dateStr: string) => {
-  return format(new Date(dateStr), 'MMM dd')
-}
+
 
 const formatDate = (dateStr: string) => {
   return format(new Date(dateStr), 'MMM dd, yyyy')
