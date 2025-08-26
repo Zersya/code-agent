@@ -80,7 +80,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Approval Rate</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ (analyticsStore.analytics.approvalRate || 0).toFixed(1) }}%</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ (analyticsStore.analytics.approvalRate || 0)?.toFixed(1) || '-' }}%</p>
           </div>
         </div>
       </BaseCard>
@@ -206,7 +206,7 @@
             <div v-for="project in analyticsStore.analytics.topProjects.slice(0, 5)" :key="project.projectName" class="flex items-center justify-between">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</p>
-                <p class="text-xs text-gray-500">{{ (project.approvalRate || 0).toFixed(1) }}% approval rate</p>
+                <p class="text-xs text-gray-500">{{ (project.approvalRate || 0)?.toFixed(1) || '-' }}% approval rate</p>
               </div>
               <div class="ml-4 flex-shrink-0">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
@@ -223,7 +223,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <BaseCard title="Review Frequency">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ (analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay || 0).toFixed(1) }}</p>
+          <p class="text-2xl font-bold text-primary-600">{{ (analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay || 0)?.toFixed(1) || '-' }}</p>
           <p class="text-sm text-gray-600">Reviews per day</p>
           <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.reviewFrequency?.activeDays || 0 }} active days</p>
         </div>
@@ -270,7 +270,7 @@
               <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
                 <div>
                   <span class="font-medium">Avg Review Time:</span>
-                  <span class="ml-1">{{ (project.avgReviewTime || 0).toFixed(1) }}m</span>
+                  <span class="ml-1">{{ (project.avgReviewTime || 0)?.toFixed(1) || '-' }}m</span>
                 </div>
                 <div>
                   <span class="font-medium">Active Days:</span>
@@ -299,7 +299,7 @@
           <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
             <div>
               <p class="text-sm font-medium text-blue-800">Approval Rate</p>
-              <p class="text-2xl font-bold text-blue-600">{{ (analyticsStore.analytics.approvalRate || 0).toFixed(1) }}%</p>
+              <p class="text-2xl font-bold text-blue-600">{{ (analyticsStore.analytics.approvalRate || 0)?.toFixed(1) || '-' }}%</p>
             </div>
             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,7 +443,7 @@
             <div class="mt-4 p-3 bg-gray-50 rounded-lg">
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Average Processing Time</span>
-                <span class="text-sm font-semibold text-gray-900">{{ (analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime || 0).toFixed(1) }}m</span>
+                <span class="text-sm font-semibold text-gray-900">{{ (analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime || 0)?.toFixed(1) || '-' }}m</span>
               </div>
             </div>
           </div>
