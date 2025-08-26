@@ -592,6 +592,83 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_user_mr_stats_username ON user_mr_statistics(username)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_user_mr_stats_project ON user_mr_statistics(project_id)');
 
+      // Create developer performance tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS developer_performance (
+          id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          date DATE NOT NULL,
+          mrs_created INTEGER DEFAULT 0,
+          mrs_merged INTEGER DEFAULT 0,
+          lines_added INTEGER DEFAULT 0,
+          lines_removed INTEGER DEFAULT 0,
+          commits_count INTEGER DEFAULT 0,
+          avg_review_time_hours DECIMAL(10,2),
+          calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(username, project_id, date)
+        )
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS mr_quality_metrics (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          username TEXT NOT NULL,
+          quality_score DECIMAL(5,2) NOT NULL,
+          review_cycles INTEGER NOT NULL,
+          critical_issues_count INTEGER NOT NULL,
+          fixes_implemented_count INTEGER NOT NULL,
+          time_to_first_review_hours DECIMAL(10,2),
+          time_to_merge_hours DECIMAL(10,2),
+          calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(project_id, merge_request_iid)
+        )
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS notion_issues (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          issue_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT,
+          priority TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(project_id, merge_request_iid, issue_id)
+        )
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS issue_metrics (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          issue_id TEXT NOT NULL,
+          username TEXT NOT NULL,
+          status TEXT NOT NULL,
+          priority TEXT,
+          resolution_time_days DECIMAL(10,2),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          resolved_at TIMESTAMP WITH TIME ZONE,
+          UNIQUE(project_id, issue_id)
+        )
+      `);
+
+      // Create indexes for developer performance tables
+      await client.query('CREATE INDEX IF NOT EXISTS idx_developer_performance_username ON developer_performance(username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_developer_performance_project ON developer_performance(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_developer_performance_date ON developer_performance(date)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_quality_metrics_project ON mr_quality_metrics(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_mr_quality_metrics_username ON mr_quality_metrics(username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_issues_project ON notion_issues(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_issues_mr ON notion_issues(merge_request_iid)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_project ON issue_metrics(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_username ON issue_metrics(username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_status ON issue_metrics(status)');
+
       console.log('Database schema initialized');
     } catch (error) {
       console.error('Failed to initialize database schema:', error);
