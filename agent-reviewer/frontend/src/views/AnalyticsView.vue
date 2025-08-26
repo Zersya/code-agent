@@ -80,7 +80,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Approval Rate</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.approvalRate.toFixed(1) }}%</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ (analyticsStore.analytics.approvalRate || 0).toFixed(1) }}%</p>
           </div>
         </div>
       </BaseCard>
@@ -206,7 +206,7 @@
             <div v-for="project in analyticsStore.analytics.topProjects.slice(0, 5)" :key="project.projectName" class="flex items-center justify-between">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</p>
-                <p class="text-xs text-gray-500">{{ project.approvalRate.toFixed(1) }}% approval rate</p>
+                <p class="text-xs text-gray-500">{{ (project.approvalRate || 0).toFixed(1) }}% approval rate</p>
               </div>
               <div class="ml-4 flex-shrink-0">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
