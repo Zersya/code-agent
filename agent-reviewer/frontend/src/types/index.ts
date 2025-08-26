@@ -114,12 +114,6 @@ export interface AnalyticsData {
     criticalIssues: number
   }>
 
-  // Heatmap data for VueUiHeatmap component
-  reviewTrendsHeatmap: Array<{
-    name: string
-    values: Array<number | null>
-  }>
-
   // Issue categorization
   issueCategories: Array<{
     category: string
