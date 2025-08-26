@@ -557,8 +557,8 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
     // Transform review trends data for VueUiHeatmap format
     // Create a heatmap showing review activity by day of week and week of year
-    const heatmapData = [];
-    const reviewsByDate = new Map();
+    const heatmapData: Array<{ name: string; values: number[] }> = [];
+    const reviewsByDate = new Map<string, number>();
     
     // Create a map of review counts by date
     reviewTrendsResult.rows.forEach(row => {
