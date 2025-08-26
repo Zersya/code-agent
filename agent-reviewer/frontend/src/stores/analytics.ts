@@ -28,9 +28,6 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     // Trend analysis
     reviewTrends: [],
 
-    // Heatmap data for VueUiHeatmap component
-    reviewTrendsHeatmap: [],
-
     // Issue categorization
     issueCategories: [],
 
