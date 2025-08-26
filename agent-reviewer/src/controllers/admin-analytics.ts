@@ -555,6 +555,45 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     `;
     const reviewTrendsResult = await dbService.query(reviewTrendsQuery, [dateFrom, dateTo]);
 
+    // Transform review trends data for VueUiHeatmap format
+    // Create a heatmap showing review activity by day of week and week of year
+    const heatmapData = [];
+    const reviewsByDate = new Map();
+    
+    // Create a map of review counts by date
+    reviewTrendsResult.rows.forEach(row => {
+      reviewsByDate.set(row.date, parseInt(row.reviews));
+    });
+    
+    // Generate heatmap data for the date range (weeks as rows, days as columns)
+    const startDate = new Date(dateFrom);
+    const endDate = new Date(dateTo);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    // Create data structure for each day of the week
+    dayNames.forEach(dayName => {
+      const dayValues = [];
+      const currentDate = new Date(startDate);
+      
+      // Find the first occurrence of this day of week
+      while (currentDate.getDay() !== dayNames.indexOf(dayName) && currentDate <= endDate) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Collect values for this day of week across all weeks
+      while (currentDate <= endDate) {
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        const reviewCount = reviewsByDate.get(dateStr) || 0;
+        dayValues.push(reviewCount);
+        currentDate.setDate(currentDate.getDate() + 7); // Move to next week
+      }
+      
+      heatmapData.push({
+        name: dayName,
+        values: dayValues
+      });
+    });
+
     // Get queue statistics for current status
     const queueStats = await queueService.getQueueStats();
 
@@ -647,6 +686,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
         approvals: parseInt(row.approvals),
         criticalIssues: parseInt(row.criticalIssues)
       })),
+
+      // Heatmap data for VueUiHeatmap component
+      reviewTrendsHeatmap: heatmapData,
 
       // Issue categorization
       issueCategories,
