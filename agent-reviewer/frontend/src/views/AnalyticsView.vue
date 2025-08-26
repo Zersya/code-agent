@@ -80,7 +80,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Approval Rate</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ (analyticsStore.analytics.approvalRate || 0)?.toFixed(1) || '-' }}%</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.approvalRate.toFixed(1) }}%</p>
           </div>
         </div>
       </BaseCard>
@@ -157,10 +157,10 @@
                     <div 
                       v-for="(day, index) in heatmapData" 
                       :key="index"
-                      class="w-3 h-3 rounded-sm cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary-300"
+                      class="w-3 h-3 rounded-sm transition-all duration-200"
                       :class="getHeatmapColor(day.reviews)"
-                      :title="`${day.date}: ${day.reviews} reviews`"
-                      @mouseenter="showTooltip($event, day)"
+                      :title="day.reviews >= 0 ? `${day.date}: ${day.reviews} reviews` : ''"
+                      @mouseenter="day.reviews >= 0 ? showTooltip($event, day) : null"
                       @mouseleave="hideTooltip"
                     ></div>
                   </div>
@@ -206,7 +206,7 @@
             <div v-for="project in analyticsStore.analytics.topProjects.slice(0, 5)" :key="project.projectName" class="flex items-center justify-between">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</p>
-                <p class="text-xs text-gray-500">{{ (project.approvalRate || 0)?.toFixed(1) || '-' }}% approval rate</p>
+                <p class="text-xs text-gray-500">{{ project.approvalRate.toFixed(1) }}% approval rate</p>
               </div>
               <div class="ml-4 flex-shrink-0">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
@@ -223,7 +223,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <BaseCard title="Review Frequency">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ (analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay || 0)?.toFixed(1) || '-' }}</p>
+          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay?.toFixed(1) || '0' }}</p>
           <p class="text-sm text-gray-600">Reviews per day</p>
           <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.reviewFrequency?.activeDays || 0 }} active days</p>
         </div>
@@ -270,7 +270,7 @@
               <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
                 <div>
                   <span class="font-medium">Avg Review Time:</span>
-                  <span class="ml-1">{{ (project.avgReviewTime || 0)?.toFixed(1) || '-' }}m</span>
+                  <span class="ml-1">{{ project.avgReviewTime?.toFixed(1) || '0' }}m</span>
                 </div>
                 <div>
                   <span class="font-medium">Active Days:</span>
@@ -299,7 +299,7 @@
           <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
             <div>
               <p class="text-sm font-medium text-blue-800">Approval Rate</p>
-              <p class="text-2xl font-bold text-blue-600">{{ (analyticsStore.analytics.approvalRate || 0)?.toFixed(1) || '-' }}%</p>
+              <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.approvalRate?.toFixed(1) }}%</p>
             </div>
             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,7 +443,7 @@
             <div class="mt-4 p-3 bg-gray-50 rounded-lg">
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Average Processing Time</span>
-                <span class="text-sm font-semibold text-gray-900">{{ (analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime || 0)?.toFixed(1) || '-' }}m</span>
+                <span class="text-sm font-semibold text-gray-900">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime?.toFixed(1) || '0' }}m</span>
               </div>
             </div>
           </div>
@@ -518,102 +518,103 @@ const tooltip = reactive({
   content: ''
 })
 
-
-
 // Heatmap computed properties
 const heatmapData = computed(() => {
   const today = new Date()
-  const startDate = subDays(today, 364) // Show last year
-  const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
-  const endWeek = startOfWeek(today, { weekStartsOn: 0 }) // End on today's week
-  
-  // Calculate the actual number of weeks needed
-  const totalDays = Math.ceil((endWeek.getTime() - startWeek.getTime()) / (1000 * 60 * 60 * 24)) + 7
-  const totalWeeks = Math.ceil(totalDays / 7)
-  
-  // Create a map of existing trend data for quick lookup
+  const startDate = subDays(today, 364)
+  const startDayOfGrid = startOfWeek(startDate, { weekStartsOn: 0 }) // The very first Sunday to show on the grid
+
+  const totalWeeks = 53; // A year can span up to 53 weeks
+
   const trendMap = new Map()
   analyticsStore.analytics.reviewTrends.forEach(trend => {
     trendMap.set(trend.date, trend.reviews)
   })
-  
-  // Create a 2D array: 7 rows (days) x dynamic columns (weeks)
+
+  // Create a 2D array representing the grid: 7 rows (days) x 53 columns (weeks)
   const grid = Array(7).fill(null).map(() => Array(totalWeeks).fill(null))
-  
-  // Fill the grid with data up to today
+
+  // Populate the 2D grid with data or placeholders
   for (let week = 0; week < totalWeeks; week++) {
     for (let day = 0; day < 7; day++) {
-      const date = addDays(startWeek, week * 7 + day)
+      const date = addDays(startDayOfGrid, week * 7 + day)
       
-      // Only include dates up to today
-      if (date <= today) {
+      // Only include dates from the last year up to today
+      if (date >= startDate && date <= today) {
         const dateStr = format(date, 'yyyy-MM-dd')
         const reviews = trendMap.get(dateStr) || 0
-        
         grid[day][week] = {
           date: format(date, 'MMM dd, yyyy'),
           dateStr,
           reviews,
           dayOfWeek: day
         }
+      } else {
+        // Use a placeholder for dates outside the range (future or too far past)
+        // This ensures the grid structure is always complete
+        grid[day][week] = {
+          date: format(date, 'MMM dd, yyyy'),
+          reviews: -1, // Use -1 to signify an invalid/placeholder cell
+          placeholder: true
+        }
       }
     }
   }
-  
-  // Flatten the grid week by week (CSS grid fills column by column, each column is a week)
+
+  // Flatten the grid row-by-row to match CSS grid's default filling order
   const data = []
-  for (let week = 0; week < totalWeeks; week++) {
-    for (let day = 0; day < 7; day++) {
-      if (grid[day][week]) {
-        data.push(grid[day][week])
-      }
+  for (let day = 0; day < 7; day++) {
+    for (let week = 0; week < totalWeeks; week++) {
+      data.push(grid[day][week])
     }
   }
-  
+
   return data
 })
 
+
 const heatmapWeeks = computed(() => {
-  const today = new Date()
-  const startDate = subDays(today, 364)
-  const startWeek = startOfWeek(startDate, { weekStartsOn: 0 }) // Sunday start
-  const endWeek = startOfWeek(today, { weekStartsOn: 0 }) // End on today's week
-  
-  // Calculate the actual number of weeks needed
-  const totalDays = Math.ceil((endWeek.getTime() - startWeek.getTime()) / (1000 * 60 * 60 * 24)) + 7
-  const totalWeeks = Math.ceil(totalDays / 7)
-  
-  const weeks = []
+  // Return a fixed array of 53 weeks for the grid columns
+  const totalWeeks = 53;
+  const startDate = subDays(new Date(), 364);
+  const startDayOfGrid = startOfWeek(startDate, { weekStartsOn: 0 });
+
+  const weeks = [];
   for (let i = 0; i < totalWeeks; i++) {
-    weeks.push(addDays(startWeek, i * 7))
+    weeks.push(addDays(startDayOfGrid, i * 7));
   }
-  
-  return weeks
-})
+  return weeks;
+});
 
 const heatmapMonths = computed(() => {
   const months: Array<{ name: string; offset: number; width: number }> = []
-  const today = new Date()
-  const startDate = subDays(today, 364)
-  
-  let currentMonth = getMonth(startDate)
-  let weekIndex = 0
+  let lastMonth = -1
   
   heatmapWeeks.value.forEach((week, index) => {
-    const weekMonth = getMonth(week)
-    if (weekMonth !== currentMonth && index > 0) {
+    const month = getMonth(addDays(week, 3)) // Check middle of the week for month
+    if (month !== lastMonth) {
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      months.push({
-        name: monthNames[weekMonth],
-        offset: weekIndex * 13, // 12px width + 1px gap
-        width: 24
-      })
-      currentMonth = weekMonth
+      if (index > 0) { // Don't add a label for the very first week
+        months.push({
+          name: monthNames[month],
+          offset: 0, // We'll calculate this later
+          width: index, // Temporarily store the week index
+        })
+      }
+      lastMonth = month
     }
-    weekIndex++
   })
+
+  // Calculate offsets based on previous month's position
+  for (let i = 0; i < months.length; i++) {
+    const prevWidth = i > 0 ? months[i - 1].width : 0;
+    months[i].offset = (months[i].width - prevWidth) * 13; // 12px width + 1px gap
+  }
   
-  return months
+  // Clean up width property
+  months.forEach(m => m.width = 24);
+
+  return months.slice(0, 12) // Ensure we don't have too many labels
 })
 
 const maxHeatmapValue = computed(() => {
@@ -621,6 +622,8 @@ const maxHeatmapValue = computed(() => {
 })
 
 const getHeatmapColor = (value: number) => {
+  // -1 indicates a placeholder cell that should be transparent
+  if (value < 0) return 'bg-transparent'
   if (value === 0) return 'bg-gray-100'
   
   const intensity = value / maxHeatmapValue.value
