@@ -21,6 +21,12 @@ import type {
   UserMRStatistics,
   MergeRequestListParams
 } from '@/types'
+import type {
+  DeveloperPerformanceMetrics,
+  MRQualityMetrics,
+  IssueMetrics,
+  PerformanceFilters
+} from '@/types/performance'
 
 class ApiClient {
   private client: AxiosInstance
@@ -231,6 +237,18 @@ export const documentationApi = {
 
   mapProjectToDocumentation: (projectId: number, data: { sourceId: string; priority: number; isEnabled: boolean }): Promise<ApiResponse<ProjectDocumentationMapping>> =>
     apiClient.post<ProjectDocumentationMapping>(`/projects/${projectId}/documentation`, data),
+}
+
+// Performance API
+export const performanceApi = {
+  getDeveloperPerformance: (filters?: PerformanceFilters): Promise<ApiResponse<DeveloperPerformanceMetrics[]>> =>
+    apiClient.get<DeveloperPerformanceMetrics[]>('/analytics/developers', filters),
+
+  getMRQualityMetrics: (filters?: PerformanceFilters): Promise<ApiResponse<MRQualityMetrics[]>> =>
+    apiClient.get<MRQualityMetrics[]>('/analytics/merge-requests', filters),
+
+  getIssueMetrics: (filters?: PerformanceFilters): Promise<ApiResponse<IssueMetrics[]>> =>
+    apiClient.get<IssueMetrics[]>('/analytics/issues', filters),
 }
 
 export default apiClient

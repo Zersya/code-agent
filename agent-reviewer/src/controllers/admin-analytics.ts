@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/database.js';
 import { queueService } from '../services/queue.js';
+import { performanceService } from '../services/performance.js';
 import { format, subDays, startOfDay } from 'date-fns';
 
 /**
@@ -740,3 +741,85 @@ export const getSystemHealth = async (_req: Request, res: Response): Promise<voi
     });
   }
 };
+
+/**
+ * Get developer performance analytics
+ */
+export async function getDeveloperPerformanceAnalytics(req: Request, res: Response) {
+  try {
+    const filters = {
+      dateFrom: req.query.dateFrom as string,
+      dateTo: req.query.dateTo as string,
+      projectId: req.query.projectId ? parseInt(req.query.projectId as string) : undefined,
+      developerId: req.query.developerId ? parseInt(req.query.developerId as string) : undefined
+    };
+
+    const result = await performanceService.getDeveloperPerformance(filters);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting developer performance analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get developer performance analytics'
+    });
+  }
+}
+
+/**
+ * Get MR quality analytics
+ */
+export async function getMRQualityAnalytics(req: Request, res: Response) {
+  try {
+    const filters = {
+      dateFrom: req.query.dateFrom as string,
+      dateTo: req.query.dateTo as string,
+      authorId: req.query.authorId ? parseInt(req.query.authorId as string) : undefined,
+      projectId: req.query.projectId ? parseInt(req.query.projectId as string) : undefined
+    };
+
+    const result = await performanceService.getMRQualityMetrics(filters);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting MR quality analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get MR quality analytics'
+    });
+  }
+}
+
+/**
+ * Get issue tracking analytics
+ */
+export async function getIssueTrackingAnalytics(req: Request, res: Response) {
+  try {
+    const filters = {
+      dateFrom: req.query.dateFrom as string,
+      dateTo: req.query.dateTo as string,
+      issueType: req.query.issueType as string || 'Bug',
+      projectId: req.query.projectId ? parseInt(req.query.projectId as string) : undefined,
+      status: req.query.status as string
+    };
+
+    const result = await performanceService.getIssueTrackingMetrics(filters);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting issue tracking analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get issue tracking analytics'
+    });
+  }
+}

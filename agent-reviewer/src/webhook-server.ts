@@ -22,7 +22,7 @@ import {
 import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.js';
 import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
 import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests, updateMergeRequestFixesCount, updateMergeRequestReviewStatus } from './controllers/admin-merge-requests.js';
-import { getAnalytics, getSystemHealth } from './controllers/admin-analytics.js';
+import { getAnalytics, getSystemHealth, getDeveloperPerformanceAnalytics, getMRQualityAnalytics, getIssueTrackingAnalytics } from './controllers/admin-analytics.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 import { monitoringService } from './services/monitoring.js';
@@ -146,6 +146,11 @@ app.put('/api/projects/:projectId/merge-requests/:mergeRequestIid/review-status'
 // Analytics endpoints
 app.get('/api/analytics', adminAuth, getAnalytics);
 app.get('/api/system/health', adminAuth, getSystemHealth);
+
+// Developer Performance Analytics endpoints
+app.get('/api/analytics/developers', adminAuth, getDeveloperPerformanceAnalytics);
+app.get('/api/analytics/merge-requests', adminAuth, getMRQualityAnalytics);
+app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

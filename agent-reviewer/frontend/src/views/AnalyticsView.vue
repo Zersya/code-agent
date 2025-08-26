@@ -480,15 +480,50 @@
       </div>
     </div>
 
-    <!-- Error Alert -->
+    <!-- Developer Performance Section -->
+    <div v-if="performanceStore.developerMetrics.length > 0" class="mt-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Developer Performance</h2>
+      <div class="space-y-6">
+        <DeveloperPerformanceCard 
+          v-for="developer in performanceStore.developerMetrics" 
+          :key="developer.user_id" 
+          :developer="developer" 
+        />
+      </div>
+    </div>
+
+    <!-- MR Quality Metrics Section -->
+    <div v-if="performanceStore.mrQualityMetrics.length > 0" class="mt-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Merge Request Quality</h2>
+      <MRQualityChart :metrics="performanceStore.mrQualityMetrics" />
+    </div>
+
+    <!-- Issue Tracking Section -->
+    <div v-if="performanceStore.issueMetrics.length > 0" class="mt-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Issue Tracking</h2>
+      <IssueTrackingChart :metrics="performanceStore.issueMetrics" />
+    </div>
+
+    <!-- Error Alerts -->
     <BaseAlert
       v-if="analyticsStore.error"
       type="danger"
       :show="!!analyticsStore.error"
-      title="Error"
+      title="Analytics Error"
       :message="analyticsStore.error"
       dismissible
       @dismiss="analyticsStore.clearError"
+      class="mt-6"
+    />
+    
+    <BaseAlert
+      v-if="performanceStore.error"
+      type="danger"
+      :show="!!performanceStore.error"
+      title="Performance Error"
+      :message="performanceStore.error"
+      dismissible
+      @dismiss="performanceStore.clearError"
       class="mt-6"
     />
   </div>
@@ -498,12 +533,17 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { format, subDays, startOfWeek, addDays, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
+import { usePerformanceStore } from '@/stores/performance'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseInput from '@/components/BaseInput.vue'
 import BaseAlert from '@/components/BaseAlert.vue'
+import DeveloperPerformanceCard from '@/components/DeveloperPerformanceCard.vue'
+import MRQualityChart from '@/components/MRQualityChart.vue'
+import IssueTrackingChart from '@/components/IssueTrackingChart.vue'
 
 const analyticsStore = useAnalyticsStore()
+const performanceStore = usePerformanceStore()
 const selectedDateRange = ref('30')
 
 const customDateRange = reactive({
@@ -694,12 +734,17 @@ const applyCustomDateRange = () => {
   })
 }
 
-const refreshAnalytics = () => {
-  if (selectedDateRange.value === 'custom') {
-    applyCustomDateRange()
-  } else {
-    handleDateRangeChange()
-  }
+const refreshAnalytics = async () => {
+  const dateRange = selectedDateRange.value === 'custom' 
+    ? { from: customDateRange.from, to: customDateRange.to }
+    : undefined
+  
+  await Promise.all([
+    analyticsStore.fetchAnalytics(dateRange),
+    performanceStore.fetchDeveloperPerformance(dateRange),
+    performanceStore.fetchMRQualityMetrics(dateRange),
+    performanceStore.fetchIssueMetrics(dateRange)
+  ])
 }
 
 onMounted(() => {
