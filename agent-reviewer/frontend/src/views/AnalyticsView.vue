@@ -560,10 +560,10 @@ const heatmapData = computed(() => {
     }
   }
   
-  // Flatten the grid row by row (CSS grid fills row by row across weeks)
+  // Flatten the grid week by week (CSS grid fills column by column, each column is a week)
   const data = []
-  for (let day = 0; day < 7; day++) {
-    for (let week = 0; week < totalWeeks; week++) {
+  for (let week = 0; week < totalWeeks; week++) {
+    for (let day = 0; day < 7; day++) {
       if (grid[day][week]) {
         data.push(grid[day][week])
       }
