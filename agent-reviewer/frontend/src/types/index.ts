@@ -4,6 +4,9 @@ export interface User {
   role: string
 }
 
+// Re-export performance types
+export * from './performance'
+
 export interface LoginCredentials {
   secretKey: string
 }

@@ -6,6 +6,7 @@ import { embeddingService } from '../services/embedding.js';
 import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
+import { performanceService } from '../services/performance.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 
 /**
@@ -424,6 +425,18 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
           projectId
         );
       }
+
+      // Process performance metrics for merged MR
+      try {
+        await performanceService.processMRForQualityMetrics(
+          event.object_attributes.id,
+          projectId,
+          updateData.author_id
+        );
+        console.log(`Processed performance metrics for merged MR !${mergeRequestIid}`);
+      } catch (metricsError) {
+        console.error(`Error processing performance metrics for MR !${mergeRequestIid}:`, metricsError);
+      }
     } catch (updateError) {
       console.error(`Error updating merge request tracking data for MR !${mergeRequestIid}:`, updateError);
     }
@@ -502,6 +515,18 @@ async function processRepopoMergeCompletionEvent(event: RepopoWebhookEvent) {
           updateData.author_username,
           projectId
         );
+      }
+
+      // Process performance metrics for merged Repopo MR
+      try {
+        await performanceService.processMRForQualityMetrics(
+          event.object_attributes.id,
+          projectId,
+          updateData.author_id
+        );
+        console.log(`Processed performance metrics for merged Repopo MR !${mergeRequestIid}`);
+      } catch (metricsError) {
+        console.error(`Error processing performance metrics for Repopo MR !${mergeRequestIid}:`, metricsError);
       }
     } catch (updateError) {
       console.error(`Error updating Repopo merge request tracking data for MR !${mergeRequestIid}:`, updateError);

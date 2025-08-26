@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
 import { MergeRequestTrackingRecord, UserMRStatisticsRecord } from '../models/merge-request.js';
+import { DeveloperPerformanceMetrics, MRQualityMetrics, NotionIssue } from '../types/performance.js';
 
 dotenv.config();
 
@@ -2300,6 +2301,225 @@ class DatabaseService {
     } finally {
       client.release();
     }
+  }
+
+  // Developer Performance Analytics Methods
+
+  /**
+   * Get developer performance metrics
+   */
+  async getDeveloperPerformanceMetrics(
+    dateFrom: Date,
+    dateTo: Date,
+    developerId?: number,
+    projectId?: number
+  ): Promise<DeveloperPerformanceMetrics[]> {
+    const conditions = ['performance_date BETWEEN $1 AND $2'];
+    const params: any[] = [dateFrom, dateTo];
+    
+    if (developerId) {
+      conditions.push(`developer_id = $${params.length + 1}`);
+      params.push(developerId);
+    }
+    
+    if (projectId) {
+      conditions.push(`project_id = $${params.length + 1}`);
+      params.push(projectId);
+    }
+    
+    const query = `
+      SELECT 
+        dp.*,
+        u.username,
+        u.name as developer_name,
+        p.name as project_name
+      FROM developer_performance dp
+      LEFT JOIN users u ON dp.developer_id = u.id
+      LEFT JOIN projects p ON dp.project_id = p.project_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY dp.performance_date DESC, dp.quality_score DESC
+    `;
+    
+    const result = await this.query(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Insert or update developer performance metrics
+   */
+  async upsertDeveloperPerformance(
+    metrics: DeveloperPerformanceMetrics
+  ): Promise<void> {
+    const query = `
+      INSERT INTO developer_performance (
+        developer_id, project_id, performance_date,
+        total_mrs, merged_mrs, success_rate, avg_merge_time_hours,
+        quality_score, issues_created, issues_resolved, avg_resolution_time_days
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (developer_id, project_id, performance_date)
+      DO UPDATE SET
+        total_mrs = EXCLUDED.total_mrs,
+        merged_mrs = EXCLUDED.merged_mrs,
+        success_rate = EXCLUDED.success_rate,
+        avg_merge_time_hours = EXCLUDED.avg_merge_time_hours,
+        quality_score = EXCLUDED.quality_score,
+        issues_created = EXCLUDED.issues_created,
+        issues_resolved = EXCLUDED.issues_resolved,
+        avg_resolution_time_days = EXCLUDED.avg_resolution_time_days,
+        updated_at = NOW()
+    `;
+    
+    await this.query(query, [
+      metrics.developer_id,
+      metrics.project_id,
+      metrics.performance_date,
+      metrics.total_mrs,
+      metrics.merged_mrs,
+      metrics.success_rate,
+      metrics.avg_merge_time_hours,
+      metrics.quality_score,
+      metrics.issues_created,
+      metrics.issues_resolved,
+      metrics.avg_resolution_time_days
+    ]);
+  }
+
+  /**
+   * Get MR quality metrics
+   */
+  async getMRQualityMetrics(
+    dateFrom: Date,
+    dateTo: Date,
+    developerId?: number
+  ): Promise<MRQualityMetrics[]> {
+    const conditions = ['mqm.created_at BETWEEN $1 AND $2'];
+    const params: any[] = [dateFrom, dateTo];
+    
+    if (developerId) {
+      conditions.push(`mqm.developer_id = $${params.length + 1}`);
+      params.push(developerId);
+    }
+    
+    const query = `
+      SELECT 
+        mqm.*,
+        mrt.title as mr_title,
+        mrt.source_branch,
+        mrt.target_branch
+      FROM mr_quality_metrics mqm
+      LEFT JOIN merge_request_tracking mrt ON mqm.merge_request_id = mrt.merge_request_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY mqm.created_at DESC
+    `;
+    
+    const result = await this.query(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Insert MR quality metrics
+   */
+  async insertMRQualityMetrics(
+    metrics: MRQualityMetrics
+  ): Promise<void> {
+    const query = `
+      INSERT INTO mr_quality_metrics (
+        merge_request_id, developer_id, project_id,
+        quality_score, review_cycles, critical_issues_count,
+        fixes_implemented_count, time_to_first_review_hours,
+        time_to_merge_hours, code_complexity_score
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ON CONFLICT (merge_request_id)
+      DO UPDATE SET
+        quality_score = EXCLUDED.quality_score,
+        review_cycles = EXCLUDED.review_cycles,
+        critical_issues_count = EXCLUDED.critical_issues_count,
+        fixes_implemented_count = EXCLUDED.fixes_implemented_count,
+        time_to_first_review_hours = EXCLUDED.time_to_first_review_hours,
+        time_to_merge_hours = EXCLUDED.time_to_merge_hours,
+        code_complexity_score = EXCLUDED.code_complexity_score,
+        updated_at = NOW()
+    `;
+    
+    await this.query(query, [
+      metrics.merge_request_id,
+      metrics.developer_id,
+      metrics.project_id,
+      metrics.quality_score,
+      metrics.review_cycles,
+      metrics.critical_issues_count,
+      metrics.fixes_implemented_count,
+      metrics.time_to_first_review_hours,
+      metrics.time_to_merge_hours,
+      metrics.code_complexity_score
+    ]);
+  }
+
+  /**
+   * Get Notion issues
+   */
+  async getNotionIssues(
+    dateFrom: Date,
+    dateTo: Date,
+    issueType: string = 'Bug',
+    projectId?: number
+  ): Promise<NotionIssue[]> {
+    const conditions = ['created_at BETWEEN $1 AND $2', 'issue_type = $3'];
+    const params: any[] = [dateFrom, dateTo, issueType];
+    
+    if (projectId) {
+      conditions.push(`project_id = $${params.length + 1}`);
+      params.push(projectId);
+    }
+    
+    const query = `
+      SELECT * FROM notion_issues
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY created_at DESC
+    `;
+    
+    const result = await this.query(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Insert or update Notion issue
+   */
+  async upsertNotionIssue(issue: NotionIssue): Promise<void> {
+    const query = `
+      INSERT INTO notion_issues (
+        id, notion_page_id, title, description, issue_type,
+        status, priority_level, creator_id, assignee_id,
+        project_id, merge_request_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (id)
+      DO UPDATE SET
+        title = EXCLUDED.title,
+        description = EXCLUDED.description,
+        status = EXCLUDED.status,
+        priority_level = EXCLUDED.priority_level,
+        assignee_id = EXCLUDED.assignee_id,
+        resolved_at = CASE 
+          WHEN EXCLUDED.status = 'Resolved' AND notion_issues.status != 'Resolved' 
+          THEN NOW() 
+          ELSE notion_issues.resolved_at 
+        END,
+        updated_at = NOW()
+    `;
+    
+    await this.query(query, [
+      issue.id,
+      issue.notion_page_id,
+      issue.title,
+      issue.description,
+      issue.issue_type,
+      issue.status,
+      issue.priority_level,
+      issue.creator_id,
+      issue.assignee_id,
+      issue.project_id,
+      issue.merge_request_id
+    ]);
   }
 }
 
