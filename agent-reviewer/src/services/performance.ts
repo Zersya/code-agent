@@ -131,12 +131,19 @@ export class PerformanceService {
       const qualityMetrics = await this.calculateMRQualityScore(mr);
 
       // Insert quality metrics
-      await dbService.insertMRQualityMetrics({
+      const metricsToInsert: MRQualityMetrics = {
         merge_request_id: mergeRequestId,
         developer_id: authorId,
         project_id: projectId,
-        ...qualityMetrics
-      });
+        quality_score: qualityMetrics.quality_score ?? 0,
+        review_cycles: qualityMetrics.review_cycles ?? 0,
+        critical_issues_count: qualityMetrics.critical_issues_count ?? 0,
+        fixes_implemented_count: qualityMetrics.fixes_implemented_count ?? 0,
+        time_to_first_review_hours: qualityMetrics.time_to_first_review_hours,
+        time_to_merge_hours: qualityMetrics.time_to_merge_hours
+      };
+      
+      await dbService.insertMRQualityMetrics(metricsToInsert);
 
       // Update developer performance
       await this.updateDeveloperPerformance(authorId, projectId);
@@ -237,8 +244,8 @@ export class PerformanceService {
       review_cycles: reviewResult.rows.length,
       critical_issues_count: criticalIssues,
       fixes_implemented_count: fixesImplemented,
-      time_to_first_review_hours: timeToFirstReview,
-      time_to_merge_hours: timeToMerge
+      time_to_first_review_hours: timeToFirstReview ?? undefined,
+      time_to_merge_hours: timeToMerge ?? undefined
     };
   }
 

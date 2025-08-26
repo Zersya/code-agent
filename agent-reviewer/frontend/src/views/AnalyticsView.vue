@@ -735,15 +735,19 @@ const applyCustomDateRange = () => {
 }
 
 const refreshAnalytics = async () => {
-  const dateRange = selectedDateRange.value === 'custom' 
+  const analyticsDateRange = selectedDateRange.value === 'custom' 
     ? { from: customDateRange.from, to: customDateRange.to }
     : undefined
   
+  const performanceDateRange = selectedDateRange.value === 'custom' 
+    ? { dateFrom: customDateRange.from, dateTo: customDateRange.to }
+    : undefined
+  
   await Promise.all([
-    analyticsStore.fetchAnalytics(dateRange),
-    performanceStore.fetchDeveloperPerformance(dateRange),
-    performanceStore.fetchMRQualityMetrics(dateRange),
-    performanceStore.fetchIssueMetrics(dateRange)
+    analyticsStore.fetchAnalytics(analyticsDateRange),
+    performanceStore.fetchDeveloperPerformance(performanceDateRange),
+    performanceStore.fetchMRQualityMetrics(performanceDateRange),
+    performanceStore.fetchIssueMetrics(performanceDateRange)
   ])
 }
 

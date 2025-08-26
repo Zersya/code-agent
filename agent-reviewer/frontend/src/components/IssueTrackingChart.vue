@@ -156,17 +156,17 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <span 
                   class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getStatusColor(issue.status)"
+                  :class="getStatusColor(issue.status || 'unknown')"
                 >
-                  {{ issue.status }}
+                  {{ issue.status || 'Unknown' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span 
                   class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getPriorityColor(issue.priority)"
+                  :class="getPriorityColor(issue.priority || 'medium')"
                 >
-                  {{ issue.priority }}
+                  {{ issue.priority || 'Medium' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
