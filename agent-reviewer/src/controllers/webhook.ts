@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { GitLabPushEvent, GitLabMergeRequestEvent, GitLabWebhookEvent, GitLabNoteEvent, GitLabEmojiEvent } from '../types/webhook.js';
+import { GitLabPushEvent, GitLabMergeRequestEvent, GitLabWebhookEvent, GitLabNoteEvent, GitLabEmojiEvent, GitLabMergeRequestAttributes } from '../types/webhook.js';
 import { RepopoWebhookEvent } from '../types/review.js';
 import { gitlabService } from '../services/gitlab.js';
 import { embeddingService } from '../services/embedding.js';
@@ -8,6 +8,33 @@ import { reviewService } from '../services/review.js';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
 import { performanceService } from '../services/performance.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
+
+/**
+ * Helper function to check if a merge request is in draft status
+ */
+function isDraftMergeRequest(attributes: GitLabMergeRequestAttributes): boolean {
+  return attributes.work_in_progress === true;
+}
+
+/**
+ * Helper function to check if a merge request transitioned from draft to ready
+ */
+function isTransitionFromDraftToReady(event: GitLabMergeRequestEvent): boolean {
+  return event.changes?.work_in_progress?.previous === true &&
+         event.changes?.work_in_progress?.current === false;
+}
+
+/**
+ * Helper function to determine if a merge request should be processed
+ * Returns true if MR is ready OR if it's transitioning from draft to ready
+ */
+function shouldProcessMergeRequest(event: GitLabMergeRequestEvent): boolean {
+  const isDraft = isDraftMergeRequest(event.object_attributes);
+  const isTransition = isTransitionFromDraftToReady(event);
+
+  // Process if not draft OR if transitioning from draft to ready
+  return !isDraft || isTransition;
+}
 
 /**
  * Process a GitLab webhook event
@@ -276,6 +303,14 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
       return;
     }
 
+    // Check if merge request should be processed based on draft status
+    if (!shouldProcessMergeRequest(event)) {
+      const gitlabProjectId = event.project.id;
+      const mergeRequestIid = event.object_attributes.iid;
+      console.log(`Skipping draft merge request !${mergeRequestIid} in project ${gitlabProjectId} (work_in_progress: ${event.object_attributes.work_in_progress})`);
+      return;
+    }
+
     const gitlabProjectId = event.project.id;
     const mergeRequestIid = event.object_attributes.iid;
     const sourceBranch = event.object_attributes.source_branch;
@@ -284,7 +319,13 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     // Generate a consistent project ID
     const projectId = event.project.id
 
-    console.log(`Processing merge request event for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, MR !${mergeRequestIid}, commit ${commitId}`);
+    // Log processing with draft status information
+    const isDraft = isDraftMergeRequest(event.object_attributes);
+    const isTransition = isTransitionFromDraftToReady(event);
+    const statusInfo = isDraft ? 'draft' : 'ready';
+    const transitionInfo = isTransition ? ' (transitioned from draft to ready)' : '';
+
+    console.log(`Processing ${statusInfo} merge request event${transitionInfo} for GitLab project ${gitlabProjectId}, using consistent project ID ${projectId}, MR !${mergeRequestIid}, commit ${commitId}`);
 
     // Get project metadata
     let projectMetadata = await dbService.getProjectMetadata(projectId);
@@ -569,10 +610,24 @@ async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
       return;
     }
 
+    // Check if merge request should be processed based on draft status
+    if (!shouldProcessMergeRequest(event)) {
+      const projectId = event.project.id;
+      const mergeRequestIid = event.object_attributes.iid;
+      console.log(`Skipping draft Repopo merge request !${mergeRequestIid} in project ${projectId} (work_in_progress: ${event.object_attributes.work_in_progress})`);
+      return;
+    }
+
     const projectId = event.project.id;
     const mergeRequestIid = event.object_attributes.iid;
 
-    console.log(`Processing Repopo merge request event for project ${projectId}, MR !${mergeRequestIid}`);
+    // Log processing with draft status information
+    const isDraft = isDraftMergeRequest(event.object_attributes);
+    const isTransition = isTransitionFromDraftToReady(event);
+    const statusInfo = isDraft ? 'draft' : 'ready';
+    const transitionInfo = isTransition ? ' (transitioned from draft to ready)' : '';
+
+    console.log(`Processing ${statusInfo} Repopo merge request event${transitionInfo} for project ${projectId}, MR !${mergeRequestIid}`);
 
     // First, process the merge request normally to generate embeddings
     await processMergeRequestEvent(event);
