@@ -96,7 +96,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Avg Review Time</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.averageReviewTime }}m</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.averageReviewTime?.toFixed(1) || '0' }}m</p>
           </div>
         </div>
       </BaseCard>
@@ -287,7 +287,7 @@
           <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg">
             <div>
               <p class="text-sm font-medium text-green-800">Average Review Time</p>
-              <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.averageReviewTime }}m</p>
+              <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.averageReviewTime?.toFixed(1) || '0' }}m</p>
             </div>
             <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,6 +317,39 @@
               <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
+            </div>
+          </div>
+        </div>
+      </BaseCard>
+    </div>
+
+    <!-- Issue Categories Section -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Issue Categories</h2>
+
+      <BaseCard title="Issue Distribution">
+        <div class="space-y-3">
+          <div v-if="analyticsStore.analytics.issueCategories?.length === 0" class="text-center text-gray-500 py-8">
+            <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p>No issue data available</p>
+          </div>
+          <div v-else>
+            <div v-for="category in analyticsStore.analytics.issueCategories" :key="category.category" class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span class="text-sm font-medium text-gray-900">{{ category.category }}</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <div class="w-16 bg-gray-200 rounded-full h-2">
+                  <div
+                    class="bg-blue-600 h-2 rounded-full"
+                    :style="{ width: category.percentage + '%' }"
+                  ></div>
+                </div>
+                <span class="text-sm text-gray-600 w-8 text-right">{{ category.count }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -480,6 +513,56 @@
       </div>
     </div>
 
+    <!-- Queue Statistics Section -->
+    <div class="mt-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Queue Statistics</h2>
+
+      <!-- Queue Overview Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
+        <BaseCard title="Total Jobs">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-gray-600">{{ analyticsStore.analytics.queueStats?.total?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">All jobs</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Pending">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-yellow-600">{{ analyticsStore.analytics.queueStats?.pending?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Waiting</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Processing">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.queueStats?.processing?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Active</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Completed">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.queueStats?.completed?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Finished</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Failed">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-red-600">{{ analyticsStore.analytics.queueStats?.failed?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Errors</p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Retrying">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-orange-600">{{ analyticsStore.analytics.queueStats?.retrying?.toLocaleString() || '0' }}</p>
+            <p class="text-sm text-gray-600">Retry</p>
+          </div>
+        </BaseCard>
+      </div>
+    </div>
+
     <!-- Developer Performance Section -->
     <div v-if="performanceStore.developerMetrics.length > 0" class="mt-8">
       <h2 class="text-xl font-bold text-gray-900 mb-6">Developer Performance</h2>
@@ -503,6 +586,9 @@
       <h2 class="text-xl font-bold text-gray-900 mb-6">Issue Tracking</h2>
       <IssueTrackingChart :metrics="performanceStore.issueMetrics" />
     </div>
+
+    <!-- Debug Info (only in development) -->
+    <div v-if="false" class="hidden">{{ debugAnalyticsData }}</div>
 
     <!-- Error Alerts -->
     <BaseAlert
@@ -556,6 +642,22 @@ const tooltip = reactive({
   x: 0,
   y: 0,
   content: ''
+})
+
+// Debug computed property to check data structure
+const debugAnalyticsData = computed(() => {
+  console.log('Current analytics data structure:', {
+    totalReviews: analyticsStore.analytics.totalReviews,
+    approvalRate: analyticsStore.analytics.approvalRate,
+    averageReviewTime: analyticsStore.analytics.averageReviewTime,
+    reviewTrends: analyticsStore.analytics.reviewTrends?.length,
+    projectActivity: analyticsStore.analytics.projectActivity?.length,
+    embeddingMetrics: !!analyticsStore.analytics.embeddingMetrics,
+    mergeRequestMetrics: !!analyticsStore.analytics.mergeRequestMetrics,
+    queueStats: !!analyticsStore.analytics.queueStats,
+    issueCategories: analyticsStore.analytics.issueCategories?.length
+  })
+  return analyticsStore.analytics
 })
 
 // Heatmap computed properties
@@ -735,20 +837,27 @@ const applyCustomDateRange = () => {
 }
 
 const refreshAnalytics = async () => {
-  const analyticsDateRange = selectedDateRange.value === 'custom' 
-    ? { from: customDateRange.from, to: customDateRange.to }
-    : undefined
-  
-  const performanceDateRange = selectedDateRange.value === 'custom' 
-    ? { dateFrom: customDateRange.from, dateTo: customDateRange.to }
-    : undefined
-  
-  await Promise.all([
-    analyticsStore.fetchAnalytics(analyticsDateRange),
-    performanceStore.fetchDeveloperPerformance(performanceDateRange),
-    performanceStore.fetchMRQualityMetrics(performanceDateRange),
-    performanceStore.fetchIssueMetrics(performanceDateRange)
-  ])
+  try {
+    const analyticsDateRange = selectedDateRange.value === 'custom'
+      ? { from: customDateRange.from, to: customDateRange.to }
+      : undefined
+
+    const performanceDateRange = selectedDateRange.value === 'custom'
+      ? { dateFrom: customDateRange.from, dateTo: customDateRange.to }
+      : undefined
+
+    await Promise.all([
+      analyticsStore.fetchAnalytics(analyticsDateRange),
+      performanceStore.fetchDeveloperPerformance(performanceDateRange),
+      performanceStore.fetchMRQualityMetrics(performanceDateRange),
+      performanceStore.fetchIssueMetrics(performanceDateRange)
+    ])
+
+    // Debug: Log the analytics data to console
+    console.log('Analytics data loaded:', analyticsStore.analytics)
+  } catch (error) {
+    console.error('Error refreshing analytics:', error)
+  }
 }
 
 onMounted(() => {

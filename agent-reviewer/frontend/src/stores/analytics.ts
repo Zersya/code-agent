@@ -70,7 +70,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       }
     },
 
-    // Merge request metrics (optional)
+    // Merge request metrics
     mergeRequestMetrics: {
       totalMRs: 0,
       mergedMRs: 0,
@@ -84,6 +84,16 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       mergeTimeTrends: [],
       dailyMRCreation: [],
       repopoVsGitlab: { repopo_count: 0, gitlab_count: 0 }
+    },
+
+    // Queue statistics
+    queueStats: {
+      total: 0,
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      retrying: 0
     }
   })
   const isLoading = ref(false)
