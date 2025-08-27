@@ -186,8 +186,8 @@ export interface AnalyticsData {
     }
   }
 
-  // Merge request metrics (optional, may not be available)
-  mergeRequestMetrics?: {
+  // Merge request metrics
+  mergeRequestMetrics: {
     totalMRs: number
     mergedMRs: number
     closedMRs: number
@@ -221,6 +221,9 @@ export interface AnalyticsData {
       gitlab_count: number
     }
   }
+
+  // Queue statistics
+  queueStats: QueueStats
 }
 
 export interface PaginationParams {
