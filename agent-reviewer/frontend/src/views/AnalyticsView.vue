@@ -80,7 +80,7 @@
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Approval Rate</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.approvalRate.toFixed(1) }}%</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ analyticsStore.analytics.approvalRate?.toFixed(1) }}%</p>
           </div>
         </div>
       </BaseCard>
@@ -206,7 +206,7 @@
             <div v-for="project in analyticsStore.analytics.topProjects.slice(0, 5)" :key="project.projectName" class="flex items-center justify-between">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</p>
-                <p class="text-xs text-gray-500">{{ project.approvalRate.toFixed(1) }}% approval rate</p>
+                <p class="text-xs text-gray-500">{{ project.approvalRate?.toFixed(1) }}% approval rate</p>
               </div>
               <div class="ml-4 flex-shrink-0">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
@@ -513,78 +513,259 @@
       </div>
     </div>
 
-    <!-- Queue Statistics Section -->
-    <div class="mt-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Queue Statistics</h2>
+    <!-- Merge Request Analytics Section -->
+    <div v-if="analyticsStore.analytics.mergeRequestMetrics" class="mt-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Merge Request Analytics</h2>
 
-      <!-- Queue Overview Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
-        <BaseCard title="Total Jobs">
+      <!-- MR Overview Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <BaseCard title="Total MRs">
           <div class="text-center">
-            <p class="text-2xl font-bold text-gray-600">{{ analyticsStore.analytics.queueStats?.total?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">All jobs</p>
+            <p class="text-3xl font-bold text-blue-600">{{ analyticsStore.analytics.mergeRequestMetrics.totalMRs }}</p>
+            <p class="text-sm text-gray-600">All merge requests</p>
+            <div class="mt-2 text-xs text-gray-500">
+              <span class="text-green-600">{{ analyticsStore.analytics.mergeRequestMetrics.mergedMRs }} merged</span> •
+              <span class="text-yellow-600">{{ analyticsStore.analytics.mergeRequestMetrics.openMRs }} open</span> •
+              <span class="text-red-600">{{ analyticsStore.analytics.mergeRequestMetrics.closedMRs }} closed</span>
+            </div>
           </div>
         </BaseCard>
 
-        <BaseCard title="Pending">
+        <BaseCard title="Success Rate">
           <div class="text-center">
-            <p class="text-2xl font-bold text-yellow-600">{{ analyticsStore.analytics.queueStats?.pending?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Waiting</p>
+            <p class="text-3xl font-bold text-green-600">{{ analyticsStore.analytics.mergeRequestMetrics.successRate }}%</p>
+            <p class="text-sm text-gray-600">Merge success rate</p>
+            <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+              <div
+                class="bg-green-600 h-2 rounded-full transition-all duration-300"
+                :style="{ width: analyticsStore.analytics.mergeRequestMetrics.successRate + '%' }"
+              ></div>
+            </div>
           </div>
         </BaseCard>
 
-        <BaseCard title="Processing">
+        <BaseCard title="Avg Merge Time">
           <div class="text-center">
-            <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.queueStats?.processing?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Active</p>
+            <p class="text-3xl font-bold text-purple-600">{{ analyticsStore.analytics.mergeRequestMetrics.avgMergeTime?.toFixed(1) || '0' }}h</p>
+            <p class="text-sm text-gray-600">Average time to merge</p>
+            <p class="text-xs text-gray-500 mt-1">From creation to merge</p>
           </div>
         </BaseCard>
 
-        <BaseCard title="Completed">
+        <BaseCard title="Source Distribution">
           <div class="text-center">
-            <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.queueStats?.completed?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Finished</p>
-          </div>
-        </BaseCard>
-
-        <BaseCard title="Failed">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-red-600">{{ analyticsStore.analytics.queueStats?.failed?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Errors</p>
-          </div>
-        </BaseCard>
-
-        <BaseCard title="Retrying">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-orange-600">{{ analyticsStore.analytics.queueStats?.retrying?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Retry</p>
+            <p class="text-3xl font-bold text-orange-600">{{ analyticsStore.analytics.mergeRequestMetrics.repopoVsGitlab?.repopo_count || 0 }}</p>
+            <p class="text-sm text-gray-600">Repopo events</p>
+            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.mergeRequestMetrics.repopoVsGitlab?.gitlab_count || 0 }} GitLab direct</p>
           </div>
         </BaseCard>
       </div>
-    </div>
 
-    <!-- Developer Performance Section -->
-    <div v-if="performanceStore.developerMetrics.length > 0" class="mt-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Developer Performance</h2>
-      <div class="space-y-6">
-        <DeveloperPerformanceCard 
-          v-for="developer in performanceStore.developerMetrics" 
-          :key="developer.user_id" 
-          :developer="developer" 
-        />
+      <!-- Developer Performance Table -->
+      <div class="mb-8">
+        <BaseCard title="Developer Performance">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Developer
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total MRs
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Merged
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Success Rate
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avg Merge Time
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="user in analyticsStore.analytics.mergeRequestMetrics.mrsByUser" :key="user.username" class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 h-8 w-8">
+                        <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span class="text-sm font-medium text-gray-700">{{ getInitials(user.username) }}</span>
+                        </div>
+                      </div>
+                      <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ user.total_mrs }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ user.merged_mrs }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm font-medium" :class="getSuccessRateColor(user.success_rate)">
+                            {{ user.success_rate.toFixed(1) }}%
+                          </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            class="h-2 rounded-full transition-all duration-300"
+                            :class="getSuccessRateBarColor(user.success_rate)"
+                            :style="{ width: user.success_rate + '%' }"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ user.avg_merge_time_hours.toFixed(1) }}h
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </BaseCard>
       </div>
-    </div>
 
-    <!-- MR Quality Metrics Section -->
-    <div v-if="performanceStore.mrQualityMetrics.length > 0" class="mt-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Merge Request Quality</h2>
-      <MRQualityChart :metrics="performanceStore.mrQualityMetrics" />
-    </div>
+      <!-- Project Performance Table -->
+      <div class="mb-8">
+        <BaseCard title="Project Performance">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Project
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total MRs
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Merged
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Success Rate
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avg Merge Time
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="project in analyticsStore.analytics.mergeRequestMetrics.mrsByProject" :key="project.project_id" class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 h-8 w-8">
+                        <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-900">{{ project.project_name }}</div>
+                        <div class="text-sm text-gray-500">ID: {{ project.project_id }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ project.total_mrs }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ project.merged_mrs }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm font-medium" :class="getSuccessRateColor(project.success_rate)">
+                            {{ project.success_rate.toFixed(1) }}%
+                          </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            class="h-2 rounded-full transition-all duration-300"
+                            :class="getSuccessRateBarColor(project.success_rate)"
+                            :style="{ width: project.success_rate + '%' }"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ project.avg_merge_time_hours.toFixed(1) }}h
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </BaseCard>
+      </div>
 
-    <!-- Issue Tracking Section -->
-    <div v-if="performanceStore.issueMetrics.length > 0" class="mt-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Issue Tracking</h2>
-      <IssueTrackingChart :metrics="performanceStore.issueMetrics" />
+      <!-- MR Trends Visualization -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Daily MR Creation Trend -->
+        <BaseCard title="Daily MR Creation">
+          <div class="space-y-4">
+            <div v-if="analyticsStore.analytics.mergeRequestMetrics.dailyMRCreation?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No MR creation data available</p>
+            </div>
+            <div v-else class="space-y-3">
+              <div v-for="item in analyticsStore.analytics.mergeRequestMetrics.dailyMRCreation" :key="item.date" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <span class="text-sm font-medium text-gray-900">{{ formatDate(item.date) }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-24 bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: (item.value / getMaxDailyMRs() * 100) + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-sm text-gray-600 w-8 text-right">{{ item.value }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Merge Time Trends -->
+        <BaseCard title="Merge Time Trends">
+          <div class="space-y-4">
+            <div v-if="analyticsStore.analytics.mergeRequestMetrics.mergeTimeTrends?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>No merge time data available</p>
+            </div>
+            <div v-else class="space-y-3">
+              <div v-for="item in analyticsStore.analytics.mergeRequestMetrics.mergeTimeTrends" :key="item.date" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <span class="text-sm font-medium text-gray-900">{{ formatDate(item.date) }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-24 bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: (item.value / getMaxMergeTime() * 100) + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-sm text-gray-600 w-12 text-right">{{ item.value.toFixed(1) }}h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
     </div>
 
     <!-- Debug Info (only in development) -->
@@ -602,16 +783,7 @@
       class="mt-6"
     />
     
-    <BaseAlert
-      v-if="performanceStore.error"
-      type="danger"
-      :show="!!performanceStore.error"
-      title="Performance Error"
-      :message="performanceStore.error"
-      dismissible
-      @dismiss="performanceStore.clearError"
-      class="mt-6"
-    />
+
   </div>
 </template>
 
@@ -619,17 +791,12 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { format, subDays, startOfWeek, addDays, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
-import { usePerformanceStore } from '@/stores/performance'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseInput from '@/components/BaseInput.vue'
 import BaseAlert from '@/components/BaseAlert.vue'
-import DeveloperPerformanceCard from '@/components/DeveloperPerformanceCard.vue'
-import MRQualityChart from '@/components/MRQualityChart.vue'
-import IssueTrackingChart from '@/components/IssueTrackingChart.vue'
 
 const analyticsStore = useAnalyticsStore()
-const performanceStore = usePerformanceStore()
 const selectedDateRange = ref('30')
 
 const customDateRange = reactive({
@@ -643,6 +810,38 @@ const tooltip = reactive({
   y: 0,
   content: ''
 })
+
+// Helper functions
+const getInitials = (name: string): string => {
+  return name
+    .split(/[\s._-]+/)
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .substring(0, 2)
+}
+
+const getSuccessRateColor = (rate: number): string => {
+  if (rate >= 90) return 'text-green-600'
+  if (rate >= 70) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+const getSuccessRateBarColor = (rate: number): string => {
+  if (rate >= 90) return 'bg-green-500'
+  if (rate >= 70) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
+
+const getMaxDailyMRs = (): number => {
+  const dailyData = analyticsStore.analytics.mergeRequestMetrics?.dailyMRCreation || []
+  return Math.max(...dailyData.map(item => item.value), 1)
+}
+
+const getMaxMergeTime = (): number => {
+  const mergeTimeData = analyticsStore.analytics.mergeRequestMetrics?.mergeTimeTrends || []
+  return Math.max(...mergeTimeData.map(item => item.value), 1)
+}
 
 // Debug computed property to check data structure
 const debugAnalyticsData = computed(() => {
@@ -842,19 +1041,11 @@ const refreshAnalytics = async () => {
       ? { from: customDateRange.from, to: customDateRange.to }
       : undefined
 
-    const performanceDateRange = selectedDateRange.value === 'custom'
-      ? { dateFrom: customDateRange.from, dateTo: customDateRange.to }
-      : undefined
-
-    await Promise.all([
-      analyticsStore.fetchAnalytics(analyticsDateRange),
-      performanceStore.fetchDeveloperPerformance(performanceDateRange),
-      performanceStore.fetchMRQualityMetrics(performanceDateRange),
-      performanceStore.fetchIssueMetrics(performanceDateRange)
-    ])
+    await analyticsStore.fetchAnalytics(analyticsDateRange)
 
     // Debug: Log the analytics data to console
     console.log('Analytics data loaded:', analyticsStore.analytics)
+    console.log('MR Metrics:', analyticsStore.analytics.mergeRequestMetrics)
   } catch (error) {
     console.error('Error refreshing analytics:', error)
   }
