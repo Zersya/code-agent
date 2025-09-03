@@ -1695,9 +1695,16 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
    */
   async submitReview(projectId: number, mergeRequestIid: number): Promise<void> {
     try {
-      // Check if merge request reviews are enabled
+      // Check if merge request reviews are enabled globally
       if (!ENABLE_MR_REVIEW) {
-        console.log(`Merge request reviews are disabled. Skipping review for !${mergeRequestIid} in project ${projectId}`);
+        console.log(`Merge request reviews are disabled globally. Skipping review for !${mergeRequestIid} in project ${projectId}`);
+        return;
+      }
+
+      // Check if auto review is enabled for this specific project
+      const isAutoReviewEnabledForProject = await dbService.isAutoReviewEnabled(projectId);
+      if (!isAutoReviewEnabledForProject) {
+        console.log(`Auto review is disabled for project ${projectId}. Skipping review for !${mergeRequestIid}`);
         return;
       }
 
@@ -1752,9 +1759,16 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
    */
   async submitReReview(projectId: number, mergeRequestIid: number): Promise<void> {
     try {
-      // Check if merge request reviews are enabled
+      // Check if merge request reviews are enabled globally
       if (!ENABLE_MR_REVIEW) {
-        console.log(`Merge request reviews are disabled. Skipping re-review for !${mergeRequestIid} in project ${projectId}`);
+        console.log(`Merge request reviews are disabled globally. Skipping re-review for !${mergeRequestIid} in project ${projectId}`);
+        return;
+      }
+
+      // Check if auto review is enabled for this specific project
+      const isAutoReviewEnabledForProject = await dbService.isAutoReviewEnabled(projectId);
+      if (!isAutoReviewEnabledForProject) {
+        console.log(`Auto review is disabled for project ${projectId}. Skipping re-review for !${mergeRequestIid}`);
         return;
       }
 

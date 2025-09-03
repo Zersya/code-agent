@@ -248,6 +248,12 @@
             >
               Documentation
             </router-link>
+            <router-link
+              to="/auto-review-settings"
+              class="btn btn-secondary btn-md w-full justify-center"
+            >
+              Auto Review Settings
+            </router-link>
             <button
               @click="refreshData"
               class="btn btn-primary btn-md w-full justify-center"

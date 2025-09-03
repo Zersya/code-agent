@@ -7,7 +7,7 @@ import { apiAuth } from './middleware/api-auth.js';
 import { adminAuth } from './middleware/admin-auth.js';
 import { processWebhook } from './controllers/webhook.js';
 import { processRepository, getRepositoryStatus, getQueueStatus, retryRepositoryJob, cancelRepositoryJob, deleteRepositoryJob } from './controllers/repository.js';
-import { searchCode, listProjects } from './controllers/search.js';
+import { searchCode, listProjects, updateProjectAutoReview, getProjectAutoReview } from './controllers/search.js';
 import {
   addDocumentationSource,
   getDocumentationSources,
@@ -98,6 +98,10 @@ app.get('/api/queue/status', apiAuth, getQueueStatus);
 // Code search API
 app.post('/api/search', apiAuth, searchCode);
 app.get('/api/projects', apiAuth, listProjects);
+
+// Project auto review API
+app.put('/api/projects/:projectId/auto-review', adminAuth, updateProjectAutoReview);
+app.get('/api/projects/:projectId/auto-review', apiAuth, getProjectAutoReview);
 
 // Documentation API
 app.post('/api/documentation/sources', apiAuth, addDocumentationSource);

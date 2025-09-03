@@ -8,6 +8,7 @@ import AnalyticsView from '@/views/AnalyticsView.vue'
 import RepositoryEmbeddingView from '@/views/RepositoryEmbeddingView.vue'
 import DocumentationManagementView from '@/views/DocumentationManagementView.vue'
 import MergeRequestsView from '@/views/MergeRequestsView.vue'
+import AutoReviewSettingsView from '@/views/AutoReviewSettingsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
@@ -59,6 +60,11 @@ const router = createRouter({
           path: '/merge-requests',
           name: 'MergeRequests',
           component: MergeRequestsView
+        },
+        {
+          path: '/auto-review-settings',
+          name: 'AutoReviewSettings',
+          component: AutoReviewSettingsView
         }
       ]
     },
