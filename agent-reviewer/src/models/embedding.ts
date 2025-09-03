@@ -29,6 +29,7 @@ export interface ProjectMetadata {
   lastProcessedCommit: string;
   lastProcessedAt: Date;
   lastReembeddingAt?: Date;
+  autoReviewEnabled?: boolean;
 }
 
 export interface EmbeddingBatch {

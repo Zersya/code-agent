@@ -182,6 +182,12 @@ export const mergeRequestApi = {
 export const projectsApi = {
   getProjects: (): Promise<ApiResponse<Project[]> | Project[]> =>
     apiClient.get<Project[]>('/projects'),
+
+  updateAutoReview: (projectId: number, enabled: boolean): Promise<ApiResponse<{ success: boolean; message: string; autoReviewEnabled: boolean }>> =>
+    apiClient.put<{ success: boolean; message: string; autoReviewEnabled: boolean }>(`/projects/${projectId}/auto-review`, { enabled }),
+
+  getAutoReviewStatus: (projectId: number): Promise<ApiResponse<{ projectId: number; autoReviewEnabled: boolean }>> =>
+    apiClient.get<{ projectId: number; autoReviewEnabled: boolean }>(`/projects/${projectId}/auto-review`),
 }
 
 // Repository Embedding API
