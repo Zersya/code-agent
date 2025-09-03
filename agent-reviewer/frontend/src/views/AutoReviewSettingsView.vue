@@ -68,7 +68,7 @@
                   type="checkbox"
                   :checked="project.autoReviewEnabled !== false"
                   :disabled="updatingProject === project.projectId"
-                  @change="toggleAutoReview(project.projectId, $event.target.checked)"
+                  @change="toggleAutoReview(project.projectId, ($event.target as HTMLInputElement).checked)"
                   class="sr-only"
                 />
                 <div 
