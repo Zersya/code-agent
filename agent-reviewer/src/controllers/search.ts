@@ -87,13 +87,17 @@ export const listProjects = async (req: Request, res: Response): Promise<void> =
     const projects = await dbService.getAllProjects();
 
     res.status(200).json({
-      projects,
+      success: true,
+      data: projects,
       count: projects.length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error listing projects:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
   }
 };
 
@@ -144,25 +148,28 @@ export const getProjectAutoReview = async (req: Request, res: Response): Promise
     const { projectId } = req.params;
 
     if (!projectId) {
-      res.status(400).json({ error: 'Project ID is required' });
+      res.status(400).json({ success: false, error: 'Project ID is required' });
       return;
     }
 
     const projectIdNum = parseInt(projectId, 10);
     if (isNaN(projectIdNum)) {
-      res.status(400).json({ error: 'Project ID must be a valid number' });
+      res.status(400).json({ success: false, error: 'Project ID must be a valid number' });
       return;
     }
 
     const isEnabled = await dbService.isAutoReviewEnabled(projectIdNum);
 
     res.status(200).json({
-      projectId: projectIdNum,
-      autoReviewEnabled: isEnabled,
-      timestamp: new Date().toISOString()
+      success: true,
+      data: {
+        projectId: projectIdNum,
+        autoReviewEnabled: isEnabled,
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
     console.error('Error getting project auto review status:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
