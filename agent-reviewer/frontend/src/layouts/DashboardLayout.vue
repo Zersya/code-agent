@@ -48,14 +48,14 @@
               </div>
 
               <!-- More Dropdown for Secondary Items -->
-              <div class="relative" :class="{ 'block': !showMoreDropdown, 'hidden': showMoreDropdown }">
+              <div class="relative flex items-center">
                 <button
                   @click="showMoreDropdown = !showMoreDropdown"
                   class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
                   :class="{ 'border-primary-500 text-primary-600': isMoreDropdownActive }"
                 >
                   More
-                  <svg class="ml-1 h-4 w-4" :class="{ 'rotate-180': showMoreDropdown }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="ml-1 h-4 w-4 transition-transform duration-200" :class="{ 'rotate-180': showMoreDropdown }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -63,7 +63,7 @@
                 <!-- Dropdown Menu -->
                 <div
                   v-show="showMoreDropdown"
-                  class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
+                  class="absolute left-0 top-full mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
                 >
                   <router-link
                     to="/repository-embedding"
@@ -317,8 +317,8 @@ const isMoreDropdownActive = computed(() => {
 
 // Close dropdown when clicking outside
 const closeDropdowns = (event: MouseEvent) => {
-  const dropdown = document.querySelector('.relative')
-  if (dropdown && !dropdown.contains(event.target as Node)) {
+  const dropdown = event.target as Element
+  if (!dropdown.closest('.relative')) {
     showMoreDropdown.value = false
   }
 }
