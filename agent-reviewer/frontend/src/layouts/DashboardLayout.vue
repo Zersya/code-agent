@@ -13,7 +13,138 @@
               </div>
               <span class="ml-3 text-xl font-semibold text-gray-900">Agent Reviewer</span>
             </div>
-            <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <!-- Desktop Navigation -->
+            <div class="hidden lg:ml-6 lg:flex lg:space-x-4 xl:space-x-8">
+              <!-- Primary Navigation Items -->
+              <div class="hidden xl:flex xl:space-x-8">
+                <router-link
+                  to="/"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Dashboard
+                </router-link>
+                <router-link
+                  to="/merge-requests"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Merge Requests
+                </router-link>
+                <router-link
+                  to="/status"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Status
+                </router-link>
+                <router-link
+                  to="/analytics"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Analytics
+                </router-link>
+              </div>
+
+              <!-- More Dropdown for Secondary Items -->
+              <div class="relative" :class="{ 'block': !showMoreDropdown, 'hidden': showMoreDropdown }">
+                <button
+                  @click="showMoreDropdown = !showMoreDropdown"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  :class="{ 'border-primary-500 text-primary-600': isMoreDropdownActive }"
+                >
+                  More
+                  <svg class="ml-1 h-4 w-4" :class="{ 'rotate-180': showMoreDropdown }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                <!-- Dropdown Menu -->
+                <div
+                  v-show="showMoreDropdown"
+                  class="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
+                >
+                  <router-link
+                    to="/repository-embedding"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    @click="showMoreDropdown = false"
+                  >
+                    Repository Embedding
+                  </router-link>
+                  <router-link
+                    to="/documentation"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    @click="showMoreDropdown = false"
+                  >
+                    Documentation
+                  </router-link>
+                  <router-link
+                    to="/auto-review-settings"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    @click="showMoreDropdown = false"
+                  >
+                    Auto Review Settings
+                  </router-link>
+                </div>
+              </div>
+
+              <!-- Medium Screen Navigation (shows all items but more compact) -->
+              <div class="hidden lg:flex xl:hidden space-x-4">
+                <router-link
+                  to="/"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Dashboard
+                </router-link>
+                <router-link
+                  to="/merge-requests"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  MRs
+                </router-link>
+                <router-link
+                  to="/status"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Status
+                </router-link>
+                <router-link
+                  to="/analytics"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Analytics
+                </router-link>
+                <router-link
+                  to="/repository-embedding"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Embedding
+                </router-link>
+                <router-link
+                  to="/documentation"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Docs
+                </router-link>
+                <router-link
+                  to="/auto-review-settings"
+                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+                  active-class="border-primary-500 text-primary-600"
+                >
+                  Auto Review
+                </router-link>
+              </div>
+            </div>
+
+            <!-- Compact Navigation for Smaller Screens -->
+            <div class="hidden sm:flex lg:hidden ml-4">
               <router-link
                 to="/"
                 class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
@@ -21,26 +152,19 @@
               >
                 Dashboard
               </router-link>
-              <!-- <router-link
-                to="/reviews"
-                class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                active-class="border-primary-500 text-primary-600"
-              >
-                Review History
-              </router-link> -->
               <router-link
                 to="/merge-requests"
                 class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
                 active-class="border-primary-500 text-primary-600"
               >
-                Merge Requests
+                MRs
               </router-link>
               <router-link
                 to="/status"
                 class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
                 active-class="border-primary-500 text-primary-600"
               >
-                Current Status
+                Status
               </router-link>
               <router-link
                 to="/analytics"
@@ -48,27 +172,6 @@
                 active-class="border-primary-500 text-primary-600"
               >
                 Analytics
-              </router-link>
-              <router-link
-                to="/repository-embedding"
-                class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                active-class="border-primary-500 text-primary-600"
-              >
-                Repository Embedding
-              </router-link>
-              <router-link
-                to="/documentation"
-                class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                active-class="border-primary-500 text-primary-600"
-              >
-                Documentation
-              </router-link>
-              <router-link
-                to="/auto-review-settings"
-                class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                active-class="border-primary-500 text-primary-600"
-              >
-                Auto Review Settings
               </router-link>
             </div>
           </div>
@@ -196,13 +299,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const mobileMenuOpen = ref(false)
+const showMoreDropdown = ref(false)
+
+// Check if current route is in the "More" dropdown to highlight the dropdown
+const isMoreDropdownActive = computed(() => {
+  const moreRoutes = ['/repository-embedding', '/documentation', '/auto-review-settings']
+  return moreRoutes.includes(route.path)
+})
+
+// Close dropdown when clicking outside
+const closeDropdowns = (event: MouseEvent) => {
+  const dropdown = document.querySelector('.relative')
+  if (dropdown && !dropdown.contains(event.target as Node)) {
+    showMoreDropdown.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdowns)
+})
+
+// Clean up event listener
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns)
+})
 
 const handleLogout = async () => {
   await authStore.logout()
