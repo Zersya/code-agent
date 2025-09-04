@@ -1741,10 +1741,17 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
         0 // fixes implemented count (will be updated later)
       );
 
-      // If the review indicates approval, approve the merge request
+      // If the review indicates approval AND auto approve is enabled, approve the merge request
       if (reviewResult.shouldApprove) {
-        await gitlabService.approveMergeRequest(projectId, mergeRequestIid);
-        console.log(`Approved merge request !${mergeRequestIid} in project ${projectId}`);
+        // Check if auto approve is enabled for this specific project
+        const isAutoApproveEnabledForProject = await dbService.isAutoApproveEnabled(projectId);
+        
+        if (isAutoApproveEnabledForProject) {
+          await gitlabService.approveMergeRequest(projectId, mergeRequestIid);
+          console.log(`Approved merge request !${mergeRequestIid} in project ${projectId} (auto approve enabled)`);
+        } else {
+          console.log(`Review indicates approval but auto approve is disabled for project ${projectId}, skipping auto-approval for MR !${mergeRequestIid}`);
+        }
       } else {
         console.log(`Did not approve merge request !${mergeRequestIid} in project ${projectId}`);
       }
@@ -1876,10 +1883,17 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
         0 // fixes implemented count (will be updated later)
       );
 
-      // If the re-review indicates approval, approve the merge request
+      // If the re-review indicates approval AND auto approve is enabled, approve the merge request
       if (shouldApprove) {
-        await gitlabService.approveMergeRequest(projectId, mergeRequestIid);
-        console.log(`Approved merge request !${mergeRequestIid} in project ${projectId} after re-review`);
+        // Check if auto approve is enabled for this specific project
+        const isAutoApproveEnabledForProject = await dbService.isAutoApproveEnabled(projectId);
+        
+        if (isAutoApproveEnabledForProject) {
+          await gitlabService.approveMergeRequest(projectId, mergeRequestIid);
+          console.log(`Approved merge request !${mergeRequestIid} in project ${projectId} after re-review (auto approve enabled)`);
+        } else {
+          console.log(`Review indicates approval but auto approve is disabled for project ${projectId}, skipping auto-approval for MR !${mergeRequestIid} after re-review`);
+        }
       } else {
         console.log(`Did not approve merge request !${mergeRequestIid} in project ${projectId} after re-review`);
       }
