@@ -56,7 +56,7 @@
             </div>
           </div>
           
-          <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-6">
             <!-- Auto Review Toggle -->
             <div class="flex items-center space-x-3">
               <label :for="`auto-review-${project.projectId}`" class="text-sm font-medium text-gray-700">
@@ -117,6 +117,69 @@
                 ]"
               >
                 {{ project.autoReviewEnabled !== false ? 'Enabled' : 'Disabled' }}
+              </span>
+            </div>
+
+            <!-- Auto Approve Toggle -->
+            <div class="flex items-center space-x-3">
+              <label :for="`auto-approve-${project.projectId}`" class="text-sm font-medium text-gray-700">
+                Auto Approve
+              </label>
+              <div class="relative">
+                <input
+                  :id="`auto-approve-${project.projectId}`"
+                  type="checkbox"
+                  :checked="project.autoApproveEnabled !== false"
+                  :disabled="updatingProject === project.projectId"
+                  @change="toggleAutoApprove(project.projectId, ($event.target as HTMLInputElement).checked)"
+                  class="sr-only"
+                />
+                <div 
+                  :class="[
+                    'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                    project.autoApproveEnabled !== false ? 'bg-green-600' : 'bg-gray-200',
+                    updatingProject === project.projectId ? 'opacity-50 cursor-not-allowed' : ''
+                  ]"
+                  @click="toggleAutoApprove(project.projectId, project.autoApproveEnabled === false)"
+                >
+                  <span
+                    :class="[
+                      'pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      project.autoApproveEnabled !== false ? 'translate-x-5' : 'translate-x-0'
+                    ]"
+                  >
+                    <span
+                      :class="[
+                        'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity',
+                        project.autoApproveEnabled !== false ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in'
+                      ]"
+                      aria-hidden="true"
+                    >
+                      <svg class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 12 12">
+                        <path d="M4 8l2-2m0 0l2-2M6 6L4 4m2 2l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span
+                      :class="[
+                        'absolute inset-0 flex h-full w-full items-center justify-center transition-opacity',
+                        project.autoApproveEnabled !== false ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out'
+                      ]"
+                      aria-hidden="true"
+                    >
+                      <svg class="h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 12 12">
+                        <path d="M3.707 5.293a1 1 0 00-1.414 1.414l1.414-1.414zM5 8l-.707.707a1 1 0 001.414 0L5 8zm4.707-4.293a1 1 0 00-1.414-1.414l1.414 1.414zm-7.414 2l2 2 1.414-1.414-2-2-1.414 1.414zm3.414 2l4-4-1.414-1.414-4 4 1.414 1.414z" />
+                      </svg>
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <span 
+                :class="[
+                  'text-sm font-medium',
+                  project.autoApproveEnabled !== false ? 'text-green-600' : 'text-gray-500'
+                ]"
+              >
+                {{ project.autoApproveEnabled !== false ? 'Enabled' : 'Disabled' }}
               </span>
             </div>
             
@@ -230,6 +293,44 @@ const toggleAutoReview = async (projectId: number, enabled: boolean) => {
   } catch (err: any) {
     console.error('Error updating auto review:', err)
     errorMessage.value = err.message || 'Failed to update auto review setting'
+    
+    // Clear error message after 5 seconds
+    setTimeout(() => {
+      errorMessage.value = ''
+    }, 5000)
+  } finally {
+    updatingProject.value = null
+  }
+}
+
+const toggleAutoApprove = async (projectId: number, enabled: boolean) => {
+  if (updatingProject.value === projectId) return
+  
+  updatingProject.value = projectId
+  errorMessage.value = ''
+  
+  try {
+    const response = await projectsApi.updateAutoApprove(projectId, enabled)
+    
+    if (response.success) {
+      // Update the local state
+      const project = projects.value.find(p => p.projectId === projectId)
+      if (project) {
+        project.autoApproveEnabled = enabled
+      }
+      
+      successMessage.value = response.message || `Auto approve ${enabled ? 'enabled' : 'disabled'} successfully`
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      throw new Error(response.message || 'Failed to update auto approve setting')
+    }
+  } catch (err: any) {
+    console.error('Error updating auto approve:', err)
+    errorMessage.value = err.message || 'Failed to update auto approve setting'
     
     // Clear error message after 5 seconds
     setTimeout(() => {

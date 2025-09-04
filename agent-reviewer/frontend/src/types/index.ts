@@ -45,6 +45,7 @@ export interface Project {
   lastProcessedAt?: string
   lastReembeddingAt?: string
   autoReviewEnabled?: boolean
+  autoApproveEnabled?: boolean
 }
 
 export interface QueueJob {

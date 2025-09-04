@@ -186,8 +186,14 @@ export const projectsApi = {
   updateAutoReview: (projectId: number, enabled: boolean): Promise<ApiResponse<{ success: boolean; message: string; autoReviewEnabled: boolean }>> =>
     apiClient.put<{ success: boolean; message: string; autoReviewEnabled: boolean }>(`/projects/${projectId}/auto-review`, { enabled }),
 
+  updateAutoApprove: (projectId: number, enabled: boolean): Promise<ApiResponse<{ success: boolean; message: string; autoApproveEnabled: boolean }>> =>
+    apiClient.put<{ success: boolean; message: string; autoApproveEnabled: boolean }>(`/projects/${projectId}/auto-approve`, { enabled }),
+
   getAutoReviewStatus: (projectId: number): Promise<ApiResponse<{ projectId: number; autoReviewEnabled: boolean }>> =>
     apiClient.get<{ projectId: number; autoReviewEnabled: boolean }>(`/projects/${projectId}/auto-review`),
+
+  getAutoApproveStatus: (projectId: number): Promise<ApiResponse<{ projectId: number; autoApproveEnabled: boolean }>> =>
+    apiClient.get<{ projectId: number; autoApproveEnabled: boolean }>(`/projects/${projectId}/auto-approve`),
 }
 
 // Repository Embedding API

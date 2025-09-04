@@ -237,6 +237,17 @@ class DatabaseService {
         console.log('Column auto_review_enabled might already exist:', error);
       }
 
+      // Add the auto_approve_enabled column if it doesn't exist (migration)
+      try {
+        await client.query(`
+          ALTER TABLE projects
+          ADD COLUMN IF NOT EXISTS auto_approve_enabled BOOLEAN DEFAULT false
+        `);
+      } catch (error) {
+        // Column might already exist, ignore the error
+        console.log('Column auto_approve_enabled might already exist:', error);
+      }
+
       // Create embeddings table based on vector extension availability
       if (vectorExtensionAvailable) {
         try {
@@ -902,9 +913,10 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at, last_reembedding_at, auto_review_enabled
+          last_processed_commit, last_processed_at, last_reembedding_at,
+          auto_review_enabled, auto_approve_enabled
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -914,7 +926,8 @@ class DatabaseService {
           last_processed_commit = EXCLUDED.last_processed_commit,
           last_processed_at = EXCLUDED.last_processed_at,
           last_reembedding_at = EXCLUDED.last_reembedding_at,
-          auto_review_enabled = EXCLUDED.auto_review_enabled
+          auto_review_enabled = COALESCE(EXCLUDED.auto_review_enabled, projects.auto_review_enabled),
+          auto_approve_enabled = COALESCE(EXCLUDED.auto_approve_enabled, projects.auto_approve_enabled)
       `, [
         metadata.projectId,
         metadata.name,
@@ -924,7 +937,8 @@ class DatabaseService {
         metadata.lastProcessedCommit,
         metadata.lastProcessedAt,
         metadata.lastReembeddingAt,
-        metadata.autoReviewEnabled !== undefined ? metadata.autoReviewEnabled : true
+        metadata.autoReviewEnabled !== undefined ? metadata.autoReviewEnabled : true,
+        metadata.autoApproveEnabled !== undefined ? metadata.autoApproveEnabled : false
       ]);
     } catch (error) {
       console.error('Error updating project metadata:', error);
@@ -948,7 +962,8 @@ class DatabaseService {
           last_processed_commit as "lastProcessedCommit",
           last_processed_at as "lastProcessedAt",
           last_reembedding_at as "lastReembeddingAt",
-          auto_review_enabled as "autoReviewEnabled"
+          auto_review_enabled as "autoReviewEnabled",
+          auto_approve_enabled as "autoApproveEnabled"
         FROM projects
         WHERE project_id = $1
       `, [projectId]);
@@ -1245,7 +1260,8 @@ class DatabaseService {
           last_processed_commit as "lastProcessedCommit",
           last_processed_at as "lastProcessedAt",
           last_reembedding_at as "lastReembeddingAt",
-          auto_review_enabled as "autoReviewEnabled"
+          auto_review_enabled as "autoReviewEnabled",
+          auto_approve_enabled as "autoApproveEnabled"
         FROM projects
         ORDER BY name
       `);
@@ -1368,9 +1384,10 @@ class DatabaseService {
       await client.query(`
         INSERT INTO projects (
           project_id, name, description, url, default_branch,
-          last_processed_commit, last_processed_at, last_reembedding_at
+          last_processed_commit, last_processed_at, last_reembedding_at,
+          auto_review_enabled, auto_approve_enabled
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (project_id)
         DO UPDATE SET
           name = EXCLUDED.name,
@@ -1379,7 +1396,9 @@ class DatabaseService {
           default_branch = EXCLUDED.default_branch,
           last_processed_commit = EXCLUDED.last_processed_commit,
           last_processed_at = EXCLUDED.last_processed_at,
-          last_reembedding_at = EXCLUDED.last_reembedding_at
+          last_reembedding_at = EXCLUDED.last_reembedding_at,
+          auto_review_enabled = COALESCE(EXCLUDED.auto_review_enabled, projects.auto_review_enabled),
+          auto_approve_enabled = COALESCE(EXCLUDED.auto_approve_enabled, projects.auto_approve_enabled)
       `, [
         metadata.projectId,
         metadata.name,
@@ -1388,7 +1407,9 @@ class DatabaseService {
         metadata.defaultBranch,
         metadata.lastProcessedCommit,
         metadata.lastProcessedAt,
-        metadata.lastReembeddingAt
+        metadata.lastReembeddingAt,
+        metadata.autoReviewEnabled,
+        metadata.autoApproveEnabled
       ]);
     } catch (error) {
       console.error('Error saving project metadata:', error);
@@ -1469,6 +1490,56 @@ class DatabaseService {
       console.error('Error checking auto review enabled status:', error);
       // Default to enabled on error
       return true;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update the auto approve enabled status for a project
+   * @param projectId The ID of the project
+   * @param enabled Whether auto approve is enabled
+   */
+  async updateAutoApproveEnabled(projectId: number, enabled: boolean): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(`
+        UPDATE projects
+        SET auto_approve_enabled = $2, updated_at = NOW()
+        WHERE project_id = $1
+      `, [projectId, enabled]);
+      
+      console.log(`Updated auto approve enabled for project ${projectId}: ${enabled}`);
+    } catch (error) {
+      console.error('Error updating auto approve enabled status:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Check if auto approve is enabled for a project
+   * @param projectId The ID of the project
+   * @returns True if auto approve is enabled, false otherwise
+   */
+  async isAutoApproveEnabled(projectId: number): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT auto_approve_enabled
+        FROM projects
+        WHERE project_id = $1
+      `, [projectId]);
+      if (result.rows.length === 0) {
+        // If project doesn't exist, default to disabled
+        return false;
+      }
+      return result.rows[0].auto_approve_enabled;
+    } catch (error) {
+      console.error('Error checking auto approve enabled status:', error);
+      // Default to disabled on error
+      return false;
     } finally {
       client.release();
     }

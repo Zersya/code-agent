@@ -173,3 +173,76 @@ export const getProjectAutoReview = async (req: Request, res: Response): Promise
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
+
+/**
+ * Update auto approve enabled status for a project
+ */
+export const updateProjectAutoApprove = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const { enabled } = req.body;
+
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required' });
+      return;
+    }
+
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ error: 'Enabled field must be a boolean' });
+      return;
+    }
+
+    const projectIdNum = parseInt(projectId, 10);
+    if (isNaN(projectIdNum)) {
+      res.status(400).json({ error: 'Project ID must be a valid number' });
+      return;
+    }
+
+    await dbService.updateAutoApproveEnabled(projectIdNum, enabled);
+
+    res.status(200).json({
+      success: true,
+      message: `Auto approve ${enabled ? 'enabled' : 'disabled'} for project ${projectId}`,
+      projectId: projectIdNum,
+      autoApproveEnabled: enabled,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating project auto approve status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get auto approve enabled status for a project
+ */
+export const getProjectAutoApprove = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+
+    if (!projectId) {
+      res.status(400).json({ success: false, error: 'Project ID is required' });
+      return;
+    }
+
+    const projectIdNum = parseInt(projectId, 10);
+    if (isNaN(projectIdNum)) {
+      res.status(400).json({ success: false, error: 'Project ID must be a valid number' });
+      return;
+    }
+
+    const isEnabled = await dbService.isAutoApproveEnabled(projectIdNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projectId: projectIdNum,
+        autoApproveEnabled: isEnabled,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error getting project auto approve status:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
