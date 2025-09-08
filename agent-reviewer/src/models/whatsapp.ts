@@ -46,7 +46,7 @@ export interface WhatsAppConfigurationRecord {
   gitlab_username: string;
   whatsapp_number: string;
   is_active: boolean;
-  notification_types: string; // JSON string in database
+  notification_types: string | NotificationType[]; // JSONB can return as string or parsed object
   created_at: Date;
   updated_at: Date;
 }
