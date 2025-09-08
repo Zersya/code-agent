@@ -23,6 +23,14 @@ import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.
 import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
 import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests, updateMergeRequestFixesCount, updateMergeRequestReviewStatus } from './controllers/admin-merge-requests.js';
 import { getAnalytics, getSystemHealth, getDeveloperPerformanceAnalytics, getMRQualityAnalytics, getIssueTrackingAnalytics } from './controllers/admin-analytics.js';
+import {
+  getWhatsAppConfigurations,
+  getWhatsAppConfiguration,
+  upsertWhatsAppConfiguration,
+  deleteWhatsAppConfiguration,
+  testWhatsAppMessage,
+  getWhatsAppServiceStatus
+} from './controllers/whatsapp.js';
 import { dbService } from './services/database.js';
 import { webhookDeduplicationService } from './services/webhook-deduplication.js';
 import { monitoringService } from './services/monitoring.js';
@@ -159,6 +167,15 @@ app.get('/api/system/health', adminAuth, getSystemHealth);
 app.get('/api/analytics/developers', adminAuth, getDeveloperPerformanceAnalytics);
 app.get('/api/analytics/merge-requests', adminAuth, getMRQualityAnalytics);
 app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
+
+// WhatsApp Configuration endpoints
+app.get('/api/whatsapp/configurations', adminAuth, getWhatsAppConfigurations);
+app.get('/api/whatsapp/configurations/:username', adminAuth, getWhatsAppConfiguration);
+app.post('/api/whatsapp/configurations', adminAuth, upsertWhatsAppConfiguration);
+app.put('/api/whatsapp/configurations', adminAuth, upsertWhatsAppConfiguration);
+app.delete('/api/whatsapp/configurations/:username', adminAuth, deleteWhatsAppConfiguration);
+app.post('/api/whatsapp/test', adminAuth, testWhatsAppMessage);
+app.get('/api/whatsapp/status', adminAuth, getWhatsAppServiceStatus);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

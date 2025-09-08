@@ -86,6 +86,13 @@
                   >
                     Auto Review Settings
                   </router-link>
+                  <router-link
+                    to="/whatsapp-settings"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    @click="showMoreDropdown = false"
+                  >
+                    WhatsApp Settings
+                  </router-link>
                 </div>
               </div>
 
@@ -265,6 +272,13 @@
             active-class="bg-primary-50 border-primary-500 text-primary-700"
           >
             Auto Review Settings
+          </router-link>
+          <router-link
+            to="/whatsapp-settings"
+            class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+            active-class="bg-primary-50 border-primary-500 text-primary-700"
+          >
+            WhatsApp Settings
           </router-link>
         </div>
         <div class="pt-4 pb-3 border-t border-gray-200">

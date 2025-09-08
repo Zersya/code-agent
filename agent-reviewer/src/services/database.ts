@@ -4,6 +4,7 @@ import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, Do
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
 import { MergeRequestTrackingRecord, UserMRStatisticsRecord } from '../models/merge-request.js';
 import { DeveloperPerformanceMetrics, MRQualityMetrics, NotionIssue } from '../types/performance.js';
+import { WhatsAppConfiguration, WhatsAppConfigurationRecord } from '../models/whatsapp.js';
 
 dotenv.config();
 
@@ -581,6 +582,19 @@ class DatabaseService {
         )
       `);
 
+      // Create WhatsApp configurations table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_configurations (
+          id SERIAL PRIMARY KEY,
+          gitlab_username TEXT NOT NULL UNIQUE,
+          whatsapp_number TEXT NOT NULL,
+          is_active BOOLEAN DEFAULT true,
+          notification_types JSONB DEFAULT '["merge_request_created", "merge_request_assigned"]'::jsonb,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
 
       await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_status ON embedding_jobs(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_embedding_jobs_processing_id ON embedding_jobs(processing_id)');
@@ -598,6 +612,10 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_webhook_key ON webhook_processing(webhook_key)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_status ON webhook_processing(status)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_processing_started_at ON webhook_processing(started_at)');
+
+      // Create WhatsApp configurations indexes
+      await client.query('CREATE INDEX IF NOT EXISTS idx_whatsapp_configurations_gitlab_username ON whatsapp_configurations(gitlab_username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_whatsapp_configurations_is_active ON whatsapp_configurations(is_active)');
 
       // Documentation indexes
       await client.query('CREATE INDEX IF NOT EXISTS idx_documentation_sources_framework ON documentation_sources(framework)');
@@ -2738,6 +2756,120 @@ class DatabaseService {
       issue.project_id,
       issue.merge_request_id
     ]);
+  }
+
+  // WhatsApp Configuration Methods
+
+  /**
+   * Get all WhatsApp configurations
+   */
+  async getWhatsAppConfigurations(): Promise<WhatsAppConfigurationRecord[]> {
+    const query = `
+      SELECT
+        id,
+        gitlab_username,
+        whatsapp_number,
+        is_active,
+        notification_types,
+        created_at,
+        updated_at
+      FROM whatsapp_configurations
+      ORDER BY gitlab_username ASC
+    `;
+
+    const result = await this.query(query);
+    return result.rows;
+  }
+
+  /**
+   * Get WhatsApp configuration by GitLab username
+   */
+  async getWhatsAppConfigurationByUsername(gitlabUsername: string): Promise<WhatsAppConfigurationRecord | null> {
+    const query = `
+      SELECT
+        id,
+        gitlab_username,
+        whatsapp_number,
+        is_active,
+        notification_types,
+        created_at,
+        updated_at
+      FROM whatsapp_configurations
+      WHERE gitlab_username = $1
+    `;
+
+    const result = await this.query(query, [gitlabUsername]);
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Create or update WhatsApp configuration
+   */
+  async upsertWhatsAppConfiguration(config: {
+    gitlabUsername: string;
+    whatsappNumber: string;
+    isActive: boolean;
+    notificationTypes: string[];
+  }): Promise<WhatsAppConfigurationRecord> {
+    const query = `
+      INSERT INTO whatsapp_configurations (
+        gitlab_username,
+        whatsapp_number,
+        is_active,
+        notification_types
+      ) VALUES ($1, $2, $3, $4)
+      ON CONFLICT (gitlab_username)
+      DO UPDATE SET
+        whatsapp_number = EXCLUDED.whatsapp_number,
+        is_active = EXCLUDED.is_active,
+        notification_types = EXCLUDED.notification_types,
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const result = await this.query(query, [
+      config.gitlabUsername,
+      config.whatsappNumber,
+      config.isActive,
+      JSON.stringify(config.notificationTypes)
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Delete WhatsApp configuration
+   */
+  async deleteWhatsAppConfiguration(gitlabUsername: string): Promise<boolean> {
+    const query = `
+      DELETE FROM whatsapp_configurations
+      WHERE gitlab_username = $1
+    `;
+
+    const result = await this.query(query, [gitlabUsername]);
+    return (result.rowCount || 0) > 0;
+  }
+
+  /**
+   * Get active WhatsApp configurations for specific notification type
+   */
+  async getActiveWhatsAppConfigurationsForNotification(notificationType: string): Promise<WhatsAppConfigurationRecord[]> {
+    const query = `
+      SELECT
+        id,
+        gitlab_username,
+        whatsapp_number,
+        is_active,
+        notification_types,
+        created_at,
+        updated_at
+      FROM whatsapp_configurations
+      WHERE is_active = true
+        AND notification_types ? $1
+    `;
+
+    const result = await this.query(query, [notificationType]);
+    return result.rows;
   }
 }
 
