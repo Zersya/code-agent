@@ -85,6 +85,7 @@ services:
       - WHATSAPP_API_BASE_URL=${WHATSAPP_API_BASE_URL}
       - WHATSAPP_API_KEY=${WHATSAPP_API_KEY}
       - WHATSAPP_ENABLED=${WHATSAPP_ENABLED}
+      - WHATSAPP_SESSION=${WHATSAPP_SESSION}
     volumes:
       - ./agent-reviewer/temp:/app/temp # Mounts a local ./temp directory to /app/temp in the container
     restart: unless-stopped
