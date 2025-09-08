@@ -196,8 +196,10 @@ async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRe
     // Send WhatsApp notifications for merge request events
     try {
       const action = event.object_attributes.action;
-      const assignee = event.object_attributes.assignee;
-      const assignees = event.object_attributes.assignees || [];
+      const assignee = event.assignee;
+      const assignees = event.assignees || [];
+
+      console.log(event);
 
       // Get all relevant users (assignee + assignees/reviewers)
       const getTargetUsers = (): string[] => {

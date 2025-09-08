@@ -95,8 +95,6 @@ export interface GitLabMergeRequestAttributes {
     };
   };
   work_in_progress: boolean;
-  assignee: GitLabUser;
-  assignees: GitLabUser[];
   author: GitLabUser;
   created_at: string;
   updated_at: string;
@@ -113,6 +111,8 @@ export interface GitLabMergeRequestEvent {
   project: GitLabProject;
   repository: GitLabRepository;
   object_attributes: GitLabMergeRequestAttributes;
+  assignee: GitLabUser;
+  assignees: GitLabUser[];
   changes: {
     [key: string]: {
       previous: any;
