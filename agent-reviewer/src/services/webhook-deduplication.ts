@@ -44,7 +44,23 @@ class WebhookDeduplicationService {
 
       case 'merge_request':
         const mrEvent = event as GitLabMergeRequestEvent;
-        keyData = `mr-${mrEvent.project.id}-${mrEvent.object_attributes.iid}-${mrEvent.object_attributes.last_commit.id}-${mrEvent.object_attributes.action}`;
+
+        // Include more specific information to differentiate between different types of updates
+        const baseKey = `mr-${mrEvent.project.id}-${mrEvent.object_attributes.iid}-${mrEvent.object_attributes.last_commit.id}-${mrEvent.object_attributes.action}`;
+
+        // Add timestamp and changes information to make each update unique
+        const timestamp = mrEvent.object_attributes.updated_at || new Date().toISOString();
+        const changesHash = mrEvent.changes ? crypto.createHash('md5').update(JSON.stringify(mrEvent.changes)).digest('hex').substring(0, 8) : 'no-changes';
+
+        keyData = `${baseKey}-${timestamp}-${changesHash}`;
+
+        console.log(`Generated MR webhook key components:`, {
+          baseKey,
+          timestamp,
+          changesHash,
+          changes: mrEvent.changes ? Object.keys(mrEvent.changes) : 'none',
+          finalKeyData: keyData
+        });
         break;
 
       case 'note':
@@ -135,15 +151,34 @@ class WebhookDeduplicationService {
       };
 
       console.log(`Creating new webhook processing record with ID ${processingId}...`);
-      await dbService.createWebhookProcessing(processingRecord);
 
-      console.log(`Started processing webhook ${identifier.uniqueKey} with ID ${processingId}`);
+      try {
+        await dbService.createWebhookProcessing(processingRecord);
+        console.log(`Started processing webhook ${identifier.uniqueKey} with ID ${processingId}`);
 
-      return {
-        success: true,
-        isDuplicate: false,
-        processingId
-      };
+        return {
+          success: true,
+          isDuplicate: false,
+          processingId
+        };
+      } catch (dbError: any) {
+        // Handle duplicate key constraint specifically
+        if (dbError.code === '23505' && dbError.constraint === 'webhook_processing_webhook_key_key') {
+          console.log(`Webhook ${identifier.uniqueKey} was already processed by another request (race condition), treating as duplicate`);
+
+          // Try to find the existing record
+          const existingRecord = await dbService.getActiveWebhookProcessing(identifier.uniqueKey);
+
+          return {
+            success: true,
+            isDuplicate: true,
+            processingId: existingRecord?.id || 'unknown'
+          };
+        }
+
+        // Re-throw other database errors
+        throw dbError;
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : 'No stack trace';
