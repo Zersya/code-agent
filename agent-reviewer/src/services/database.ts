@@ -2777,8 +2777,42 @@ class DatabaseService {
       ORDER BY gitlab_username ASC
     `;
 
-    const result = await this.query(query);
-    return result.rows;
+    try {
+      console.log('Executing WhatsApp configurations query...');
+
+      // First check if table exists
+      const tableCheck = await this.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'whatsapp_configurations'
+        );
+      `);
+      console.log('WhatsApp table exists:', tableCheck.rows[0].exists);
+
+      if (!tableCheck.rows[0].exists) {
+        console.log('WhatsApp table does not exist, creating it...');
+        await this.query(`
+          CREATE TABLE IF NOT EXISTS whatsapp_configurations (
+            id SERIAL PRIMARY KEY,
+            gitlab_username TEXT NOT NULL UNIQUE,
+            whatsapp_number TEXT NOT NULL,
+            is_active BOOLEAN DEFAULT true,
+            notification_types JSONB DEFAULT '["merge_request_created", "merge_request_assigned"]'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+        console.log('WhatsApp table created');
+      }
+
+      const result = await this.query(query);
+      console.log('Query result:', result.rows.length, 'rows');
+      return result.rows;
+    } catch (error) {
+      console.error('Error in getWhatsAppConfigurations:', error);
+      throw error;
+    }
   }
 
   /**

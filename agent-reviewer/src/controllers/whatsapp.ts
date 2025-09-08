@@ -8,8 +8,10 @@ import { WhatsAppConfiguration, NotificationType } from '../models/whatsapp.js';
  */
 export const getWhatsAppConfigurations = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('Getting WhatsApp configurations...');
     const configurations = await dbService.getWhatsAppConfigurations();
-    
+    console.log('Retrieved configurations:', configurations.length);
+
     // Transform database records to API format
     const transformedConfigurations = configurations.map(config => ({
       id: config.id,
@@ -21,9 +23,10 @@ export const getWhatsAppConfigurations = async (req: Request, res: Response): Pr
       updatedAt: config.updated_at
     }));
 
+    console.log('Sending response with', transformedConfigurations.length, 'configurations');
     res.json({
       success: true,
-      configurations: transformedConfigurations
+      data: transformedConfigurations
     });
   } catch (error) {
     console.error('Error getting WhatsApp configurations:', error);
@@ -72,7 +75,7 @@ export const getWhatsAppConfiguration = async (req: Request, res: Response): Pro
 
     res.json({
       success: true,
-      configuration: transformedConfig
+      data: transformedConfig
     });
   } catch (error) {
     console.error('Error getting WhatsApp configuration:', error);
@@ -159,7 +162,7 @@ export const upsertWhatsAppConfiguration = async (req: Request, res: Response): 
 
     res.json({
       success: true,
-      configuration: transformedConfig,
+      data: transformedConfig,
       message: 'WhatsApp configuration saved successfully'
     });
   } catch (error) {
@@ -247,8 +250,10 @@ export const testWhatsAppMessage = async (req: Request, res: Response): Promise<
     if (result.success) {
       res.json({
         success: true,
-        message: 'Test message sent successfully',
-        messageId: result.messageId
+        data: {
+          message: 'Test message sent successfully',
+          messageId: result.messageId
+        }
       });
     } else {
       res.status(400).json({
@@ -274,7 +279,7 @@ export const getWhatsAppServiceStatus = async (req: Request, res: Response): Pro
     
     res.json({
       success: true,
-      status: {
+      data: {
         enabled: config.enabled,
         baseUrl: config.baseUrl,
         session: config.session,
