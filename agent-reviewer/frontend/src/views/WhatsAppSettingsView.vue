@@ -217,7 +217,6 @@
       @dismiss="errorMessage = ''"
     />
   </div>
-  </div>
 </template>
 
 <script setup lang="ts">
