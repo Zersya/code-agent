@@ -111,8 +111,7 @@ export interface GitLabMergeRequestEvent {
   project: GitLabProject;
   repository: GitLabRepository;
   object_attributes: GitLabMergeRequestAttributes;
-  assignee: GitLabUser;
-  assignees: GitLabUser[];
+  reviewers: GitLabUser[];
   changes: {
     [key: string]: {
       previous: any;
