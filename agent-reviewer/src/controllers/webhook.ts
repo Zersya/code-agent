@@ -50,7 +50,16 @@ export const processWebhook = async (req: Request, res: Response) => {
 
     if (!deduplicationResult.success) {
       console.error('Error starting webhook processing:', deduplicationResult.error);
-      res.status(500).json({ error: 'Failed to process webhook' });
+      console.error('Event details:', {
+        object_kind: event.object_kind,
+        project_id: event.project?.id || (event as any).project_id,
+        event_size: JSON.stringify(event).length
+      });
+      res.status(500).json({
+        error: 'Failed to process webhook',
+        details: deduplicationResult.error,
+        event_type: event.object_kind
+      });
       return;
     }
 
