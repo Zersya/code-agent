@@ -18,7 +18,9 @@ export const getWhatsAppConfigurations = async (req: Request, res: Response): Pr
       gitlabUsername: config.gitlab_username,
       whatsappNumber: config.whatsapp_number,
       isActive: config.is_active,
-      notificationTypes: JSON.parse(config.notification_types),
+      notificationTypes: typeof config.notification_types === 'string'
+        ? JSON.parse(config.notification_types)
+        : config.notification_types,
       createdAt: config.created_at,
       updatedAt: config.updated_at
     }));
@@ -68,7 +70,9 @@ export const getWhatsAppConfiguration = async (req: Request, res: Response): Pro
       gitlabUsername: config.gitlab_username,
       whatsappNumber: config.whatsapp_number,
       isActive: config.is_active,
-      notificationTypes: JSON.parse(config.notification_types),
+      notificationTypes: typeof config.notification_types === 'string'
+        ? JSON.parse(config.notification_types)
+        : config.notification_types,
       createdAt: config.created_at,
       updatedAt: config.updated_at
     };
@@ -149,13 +153,29 @@ export const upsertWhatsAppConfiguration = async (req: Request, res: Response): 
       notificationTypes: notificationTypes || ['merge_request_created', 'merge_request_assigned']
     });
 
+    console.log('Database config returned:', config);
+    console.log('notification_types type:', typeof config.notification_types);
+    console.log('notification_types value:', config.notification_types);
+
     // Transform database record to API format
+    let parsedNotificationTypes;
+    try {
+      parsedNotificationTypes = typeof config.notification_types === 'string'
+        ? JSON.parse(config.notification_types)
+        : config.notification_types;
+    } catch (parseError) {
+      console.error('Error parsing notification_types:', parseError);
+      console.error('Raw notification_types:', config.notification_types);
+      // Fallback to default values
+      parsedNotificationTypes = ['merge_request_created', 'merge_request_assigned'];
+    }
+
     const transformedConfig = {
       id: config.id,
       gitlabUsername: config.gitlab_username,
       whatsappNumber: config.whatsapp_number,
       isActive: config.is_active,
-      notificationTypes: JSON.parse(config.notification_types),
+      notificationTypes: parsedNotificationTypes,
       createdAt: config.created_at,
       updatedAt: config.updated_at
     };
@@ -273,7 +293,7 @@ export const testWhatsAppMessage = async (req: Request, res: Response): Promise<
 /**
  * Get WhatsApp service status
  */
-export const getWhatsAppServiceStatus = async (req: Request, res: Response): Promise<void> => {
+export const getWhatsAppServiceStatus = async (_req: Request, res: Response): Promise<void> => {
   try {
     const config = whatsappService.getConfig();
     
