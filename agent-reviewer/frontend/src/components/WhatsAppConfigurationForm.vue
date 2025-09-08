@@ -220,21 +220,15 @@ const sendTestMessage = async () => {
   testResult.value = null
 
   try {
-    const response = await fetch('/api/whatsapp/test', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
-        whatsappNumber: form.value.whatsappNumber,
-        message: `Test message for ${form.value.gitlabUsername} 🤖\n\nYour WhatsApp notification setup is working correctly!`
-      })
+    // Import the API service dynamically to avoid circular imports
+    const { whatsappApi } = await import('@/services/api')
+
+    const response = await whatsappApi.sendTestMessage({
+      whatsappNumber: form.value.whatsappNumber,
+      message: `Test message for ${form.value.gitlabUsername} 🤖\n\nYour WhatsApp notification setup is working correctly!`
     })
 
-    const result = await response.json()
-
-    if (result.success) {
+    if (response.success) {
       testResult.value = {
         success: true,
         message: 'Test message sent successfully! Check your WhatsApp.'
@@ -242,7 +236,7 @@ const sendTestMessage = async () => {
     } else {
       testResult.value = {
         success: false,
-        message: result.error || 'Failed to send test message'
+        message: response.error || 'Failed to send test message'
       }
     }
   } catch (error) {
