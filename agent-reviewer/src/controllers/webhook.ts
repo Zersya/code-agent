@@ -7,7 +7,9 @@ import { dbService } from '../services/database.js';
 import { reviewService } from '../services/review.js';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
 import { performanceService } from '../services/performance.js';
+import { whatsappService } from '../services/whatsapp.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
+import { WhatsAppNotificationContext, NotificationType } from '../models/whatsapp.js';
 
 /**
  * Helper function to check if a merge request is in draft status
@@ -190,6 +192,35 @@ async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRe
       event.user.username,
       event.project.id
     );
+
+    // Send WhatsApp notifications for merge request events
+    try {
+      const action = event.object_attributes.action;
+
+      // Send notification for merge request creation
+      if (action === 'open') {
+        await sendWhatsAppNotifications('merge_request_created', event);
+      }
+
+      // Send notification for merge request assignment
+      if (event.object_attributes.assignee && (action === 'open' || action === 'update')) {
+        const assigneeUsername = event.object_attributes.assignee.username;
+        await sendWhatsAppNotifications('merge_request_assigned', event, [assigneeUsername]);
+      }
+
+      // Send notification for merge request merge
+      if (action === 'merge') {
+        await sendWhatsAppNotifications('merge_request_merged', event);
+      }
+
+      // Send notification for merge request close
+      if (action === 'close') {
+        await sendWhatsAppNotifications('merge_request_closed', event);
+      }
+    } catch (notificationError) {
+      console.error('Error sending WhatsApp notifications:', notificationError);
+      // Don't throw error to avoid breaking existing functionality
+    }
 
     console.log(`Saved MR tracking data for project ${event.project.id}, MR !${event.object_attributes.iid}`);
   } catch (error) {
@@ -763,5 +794,90 @@ async function triggerReReview(projectId: number, mergeRequestIid: number, trigg
     console.log(`Successfully triggered re-review for MR !${mergeRequestIid} in project ${projectId}`);
   } catch (error) {
     console.error(`Error triggering re-review for MR !${mergeRequestIid} in project ${projectId}:`, error);
+  }
+}
+
+/**
+ * Send WhatsApp notifications for merge request events
+ */
+async function sendWhatsAppNotifications(
+  notificationType: NotificationType,
+  event: GitLabMergeRequestEvent,
+  targetUsernames?: string[]
+) {
+  try {
+    if (!whatsappService.isEnabled()) {
+      console.log('WhatsApp service is disabled, skipping notifications');
+      return;
+    }
+
+    // Get active WhatsApp configurations for this notification type
+    const configurations = await dbService.getActiveWhatsAppConfigurationsForNotification(notificationType);
+
+    if (configurations.length === 0) {
+      console.log(`No active WhatsApp configurations found for notification type: ${notificationType}`);
+      return;
+    }
+
+    // Filter configurations based on target usernames if provided
+    let targetConfigurations = configurations;
+    if (targetUsernames && targetUsernames.length > 0) {
+      targetConfigurations = configurations.filter(config =>
+        targetUsernames.includes(config.gitlab_username)
+      );
+    }
+
+    if (targetConfigurations.length === 0) {
+      console.log(`No matching WhatsApp configurations found for target users: ${targetUsernames?.join(', ')}`);
+      return;
+    }
+
+    // Prepare notification context
+    const context: WhatsAppNotificationContext = {
+      type: notificationType,
+      projectName: event.project.name,
+      mergeRequestTitle: event.object_attributes.title,
+      mergeRequestUrl: event.object_attributes.url,
+      authorName: event.object_attributes.author?.name || event.user?.name || 'Unknown',
+      assigneeName: event.object_attributes.assignee?.name,
+      reviewerName: undefined // Will be set for review_completed notifications
+    };
+
+    // Send notifications to all target configurations
+    const notificationPromises = targetConfigurations.map(async (config) => {
+      try {
+        console.log(`Sending WhatsApp notification to ${config.gitlab_username} (${config.whatsapp_number}) for ${notificationType}`);
+
+        const result = await whatsappService.sendMergeRequestNotification(
+          config.whatsapp_number,
+          context
+        );
+
+        if (result.success) {
+          console.log(`Successfully sent WhatsApp notification to ${config.gitlab_username}`);
+        } else {
+          console.error(`Failed to send WhatsApp notification to ${config.gitlab_username}: ${result.error}`);
+        }
+
+        return result;
+      } catch (error) {
+        console.error(`Error sending WhatsApp notification to ${config.gitlab_username}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    // Wait for all notifications to complete
+    const results = await Promise.allSettled(notificationPromises);
+
+    const successCount = results.filter(result =>
+      result.status === 'fulfilled' && result.value.success
+    ).length;
+
+    const failureCount = results.length - successCount;
+
+    console.log(`WhatsApp notification summary for ${notificationType}: ${successCount} sent, ${failureCount} failed`);
+
+  } catch (error) {
+    console.error(`Error sending WhatsApp notifications for ${notificationType}:`, error);
   }
 }

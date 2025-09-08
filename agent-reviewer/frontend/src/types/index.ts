@@ -442,3 +442,41 @@ export interface MergeRequestListParams {
   to_date?: string
   search?: string
 }
+
+// WhatsApp Configuration Types
+export interface WhatsAppConfiguration {
+  id?: number
+  gitlabUsername: string
+  whatsappNumber: string
+  isActive: boolean
+  notificationTypes: NotificationType[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type NotificationType =
+  | 'merge_request_created'
+  | 'merge_request_assigned'
+  | 'merge_request_merged'
+  | 'merge_request_closed'
+  | 'review_completed'
+
+export interface WhatsAppConfigurationRequest {
+  gitlabUsername: string
+  whatsappNumber: string
+  isActive: boolean
+  notificationTypes: NotificationType[]
+}
+
+export interface WhatsAppConfigurationResponse {
+  success: boolean
+  configuration?: WhatsAppConfiguration
+  configurations?: WhatsAppConfiguration[]
+  message?: string
+  error?: string
+}
+
+export interface WhatsAppTestRequest {
+  whatsappNumber: string
+  message?: string
+}

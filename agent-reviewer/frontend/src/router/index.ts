@@ -9,6 +9,7 @@ import RepositoryEmbeddingView from '@/views/RepositoryEmbeddingView.vue'
 import DocumentationManagementView from '@/views/DocumentationManagementView.vue'
 import MergeRequestsView from '@/views/MergeRequestsView.vue'
 import AutoReviewSettingsView from '@/views/AutoReviewSettingsView.vue'
+import WhatsAppSettingsView from '@/views/WhatsAppSettingsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
@@ -65,6 +66,11 @@ const router = createRouter({
           path: '/auto-review-settings',
           name: 'AutoReviewSettings',
           component: AutoReviewSettingsView
+        },
+        {
+          path: '/whatsapp-settings',
+          name: 'WhatsAppSettings',
+          component: WhatsAppSettingsView
         }
       ]
     },
