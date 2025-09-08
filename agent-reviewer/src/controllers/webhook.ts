@@ -196,26 +196,69 @@ async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRe
     // Send WhatsApp notifications for merge request events
     try {
       const action = event.object_attributes.action;
+      const assignee = event.object_attributes.assignee;
+      const assignees = event.object_attributes.assignees || [];
 
-      // Send notification for merge request creation
+      // Get all relevant users (assignee + assignees/reviewers)
+      const getTargetUsers = (): string[] => {
+        const users: string[] = [];
+
+        // Add primary assignee
+        if (assignee?.username) {
+          users.push(assignee.username);
+        }
+
+        // Add additional assignees/reviewers
+        assignees.forEach(user => {
+          if (user?.username && !users.includes(user.username)) {
+            users.push(user.username);
+          }
+        });
+
+        return users;
+      };
+
+      const targetUsers = getTargetUsers();
+
+      // Send notification for merge request creation (only if assignee/reviewers are set)
       if (action === 'open') {
-        await sendWhatsAppNotifications('merge_request_created', event);
+        if (targetUsers.length > 0) {
+          console.log(`Sending MR created notification to: ${targetUsers.join(', ')}`);
+          await sendWhatsAppNotifications('merge_request_created', event, targetUsers);
+        } else {
+          console.log('No assignee or reviewers set for MR creation, skipping WhatsApp notification');
+        }
       }
 
-      // Send notification for merge request assignment
-      if (event.object_attributes.assignee && (action === 'open' || action === 'update')) {
-        const assigneeUsername = event.object_attributes.assignee.username;
-        await sendWhatsAppNotifications('merge_request_assigned', event, [assigneeUsername]);
+      // Send notification for merge request assignment (when assignee/reviewers are added/changed)
+      if (action === 'update' && targetUsers.length > 0) {
+        // Check if assignment actually changed by looking at the changes object
+        const hasAssignmentChange = event.changes?.assignee || event.changes?.assignees;
+
+        if (hasAssignmentChange) {
+          console.log(`Sending MR assignment change notification to: ${targetUsers.join(', ')}`);
+          await sendWhatsAppNotifications('merge_request_assigned', event, targetUsers);
+        }
       }
 
-      // Send notification for merge request merge
+      // Send notification for merge request merge (only to assignee/reviewers if exist)
       if (action === 'merge') {
-        await sendWhatsAppNotifications('merge_request_merged', event);
+        if (targetUsers.length > 0) {
+          console.log(`Sending MR merged notification to: ${targetUsers.join(', ')}`);
+          await sendWhatsAppNotifications('merge_request_merged', event, targetUsers);
+        } else {
+          console.log('No assignee or reviewers for merged MR, skipping WhatsApp notification');
+        }
       }
 
-      // Send notification for merge request close
+      // Send notification for merge request close (only to assignee/reviewers if exist)
       if (action === 'close') {
-        await sendWhatsAppNotifications('merge_request_closed', event);
+        if (targetUsers.length > 0) {
+          console.log(`Sending MR closed notification to: ${targetUsers.join(', ')}`);
+          await sendWhatsAppNotifications('merge_request_closed', event, targetUsers);
+        } else {
+          console.log('No assignee or reviewers for closed MR, skipping WhatsApp notification');
+        }
       }
     } catch (notificationError) {
       console.error('Error sending WhatsApp notifications:', notificationError);
