@@ -884,7 +884,7 @@ async function sendWhatsAppNotifications(
       mergeRequestTitle: event.object_attributes.title,
       mergeRequestUrl: event.object_attributes.url,
       authorName: event.object_attributes.author?.name || event.user?.name || 'Unknown',
-      assigneeName: event.object_attributes.assignee?.name,
+      assigneeName: event.assignee?.name,
       reviewerName: undefined // Will be set for review_completed notifications
     };
 
