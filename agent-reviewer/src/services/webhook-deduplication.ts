@@ -100,10 +100,15 @@ class WebhookDeduplicationService {
    * Check if webhook is already being processed and create processing record if not
    */
   async startWebhookProcessing(event: GitLabWebhookEvent): Promise<WebhookProcessingResult> {
+    let identifier: WebhookIdentifier | null = null;
+
     try {
-      const identifier = this.createWebhookIdentifier(event);
+      // Create webhook identifier
+      identifier = this.createWebhookIdentifier(event);
+      console.log(`Processing webhook: ${identifier.eventType} for project ${identifier.projectId}, key: ${identifier.uniqueKey}`);
 
       // Check if this webhook is already being processed
+      console.log(`Checking for existing webhook processing record...`);
       const existingRecord = await dbService.getActiveWebhookProcessing(identifier.uniqueKey);
 
       if (existingRecord) {
@@ -129,6 +134,7 @@ class WebhookDeduplicationService {
         updatedAt: new Date()
       };
 
+      console.log(`Creating new webhook processing record with ID ${processingId}...`);
       await dbService.createWebhookProcessing(processingRecord);
 
       console.log(`Started processing webhook ${identifier.uniqueKey} with ID ${processingId}`);
@@ -139,11 +145,28 @@ class WebhookDeduplicationService {
         processingId
       };
     } catch (error) {
-      console.error('Error starting webhook processing:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+      const webhookKey = identifier?.uniqueKey || 'unknown';
+      const projectId = identifier?.projectId || 'unknown';
+
+      console.error(`Error starting webhook processing for project ${projectId}, webhook key: ${webhookKey}`);
+      console.error(`Error message: ${errorMessage}`);
+      console.error(`Error stack: ${errorStack}`);
+      console.error(`Event type: ${event.object_kind}`);
+
+      // Log database connection status by attempting a simple query
+      try {
+        await dbService.getWebhookProcessingStats();
+        console.log('Database connection test: SUCCESS');
+      } catch (dbError) {
+        console.error('Database connection test: FAILED', dbError);
+      }
+
       return {
         success: false,
         isDuplicate: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
     }
   }
