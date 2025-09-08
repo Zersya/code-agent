@@ -27,6 +27,10 @@ import type {
   IssueMetrics,
   PerformanceFilters
 } from '@/types/performance'
+import type {
+  WhatsAppConfiguration,
+  WhatsAppConfigurationRequest
+} from '@/types'
 
 class ApiClient {
   private client: AxiosInstance
@@ -261,6 +265,30 @@ export const performanceApi = {
 
   getIssueMetrics: (filters?: PerformanceFilters): Promise<ApiResponse<IssueMetrics[]>> =>
     apiClient.get<IssueMetrics[]>('/analytics/issues', filters),
+}
+
+// WhatsApp API
+export const whatsappApi = {
+  getConfigurations: (): Promise<ApiResponse<WhatsAppConfiguration[]>> =>
+    apiClient.get<WhatsAppConfiguration[]>('/whatsapp/configurations'),
+
+  getConfiguration: (username: string): Promise<ApiResponse<WhatsAppConfiguration>> =>
+    apiClient.get<WhatsAppConfiguration>(`/whatsapp/configurations/${username}`),
+
+  createConfiguration: (data: WhatsAppConfigurationRequest): Promise<ApiResponse<WhatsAppConfiguration>> =>
+    apiClient.post<WhatsAppConfiguration>('/whatsapp/configurations', data),
+
+  updateConfiguration: (data: WhatsAppConfigurationRequest): Promise<ApiResponse<WhatsAppConfiguration>> =>
+    apiClient.put<WhatsAppConfiguration>('/whatsapp/configurations', data),
+
+  deleteConfiguration: (username: string): Promise<ApiResponse<void>> =>
+    apiClient.delete<void>(`/whatsapp/configurations/${username}`),
+
+  sendTestMessage: (data: { whatsappNumber: string; message: string }): Promise<ApiResponse<{ success: boolean; message: string }>> =>
+    apiClient.post<{ success: boolean; message: string }>('/whatsapp/test', data),
+
+  getServiceStatus: (): Promise<ApiResponse<{ enabled: boolean; baseUrl: string; session: string; timeout: number }>> =>
+    apiClient.get<{ enabled: boolean; baseUrl: string; session: string; timeout: number }>('/whatsapp/status'),
 }
 
 export default apiClient
