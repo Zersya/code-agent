@@ -117,7 +117,7 @@
         :type="alert.type"
         :message="alert.message"
         class="mt-4"
-        @close="alert = null"
+        @dismiss="alert = null"
       />
     </div>
   </div>
@@ -148,7 +148,7 @@ const formLoading = ref(false)
 const deleteLoading = ref(false)
 
 // Alert state
-const alert = ref<{ type: 'success' | 'error'; message: string } | null>(null)
+const alert = ref<{ type: 'success' | 'danger'; message: string } | null>(null)
 
 // Methods
 const fetchConfigurations = async () => {
@@ -165,10 +165,10 @@ const fetchConfigurations = async () => {
     if (result.success) {
       configurations.value = result.configurations || []
     } else {
-      showAlert('error', result.error || 'Failed to fetch configurations')
+      showAlert('danger', result.error || 'Failed to fetch configurations')
     }
   } catch (error) {
-    showAlert('error', 'Error fetching configurations')
+    showAlert('danger', 'Error fetching configurations')
   } finally {
     tableLoading.value = false
   }
@@ -188,10 +188,10 @@ const fetchServiceStatus = async () => {
     if (result.success) {
       serviceStatus.value = result.status
     } else {
-      showAlert('error', result.error || 'Failed to fetch service status')
+      showAlert('danger', result.error || 'Failed to fetch service status')
     }
   } catch (error) {
-    showAlert('error', 'Error fetching service status')
+    showAlert('danger', 'Error fetching service status')
   } finally {
     serviceStatusLoading.value = false
   }
@@ -231,10 +231,10 @@ const handleFormSubmit = async (data: WhatsAppConfigurationRequest) => {
       await fetchConfigurations()
       handleFormCancel()
     } else {
-      showAlert('error', result.error || 'Failed to save configuration')
+      showAlert('danger', result.error || 'Failed to save configuration')
     }
   } catch (error) {
-    showAlert('error', 'Error saving configuration')
+    showAlert('danger', 'Error saving configuration')
   } finally {
     formLoading.value = false
   }
@@ -263,10 +263,10 @@ const confirmDelete = async () => {
       showAlert('success', 'Configuration deleted successfully')
       await fetchConfigurations()
     } else {
-      showAlert('error', result.error || 'Failed to delete configuration')
+      showAlert('danger', result.error || 'Failed to delete configuration')
     }
   } catch (error) {
-    showAlert('error', 'Error deleting configuration')
+    showAlert('danger', 'Error deleting configuration')
   } finally {
     deleteLoading.value = false
     showDeleteModal.value = false
@@ -274,7 +274,7 @@ const confirmDelete = async () => {
   }
 }
 
-const showAlert = (type: 'success' | 'error', message: string) => {
+const showAlert = (type: 'success' | 'danger', message: string) => {
   alert.value = { type, message }
   setTimeout(() => {
     alert.value = null

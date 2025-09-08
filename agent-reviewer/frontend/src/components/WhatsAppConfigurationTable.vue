@@ -124,10 +124,10 @@
     <!-- Test Message Result -->
     <BaseAlert
       v-if="testResult"
-      :type="testResult.success ? 'success' : 'error'"
+      :type="testResult.success ? 'success' : 'danger'"
       :message="testResult.message"
       class="mt-4"
-      @close="testResult = null"
+      @dismiss="testResult = null"
     />
   </BaseCard>
 </template>

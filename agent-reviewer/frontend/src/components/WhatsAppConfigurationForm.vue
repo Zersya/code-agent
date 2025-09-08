@@ -94,7 +94,7 @@
         <BaseButton
           v-if="form.whatsappNumber"
           type="button"
-          variant="outline"
+          variant="secondary"
           @click="sendTestMessage"
           :loading="testLoading"
           :disabled="!isValidPhoneNumber"
@@ -107,17 +107,17 @@
     <!-- Test Message Result -->
     <BaseAlert
       v-if="testResult"
-      :type="testResult.success ? 'success' : 'error'"
+      :type="testResult.success ? 'success' : 'danger'"
       :message="testResult.message"
       class="mt-4"
-      @close="testResult = null"
+      @dismiss="testResult = null"
     />
   </BaseCard>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { WhatsAppConfiguration, WhatsAppConfigurationRequest, NotificationType } from '../types'
+import { WhatsAppConfiguration, WhatsAppConfigurationRequest } from '../types'
 import BaseCard from './BaseCard.vue'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
