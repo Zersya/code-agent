@@ -1,5 +1,5 @@
 // Test file for completion rate UI components
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import AnalyticsView from '../views/AnalyticsView.vue';
