@@ -245,6 +245,8 @@ export class RepositoryService {
     const extension = path.extname(filePath).toLowerCase();
 
     const languageMap: Record<string, string> = {
+      '.vue': 'vue',
+      '.dart': 'dart',
       '.js': 'javascript',
       '.jsx': 'javascript',
       '.ts': 'typescript',
