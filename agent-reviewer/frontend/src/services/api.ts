@@ -275,20 +275,30 @@ export const performanceApi = {
 
 // Completion Rate API
 export const completionRateApi = {
-  getCompletionRate: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateResponse>> =>
-    apiClient.get<CompletionRateResponse>(`/analytics/completion-rate/${developerId}`, filters),
+  getCompletionRate: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateResponse>> => {
+    console.log('🌐 API: getCompletionRate called for developer:', developerId, 'with filters:', filters)
+    return apiClient.get<CompletionRateResponse>(`/analytics/completion-rate/${developerId}`, filters)
+  },
 
-  getTeamCompletionRates: (filters?: CompletionRateFilters): Promise<ApiResponse<TeamCompletionRateResponse>> =>
-    apiClient.get<TeamCompletionRateResponse>('/analytics/completion-rate/team', filters),
+  getTeamCompletionRates: (filters?: CompletionRateFilters): Promise<ApiResponse<TeamCompletionRateResponse>> => {
+    console.log('🌐 API: getTeamCompletionRates called with filters:', filters)
+    return apiClient.get<TeamCompletionRateResponse>('/analytics/completion-rate/team', filters)
+  },
 
-  getCompletionRateTrends: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateTrendsResponse>> =>
-    apiClient.get<CompletionRateTrendsResponse>(`/analytics/completion-rate/trends/${developerId}`, filters),
+  getCompletionRateTrends: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateTrendsResponse>> => {
+    console.log('🌐 API: getCompletionRateTrends called for developer:', developerId, 'with filters:', filters)
+    return apiClient.get<CompletionRateTrendsResponse>(`/analytics/completion-rate/trends/${developerId}`, filters)
+  },
 
-  getProjectCompletionRates: (projectId: number, filters?: CompletionRateFilters): Promise<ApiResponse<ProjectCompletionRateResponse>> =>
-    apiClient.get<ProjectCompletionRateResponse>(`/analytics/completion-rate/projects/${projectId}`, filters),
+  getProjectCompletionRates: (projectId: number, filters?: CompletionRateFilters): Promise<ApiResponse<ProjectCompletionRateResponse>> => {
+    console.log('🌐 API: getProjectCompletionRates called for project:', projectId, 'with filters:', filters)
+    return apiClient.get<ProjectCompletionRateResponse>(`/analytics/completion-rate/projects/${projectId}`, filters)
+  },
 
-  getCompletionRateStats: (filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateStatsResponse>> =>
-    apiClient.get<CompletionRateStatsResponse>('/analytics/completion-rate/stats', filters),
+  getCompletionRateStats: (filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateStatsResponse>> => {
+    console.log('🌐 API: getCompletionRateStats called with filters:', filters)
+    return apiClient.get<CompletionRateStatsResponse>('/analytics/completion-rate/stats', filters)
+  },
 }
 
 // WhatsApp API

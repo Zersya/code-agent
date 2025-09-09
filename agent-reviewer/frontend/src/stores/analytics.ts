@@ -138,19 +138,25 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   }
 
   const fetchTeamCompletionRates = async (filters?: CompletionRateFilters) => {
+    console.log('🏪 Store: fetchTeamCompletionRates called with filters:', filters)
     isLoading.value = true
     error.value = null
 
     try {
+      console.log('🌐 Store: Making API call to getTeamCompletionRates...')
       const response = await completionRateApi.getTeamCompletionRates(filters)
+      console.log('📡 Store: API response received:', response)
 
       if (response.success && response.data) {
         completionRateData.value.teamRates = response.data
+        console.log('✅ Store: Team rates updated:', completionRateData.value.teamRates)
       } else {
         error.value = response.message || 'Failed to fetch team completion rates'
+        console.error('❌ Store: API response error:', response)
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch team completion rates'
+      console.error('💥 Store: Exception caught:', err)
     } finally {
       isLoading.value = false
     }
@@ -176,19 +182,25 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   }
 
   const fetchCompletionRateStats = async (filters?: CompletionRateFilters) => {
+    console.log('🏪 Store: fetchCompletionRateStats called with filters:', filters)
     isLoading.value = true
     error.value = null
 
     try {
+      console.log('🌐 Store: Making API call to getCompletionRateStats...')
       const response = await completionRateApi.getCompletionRateStats(filters)
+      console.log('📡 Store: API response received:', response)
 
       if (response.success && response.data) {
         completionRateData.value.stats = response.data
+        console.log('✅ Store: Stats updated:', completionRateData.value.stats)
       } else {
         error.value = response.message || 'Failed to fetch completion rate stats'
+        console.error('❌ Store: API response error:', response)
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch completion rate stats'
+      console.error('💥 Store: Exception caught:', err)
     } finally {
       isLoading.value = false
     }

@@ -14,7 +14,10 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "test:dashboard": "node test-dashboard.js",
-    "setup:documentation": "ts-node scripts/setup-documentation.ts"
+    "setup:documentation": "ts-node scripts/setup-documentation.ts",
+    "backfill-completion-rates": "node dist/scripts/backfill-completion-rates.js",
+    "verify-completion-rate-integration": "node dist/scripts/verify-completion-rate-integration.js",
+    "test-completion-rate-endpoints": "node dist/scripts/test-completion-rate-endpoints.js"
   },
   "dependencies": {
     "@notionhq/client": "^2.3.0",

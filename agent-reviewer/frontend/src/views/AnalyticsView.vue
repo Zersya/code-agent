@@ -1324,19 +1324,25 @@ const handleCompletionRateMonthChange = () => {
 
 const refreshCompletionRates = async () => {
   try {
+    console.log('🔄 Starting completion rate refresh...')
     const filters = {
       month: selectedCompletionRateMonth.value
     }
+    console.log('📅 Using filters:', filters)
 
     // Fetch team completion rates
+    console.log('📊 Fetching team completion rates...')
     await analyticsStore.fetchTeamCompletionRates(filters)
+    console.log('✅ Team completion rates fetched')
 
     // Fetch completion rate stats
+    console.log('📈 Fetching completion rate stats...')
     await analyticsStore.fetchCompletionRateStats(filters)
+    console.log('✅ Completion rate stats fetched')
 
-    console.log('Completion rate data loaded:', analyticsStore.completionRateData)
+    console.log('🎉 Completion rate data loaded:', analyticsStore.completionRateData)
   } catch (error) {
-    console.error('Error refreshing completion rates:', error)
+    console.error('❌ Error refreshing completion rates:', error)
   }
 }
 
