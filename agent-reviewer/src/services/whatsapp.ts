@@ -110,7 +110,7 @@ export class WhatsAppService {
    * Send a test message
    */
   async sendTestMessage(phoneNumber: string, customMessage?: string): Promise<WhatsAppApiResponse> {
-    const message = customMessage || 'Test message from GitLab Merge Request Reviewer Bot 🤖\n\nThis is a test to verify your WhatsApp notification setup is working correctly.';
+    const message = customMessage || 'Test message from Repopo Merge Request Reviewer Bot 🤖\n\nThis is a test to verify your WhatsApp notification setup is working correctly.';
     
     return this.sendMessage({
       to: phoneNumber,
@@ -196,14 +196,14 @@ export class WhatsAppService {
 
       default:
         emoji = '📢';
-        message = `${emoji} *GitLab Notification*\n\n`;
+        message = `${emoji} *Repopo Notification*\n\n`;
         message += `📁 *Project:* ${projectName}\n`;
         message += `📝 *Title:* ${mergeRequestTitle}\n`;
         message += `👤 *Author:* ${authorName}\n`;
         message += `🔗 *Link:* ${mergeRequestUrl}`;
     }
 
-    message += '\n\n_Sent by GitLab Merge Request Reviewer Bot_';
+    message += '\n\n_Sent by Repopo Merge Request Reviewer Bot_';
     return message;
   }
 
