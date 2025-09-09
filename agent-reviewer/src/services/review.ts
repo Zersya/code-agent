@@ -1959,13 +1959,9 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
         continue;
       }
       
-      // Apply threshold-based validation
-      if (this.validateCriticalIssueByThreshold(content)) {
-        validIssueCount++;
-        console.log(`✅ Valid critical issue found: ${content.substring(0, 50)}...`);
-      } else {
-        console.log(`⚠️ Issue found but not critical under ${CRITICAL_ISSUE_THRESHOLD} threshold: ${content.substring(0, 50)}...`);
-      }
+      // Count all issues marked with 🔴 emoji (remove threshold validation)
+      validIssueCount++;
+      console.log(`✅ Critical issue found: ${content.substring(0, 50)}...`);
     }
     
     return validIssueCount;
@@ -2015,10 +2011,9 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
           for (const issueMatch of issueMatches) {
             const issueContent = issueMatch.replace(/^[•\d\.-🔴]\s*/, '').trim();
             
-            // Validate the issue content
+            // Validate the issue content (remove threshold validation)
             if (issueContent.length > 5 && 
-                !issueContent.toLowerCase().includes('template') &&
-                this.validateCriticalIssueByThreshold(issueContent)) {
+                !issueContent.toLowerCase().includes('template')) {
               sectionIssueCount++;
               console.log(`✅ Valid critical issue in section: ${issueContent.substring(0, 50)}...`);
             }
@@ -2028,10 +2023,8 @@ Total maksimal ${REVIEW_MAX_SUGGESTIONS} poin utama di semua kategori. Contoh so
       
       // If no specific markers found, treat the entire section as one issue if it's substantial
       if (sectionIssueCount === 0 && content.length > 20) {
-        if (this.validateCriticalIssueByThreshold(content)) {
-          sectionIssueCount = 1;
-          console.log(`✅ Valid critical issue (whole section): ${content.substring(0, 50)}...`);
-        }
+        sectionIssueCount = 1;
+        console.log(`✅ Valid critical issue (whole section): ${content.substring(0, 50)}...`);
       }
       
       totalCount += sectionIssueCount;
