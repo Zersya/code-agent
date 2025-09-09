@@ -158,3 +158,118 @@ export interface IssueTrackingFilters {
   projectId?: number;
   status?: string;
 }
+
+// Feature Completion Rate Types
+export interface NotionTask {
+  id?: number;
+  notion_page_id: string;
+  title: string;
+  status: string;
+  assignee_username?: string;
+  assignee_name?: string;
+  project_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TaskMRMapping {
+  id?: number;
+  notion_task_id: number;
+  project_id: number;
+  merge_request_iid: number;
+  merge_request_id: number;
+  is_merged?: boolean;
+  merged_at?: string;
+  created_at?: string;
+}
+
+export interface FeatureCompletionRate {
+  id?: number;
+  username: string;
+  project_id?: number;
+  month: number;
+  year: number;
+  total_tasks: number;
+  tasks_with_mrs: number;
+  completed_tasks: number;
+  completion_rate: number;
+  calculated_at?: string;
+}
+
+export interface CompletionRateResponse {
+  username: string;
+  projectId?: number;
+  month: number;
+  year: number;
+  totalTasks: number;
+  tasksWithMRs: number;
+  completedTasks: number;
+  completionRate: number;
+  calculatedAt: string;
+}
+
+export interface TeamCompletionRateResponse {
+  month: number;
+  year: number;
+  projectId?: number;
+  teamStats: {
+    totalDevelopers: number;
+    avgCompletionRate: number;
+    totalTasks: number;
+    totalCompletedTasks: number;
+  };
+  developers: CompletionRateResponse[];
+}
+
+export interface CompletionRateTrend {
+  month: number;
+  year: number;
+  completionRate: number;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface CompletionRateTrendsResponse {
+  username: string;
+  projectId?: number;
+  trends: CompletionRateTrend[];
+}
+
+export interface ProjectCompletionRateResponse {
+  projectId: number;
+  projectName?: string;
+  month: number;
+  year: number;
+  teamStats: {
+    totalDevelopers: number;
+    avgCompletionRate: number;
+    totalTasks: number;
+    totalCompletedTasks: number;
+  };
+  developers: CompletionRateResponse[];
+}
+
+export interface CompletionRateStatsResponse {
+  totalDevelopers: number;
+  totalTasks: number;
+  totalCompletedTasks: number;
+  overallCompletionRate: number;
+  topPerformers: Array<{
+    username: string;
+    completionRate: number;
+    totalTasks: number;
+  }>;
+  monthlyTrends: Array<{
+    month: number;
+    year: number;
+    avgCompletionRate: number;
+    totalTasks: number;
+  }>;
+}
+
+export interface CompletionRateFilters {
+  month?: string; // Format: YYYY-MM
+  projectId?: number;
+  username?: string;
+  months?: number; // For trends
+}

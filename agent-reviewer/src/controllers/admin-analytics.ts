@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { dbService } from '../services/database.js';
 import { queueService } from '../services/queue.js';
 import { performanceService } from '../services/performance.js';
+import { completionRateService } from '../services/completion-rate.js';
 import { format, subDays, startOfDay } from 'date-fns';
 import { gitlabService } from '../services/gitlab.js';
 
@@ -1059,5 +1060,218 @@ async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
   } catch (error) {
     console.error('Error computing issue categories:', error)
     return zeroResult
+  }
+}
+
+/**
+ * Get completion rate for specific developer and month
+ */
+export async function getCompletionRate(req: Request, res: Response) {
+  try {
+    const { developerId } = req.params;
+    const { month } = req.query;
+
+    if (!developerId) {
+      res.status(400).json({
+        success: false,
+        error: 'Developer ID is required'
+      });
+      return;
+    }
+
+    // Parse month parameter (YYYY-MM format)
+    let targetMonth: number;
+    let targetYear: number;
+
+    if (month) {
+      const [yearStr, monthStr] = (month as string).split('-');
+      targetYear = parseInt(yearStr);
+      targetMonth = parseInt(monthStr);
+    } else {
+      // Default to current month
+      const now = new Date();
+      targetMonth = now.getMonth() + 1;
+      targetYear = now.getFullYear();
+    }
+
+    // Get developer username (assuming developerId is username for now)
+    const username = developerId;
+
+    const result = await completionRateService.calculateCompletionRate(
+      username,
+      targetMonth,
+      targetYear
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting completion rate:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get completion rate'
+    });
+  }
+}
+
+/**
+ * Get team-wide completion rates
+ */
+export async function getTeamCompletionRates(req: Request, res: Response) {
+  try {
+    const { month, projectId } = req.query;
+
+    // Parse month parameter (YYYY-MM format)
+    let targetMonth: number;
+    let targetYear: number;
+
+    if (month) {
+      const [yearStr, monthStr] = (month as string).split('-');
+      targetYear = parseInt(yearStr);
+      targetMonth = parseInt(monthStr);
+    } else {
+      // Default to current month
+      const now = new Date();
+      targetMonth = now.getMonth() + 1;
+      targetYear = now.getFullYear();
+    }
+
+    const result = await completionRateService.getTeamCompletionRates(
+      targetMonth,
+      targetYear,
+      projectId ? parseInt(projectId as string) : undefined
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting team completion rates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get team completion rates'
+    });
+  }
+}
+
+/**
+ * Get completion rate trends for a developer
+ */
+export async function getCompletionRateTrends(req: Request, res: Response) {
+  try {
+    const { developerId } = req.params;
+    const { months, projectId } = req.query;
+
+    if (!developerId) {
+      res.status(400).json({
+        success: false,
+        error: 'Developer ID is required'
+      });
+      return;
+    }
+
+    const username = developerId;
+    const monthsCount = months ? parseInt(months as string) : 6;
+
+    const result = await completionRateService.getCompletionRateTrends(
+      username,
+      monthsCount,
+      projectId ? parseInt(projectId as string) : undefined
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting completion rate trends:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get completion rate trends'
+    });
+  }
+}
+
+/**
+ * Get project completion rates
+ */
+export async function getProjectCompletionRates(req: Request, res: Response) {
+  try {
+    const { projectId } = req.params;
+    const { month } = req.query;
+
+    if (!projectId) {
+      res.status(400).json({
+        success: false,
+        error: 'Project ID is required'
+      });
+      return;
+    }
+
+    // Parse month parameter (YYYY-MM format)
+    let targetMonth: number;
+    let targetYear: number;
+
+    if (month) {
+      const [yearStr, monthStr] = (month as string).split('-');
+      targetYear = parseInt(yearStr);
+      targetMonth = parseInt(monthStr);
+    } else {
+      // Default to current month
+      const now = new Date();
+      targetMonth = now.getMonth() + 1;
+      targetYear = now.getFullYear();
+    }
+
+    // Use getTeamCompletionRates with projectId filter for project-specific data
+    const result = await completionRateService.getTeamCompletionRates(
+      targetMonth,
+      targetYear,
+      parseInt(projectId)
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting project completion rates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get project completion rates'
+    });
+  }
+}
+
+/**
+ * Get completion rate statistics summary
+ */
+export async function getCompletionRateStats(req: Request, res: Response) {
+  try {
+    const { projectId, dateFrom, dateTo } = req.query;
+
+    // For now, return basic stats - this can be enhanced later
+    const result = {
+      totalDevelopers: 0,
+      avgCompletionRate: 0,
+      totalTasks: 0,
+      totalCompletedTasks: 0,
+      topPerformers: [],
+      monthlyTrends: []
+    };
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting completion rate stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get completion rate stats'
+    });
   }
 }

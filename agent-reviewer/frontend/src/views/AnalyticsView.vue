@@ -513,6 +513,218 @@
       </div>
     </div>
 
+    <!-- Feature Completion Rate Analytics Section -->
+    <div class="mt-8">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Feature Completion Rate Analytics</h2>
+        <div class="flex space-x-3">
+          <select
+            v-model="selectedCompletionRateMonth"
+            @change="handleCompletionRateMonthChange"
+            class="input text-sm"
+          >
+            <option v-for="month in availableMonths" :key="month.value" :value="month.value">
+              {{ month.label }}
+            </option>
+          </select>
+          <BaseButton
+            @click="refreshCompletionRates"
+            :loading="analyticsStore.isLoading"
+            size="sm"
+            variant="secondary"
+          >
+            Refresh
+          </BaseButton>
+        </div>
+      </div>
+
+      <!-- Completion Rate Overview Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <BaseCard title="Overall Completion Rate">
+          <div class="text-center">
+            <p class="text-3xl font-bold text-green-600">
+              {{ analyticsStore.completionRateData.stats?.overallCompletionRate?.toFixed(1) || '0' }}%
+            </p>
+            <p class="text-sm text-gray-600">Average completion rate</p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ analyticsStore.completionRateData.stats?.totalDevelopers || 0 }} developers
+            </p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Total Tasks">
+          <div class="text-center">
+            <p class="text-3xl font-bold text-blue-600">
+              {{ analyticsStore.completionRateData.stats?.totalTasks?.toLocaleString() || '0' }}
+            </p>
+            <p class="text-sm text-gray-600">Tasks tracked</p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ analyticsStore.completionRateData.stats?.totalCompletedTasks || 0 }} completed
+            </p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Team Performance">
+          <div class="text-center">
+            <p class="text-3xl font-bold text-purple-600">
+              {{ analyticsStore.completionRateData.teamRates?.teamStats?.avgCompletionRate?.toFixed(1) || '0' }}%
+            </p>
+            <p class="text-sm text-gray-600">This month</p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ analyticsStore.completionRateData.teamRates?.teamStats?.totalTasks || 0 }} tasks
+            </p>
+          </div>
+        </BaseCard>
+
+        <BaseCard title="Top Performer">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-orange-600">
+              {{ getTopPerformer()?.username || 'N/A' }}
+            </p>
+            <p class="text-sm text-gray-600">
+              {{ getTopPerformer()?.completionRate?.toFixed(1) || '0' }}% completion
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ getTopPerformer()?.totalTasks || 0 }} tasks
+            </p>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- Team Completion Rates Table -->
+      <div class="mb-8">
+        <BaseCard title="Developer Completion Rates">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Developer
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Tasks
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Completed
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Completion Rate
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tasks with MRs
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="developer in analyticsStore.completionRateData.teamRates?.developers || []" :key="developer.username" class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 h-8 w-8">
+                        <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span class="text-sm font-medium text-gray-700">{{ getInitials(developer.username) }}</span>
+                        </div>
+                      </div>
+                      <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-900">{{ developer.username }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ developer.totalTasks }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ developer.completedTasks }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm font-medium" :class="getCompletionRateColor(developer.completionRate)">
+                            {{ developer.completionRate?.toFixed(1) }}%
+                          </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            class="h-2 rounded-full transition-all duration-300"
+                            :class="getCompletionRateBarColor(developer.completionRate)"
+                            :style="{ width: developer.completionRate + '%' }"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ developer.tasksWithMRs }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- Completion Rate Trends -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Monthly Trends Chart -->
+        <BaseCard title="Monthly Completion Rate Trends">
+          <div class="space-y-4">
+            <div v-if="!analyticsStore.completionRateData.stats?.monthlyTrends?.length" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No trend data available</p>
+            </div>
+            <div v-else class="space-y-3">
+              <div v-for="trend in analyticsStore.completionRateData.stats?.monthlyTrends?.slice(0, 6)" :key="`${trend.year}-${trend.month}`" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <span class="text-sm font-medium text-gray-900">{{ formatMonthYear(trend.month, trend.year) }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <div class="w-24 bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-green-600 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: trend.avgCompletionRate + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-sm text-gray-600 w-12 text-right">{{ trend.avgCompletionRate?.toFixed(1) }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Top Performers -->
+        <BaseCard title="Top Performers">
+          <div class="space-y-3">
+            <div v-if="!analyticsStore.completionRateData.stats?.topPerformers?.length" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <p>No performance data available</p>
+            </div>
+            <div v-else>
+              <div v-for="(performer, index) in analyticsStore.completionRateData.stats?.topPerformers?.slice(0, 5)" :key="performer.username" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" :class="getPerformerRankColor(index)">
+                    {{ index + 1 }}
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">{{ performer.username }}</p>
+                    <p class="text-xs text-gray-500">{{ performer.totalTasks }} tasks</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-sm font-semibold" :class="getCompletionRateColor(performer.completionRate)">
+                    {{ performer.completionRate?.toFixed(1) }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+    </div>
+
     <!-- Merge Request Analytics Section -->
     <div v-if="analyticsStore.analytics.mergeRequestMetrics" class="mt-8">
       <h2 class="text-xl font-bold text-gray-900 mb-6">Merge Request Analytics</h2>
@@ -798,6 +1010,7 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
 const selectedDateRange = ref('30')
+const selectedCompletionRateMonth = ref(format(new Date(), 'yyyy-MM'))
 
 const customDateRange = reactive({
   from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -810,6 +1023,27 @@ const tooltip = reactive({
   y: 0,
   content: ''
 })
+
+// Computed properties for completion rates
+const availableMonths = computed(() => {
+  const months = []
+  const now = new Date()
+
+  for (let i = 0; i < 12; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      value: format(date, 'yyyy-MM'),
+      label: format(date, 'MMMM yyyy')
+    })
+  }
+
+  return months
+})
+
+const getTopPerformer = () => {
+  const performers = analyticsStore.completionRateData.stats?.topPerformers
+  return performers && performers.length > 0 ? performers[0] : null
+}
 
 // Helper functions
 const getInitials = (name: string): string => {
@@ -831,6 +1065,32 @@ const getSuccessRateBarColor = (rate: number): string => {
   if (rate >= 90) return 'bg-green-500'
   if (rate >= 70) return 'bg-yellow-500'
   return 'bg-red-500'
+}
+
+const getCompletionRateColor = (rate: number): string => {
+  if (rate >= 80) return 'text-green-600'
+  if (rate >= 60) return 'text-yellow-600'
+  if (rate >= 40) return 'text-orange-600'
+  return 'text-red-600'
+}
+
+const getCompletionRateBarColor = (rate: number): string => {
+  if (rate >= 80) return 'bg-green-500'
+  if (rate >= 60) return 'bg-yellow-500'
+  if (rate >= 40) return 'bg-orange-500'
+  return 'bg-red-500'
+}
+
+const getPerformerRankColor = (index: number): string => {
+  if (index === 0) return 'bg-yellow-500 text-white' // Gold
+  if (index === 1) return 'bg-gray-400 text-white'   // Silver
+  if (index === 2) return 'bg-orange-600 text-white' // Bronze
+  return 'bg-blue-500 text-white'
+}
+
+const formatMonthYear = (month: number, year: number): string => {
+  const date = new Date(year, month - 1, 1)
+  return format(date, 'MMM yyyy')
 }
 
 const getMaxDailyMRs = (): number => {
@@ -1058,7 +1318,30 @@ const refreshAnalytics = async () => {
   }
 }
 
+const handleCompletionRateMonthChange = () => {
+  refreshCompletionRates()
+}
+
+const refreshCompletionRates = async () => {
+  try {
+    const filters = {
+      month: selectedCompletionRateMonth.value
+    }
+
+    // Fetch team completion rates
+    await analyticsStore.fetchTeamCompletionRates(filters)
+
+    // Fetch completion rate stats
+    await analyticsStore.fetchCompletionRateStats(filters)
+
+    console.log('Completion rate data loaded:', analyticsStore.completionRateData)
+  } catch (error) {
+    console.error('Error refreshing completion rates:', error)
+  }
+}
+
 onMounted(() => {
   handleDateRangeChange()
+  refreshCompletionRates()
 })
 </script>

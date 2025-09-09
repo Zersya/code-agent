@@ -727,6 +727,92 @@ export class NotionService {
   }
 
   /**
+   * Extract assignee information from Notion page properties
+   */
+  private extractAssigneeInfo(properties: Record<string, any>): {
+    assigneeId?: number;
+    assigneeUsername?: string;
+    assigneeName?: string;
+  } {
+    // Common property names for assignee fields
+    const assigneePropertyNames = [
+      'assignee', 'assigned to', 'assigned_to', 'owner', 'responsible',
+      'developer', 'dev', 'person', 'people'
+    ];
+
+    for (const [propertyName, property] of Object.entries(properties)) {
+      const propertyNameLower = propertyName.toLowerCase();
+
+      // Check if this property might contain assignee information
+      if (assigneePropertyNames.some(name => propertyNameLower.includes(name))) {
+        // Handle different property types
+        if (property.type === 'people' && property.people && property.people.length > 0) {
+          const person = property.people[0]; // Take first assignee if multiple
+          return {
+            assigneeId: person.id ? this.hashStringToNumber(person.id) : undefined,
+            assigneeUsername: person.name || person.email?.split('@')[0],
+            assigneeName: person.name
+          };
+        } else if (property.type === 'rich_text' && property.rich_text && property.rich_text.length > 0) {
+          const text = property.rich_text[0].plain_text;
+          return {
+            assigneeUsername: text,
+            assigneeName: text
+          };
+        } else if (property.type === 'select' && property.select) {
+          return {
+            assigneeUsername: property.select.name,
+            assigneeName: property.select.name
+          };
+        }
+      }
+    }
+
+    return {};
+  }
+
+  /**
+   * Extract task status from Notion page properties
+   */
+  private extractTaskStatus(properties: Record<string, any>): string {
+    // Common property names for status fields
+    const statusPropertyNames = [
+      'status', 'state', 'progress', 'stage', 'phase'
+    ];
+
+    for (const [propertyName, property] of Object.entries(properties)) {
+      const propertyNameLower = propertyName.toLowerCase();
+
+      if (statusPropertyNames.some(name => propertyNameLower.includes(name))) {
+        if (property.type === 'select' && property.select) {
+          return property.select.name;
+        } else if (property.type === 'status' && property.status) {
+          return property.status.name;
+        } else if (property.type === 'checkbox') {
+          return property.checkbox ? 'Completed' : 'In Progress';
+        } else if (property.type === 'rich_text' && property.rich_text && property.rich_text.length > 0) {
+          return property.rich_text[0].plain_text;
+        }
+      }
+    }
+
+    return 'Unknown';
+  }
+
+  /**
+   * Hash a string to a number (for generating consistent IDs)
+   */
+  private hashStringToNumber(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  /**
    * Parse Notion page content to extract task context
    */
   private parseNotionPage(pageContent: NotionPageContent, originalUrl: string): NotionTaskContext {
@@ -996,6 +1082,115 @@ export class NotionService {
       todoInsights,
       overallProgress
     };
+  }
+
+  /**
+   * Store task data from Notion page content
+   */
+  async storeTaskFromPageContent(
+    pageContent: NotionPageContent,
+    originalUrl: string,
+    projectId?: number
+  ): Promise<any> {
+    try {
+      // Import dbService here to avoid circular dependency
+      const { dbService } = await import('./database.js');
+
+      // Extract assignee and status information
+      const assigneeInfo = this.extractAssigneeInfo(pageContent.properties);
+      const status = this.extractTaskStatus(pageContent.properties);
+
+      // Determine completion date based on status
+      const completedAt = this.isTaskCompleted(status) ? new Date() : undefined;
+
+      // Create task data
+      const taskData = {
+        notion_page_id: pageContent.id,
+        title: pageContent.title,
+        status,
+        assignee_id: assigneeInfo.assigneeId,
+        assignee_username: assigneeInfo.assigneeUsername,
+        assignee_name: assigneeInfo.assigneeName,
+        project_id: projectId,
+        completed_at: completedAt
+      };
+
+      // Store in database
+      const storedTask = await dbService.upsertNotionTask(taskData);
+      console.log(`Stored Notion task: ${storedTask.title} (ID: ${storedTask.id})`);
+
+      return storedTask;
+    } catch (error) {
+      console.error('Error storing Notion task:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch and store task context with assignee information
+   */
+  async fetchAndStoreTaskContext(notionUrl: string, projectId?: number): Promise<any> {
+    try {
+      // Extract page ID from URL
+      const pageId = this.extractPageIdFromUrl(notionUrl);
+      if (!pageId) {
+        throw new Error(`Invalid Notion URL format: ${notionUrl}`);
+      }
+
+      // Fetch page content
+      const pageContent = await this.fetchPageContent(pageId);
+
+      // Store task data
+      const storedTask = await this.storeTaskFromPageContent(pageContent, notionUrl, projectId);
+
+      // Also return the parsed task context for backward compatibility
+      const taskContext = this.parseNotionPage(pageContent, notionUrl);
+
+      return {
+        storedTask,
+        taskContext
+      };
+    } catch (error) {
+      console.error(`Error fetching and storing task context from ${notionUrl}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a task status indicates completion
+   */
+  private isTaskCompleted(status: string): boolean {
+    const completedStatuses = [
+      'done', 'completed', 'finished', 'closed', 'resolved', 'shipped', 'deployed'
+    ];
+    return completedStatuses.some(completedStatus =>
+      status.toLowerCase().includes(completedStatus)
+    );
+  }
+
+  /**
+   * Get tasks by assignee and date range
+   */
+  async getTasksByAssignee(
+    assigneeUsername: string,
+    dateFrom?: Date,
+    dateTo?: Date,
+    projectId?: number
+  ): Promise<any[]> {
+    try {
+      // Import dbService here to avoid circular dependency
+      const { dbService } = await import('./database.js');
+
+      return await dbService.getNotionTasksByAssignee(
+        assigneeUsername,
+        dateFrom,
+        dateTo,
+        projectId
+      );
+    } catch (error) {
+      console.error('Error getting tasks by assignee:', error);
+      throw error;
+    }
   }
 
   /**

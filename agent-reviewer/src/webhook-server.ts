@@ -22,7 +22,18 @@ import {
 import { adminLogin, adminLogout, getAdminUser } from './controllers/admin-auth.js';
 import { getReviewHistory, exportReviewHistory } from './controllers/admin-reviews.js';
 import { getMergeRequests, getMergeRequest, getUserMRStatistics, exportMergeRequests, updateMergeRequestFixesCount, updateMergeRequestReviewStatus } from './controllers/admin-merge-requests.js';
-import { getAnalytics, getSystemHealth, getDeveloperPerformanceAnalytics, getMRQualityAnalytics, getIssueTrackingAnalytics } from './controllers/admin-analytics.js';
+import {
+  getAnalytics,
+  getSystemHealth,
+  getDeveloperPerformanceAnalytics,
+  getMRQualityAnalytics,
+  getIssueTrackingAnalytics,
+  getCompletionRate,
+  getTeamCompletionRates,
+  getCompletionRateTrends,
+  getProjectCompletionRates,
+  getCompletionRateStats
+} from './controllers/admin-analytics.js';
 import {
   getWhatsAppConfigurations,
   getWhatsAppConfiguration,
@@ -167,6 +178,13 @@ app.get('/api/system/health', adminAuth, getSystemHealth);
 app.get('/api/analytics/developers', adminAuth, getDeveloperPerformanceAnalytics);
 app.get('/api/analytics/merge-requests', adminAuth, getMRQualityAnalytics);
 app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
+
+// Feature Completion Rate Analytics endpoints
+app.get('/api/analytics/completion-rate/:developerId', adminAuth, getCompletionRate);
+app.get('/api/analytics/completion-rate/team', adminAuth, getTeamCompletionRates);
+app.get('/api/analytics/completion-rate/trends/:developerId', adminAuth, getCompletionRateTrends);
+app.get('/api/analytics/completion-rate/projects/:projectId', adminAuth, getProjectCompletionRates);
+app.get('/api/analytics/completion-rate/stats', adminAuth, getCompletionRateStats);
 
 // WhatsApp Configuration endpoints
 app.get('/api/whatsapp/configurations', adminAuth, getWhatsAppConfigurations);

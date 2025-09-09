@@ -135,3 +135,110 @@ export interface IssueTrackingFilters {
   projectId?: number;
   status?: string;
 }
+
+// Feature Completion Rate Types
+export interface NotionTask {
+  id?: number;
+  notion_page_id: string;
+  title: string;
+  status: string;
+  assignee_id?: number;
+  assignee_username?: string;
+  assignee_name?: string;
+  project_id?: number;
+  created_at: Date;
+  completed_at?: Date;
+  updated_at?: Date;
+  // Joined fields
+  project_name?: string;
+}
+
+export interface TaskMRMapping {
+  id?: number;
+  notion_task_id: number;
+  project_id: number;
+  merge_request_iid: number;
+  merge_request_id: number;
+  created_at: Date;
+  updated_at?: Date;
+  // Joined fields
+  task_title?: string;
+  mr_title?: string;
+  mr_status?: string;
+  mr_merged_at?: Date;
+}
+
+export interface FeatureCompletionRate {
+  id?: number;
+  developer_id?: number;
+  username: string;
+  project_id: number;
+  month: number;
+  year: number;
+  total_tasks: number;
+  tasks_with_mrs: number;
+  completed_tasks: number;
+  completion_rate: number;
+  calculated_at: Date;
+  created_at?: Date;
+  updated_at?: Date;
+  // Joined fields
+  project_name?: string;
+  developer_name?: string;
+}
+
+export interface CompletionRateBreakdown {
+  taskId: number;
+  taskTitle: string;
+  taskStatus: string;
+  hasAssociatedMR: boolean;
+  mrStatus?: string;
+  mrMergedAt?: Date;
+  isCompleted: boolean;
+}
+
+export interface CompletionRateResponse {
+  developerId?: number;
+  username: string;
+  month: string;
+  totalTasks: number;
+  tasksWithMRs: number;
+  completedTasks: number;
+  completionRate: number;
+  taskBreakdown: CompletionRateBreakdown[];
+  projectId?: number;
+  projectName?: string;
+}
+
+export interface TeamCompletionRateResponse {
+  month: string;
+  teamStats: {
+    avgCompletionRate: number;
+    totalDevelopers: number;
+    totalTasks: number;
+    totalCompletedTasks: number;
+  };
+  developers: CompletionRateResponse[];
+}
+
+export interface CompletionRateTrend {
+  month: string;
+  completionRate: number;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface CompletionRateTrendsResponse {
+  developerId?: number;
+  username: string;
+  trends: CompletionRateTrend[];
+}
+
+export interface CompletionRateFilters {
+  month?: string;
+  developerId?: number;
+  username?: string;
+  projectId?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}

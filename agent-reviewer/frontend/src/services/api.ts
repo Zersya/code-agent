@@ -25,7 +25,13 @@ import type {
   DeveloperPerformanceMetrics,
   MRQualityMetrics,
   IssueMetrics,
-  PerformanceFilters
+  PerformanceFilters,
+  CompletionRateResponse,
+  TeamCompletionRateResponse,
+  CompletionRateTrendsResponse,
+  ProjectCompletionRateResponse,
+  CompletionRateStatsResponse,
+  CompletionRateFilters
 } from '@/types/performance'
 import type {
   WhatsAppConfiguration,
@@ -265,6 +271,24 @@ export const performanceApi = {
 
   getIssueMetrics: (filters?: PerformanceFilters): Promise<ApiResponse<IssueMetrics[]>> =>
     apiClient.get<IssueMetrics[]>('/analytics/issues', filters),
+}
+
+// Completion Rate API
+export const completionRateApi = {
+  getCompletionRate: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateResponse>> =>
+    apiClient.get<CompletionRateResponse>(`/analytics/completion-rate/${developerId}`, filters),
+
+  getTeamCompletionRates: (filters?: CompletionRateFilters): Promise<ApiResponse<TeamCompletionRateResponse>> =>
+    apiClient.get<TeamCompletionRateResponse>('/analytics/completion-rate/team', filters),
+
+  getCompletionRateTrends: (developerId: string, filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateTrendsResponse>> =>
+    apiClient.get<CompletionRateTrendsResponse>(`/analytics/completion-rate/trends/${developerId}`, filters),
+
+  getProjectCompletionRates: (projectId: number, filters?: CompletionRateFilters): Promise<ApiResponse<ProjectCompletionRateResponse>> =>
+    apiClient.get<ProjectCompletionRateResponse>(`/analytics/completion-rate/projects/${projectId}`, filters),
+
+  getCompletionRateStats: (filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateStatsResponse>> =>
+    apiClient.get<CompletionRateStatsResponse>('/analytics/completion-rate/stats', filters),
 }
 
 // WhatsApp API

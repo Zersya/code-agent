@@ -8,6 +8,8 @@ import { reviewService } from '../services/review.js';
 import { webhookDeduplicationService } from '../services/webhook-deduplication.js';
 import { performanceService } from '../services/performance.js';
 import { whatsappService } from '../services/whatsapp.js';
+import { taskMRMappingService } from '../services/task-mr-mapping.js';
+import { completionRateService } from '../services/completion-rate.js';
 import { EmbeddingBatch, ProjectMetadata } from '../models/embedding.js';
 import { WhatsAppNotificationContext, NotificationType } from '../models/whatsapp.js';
 
@@ -483,6 +485,22 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
     //   return;
     // }
 
+    // Process task-MR mappings for Notion URLs in description
+    try {
+      if (event.object_attributes.description) {
+        await taskMRMappingService.processMergeRequestForTaskMapping(
+          projectId,
+          mergeRequestIid,
+          event.object_attributes.id,
+          event.object_attributes.description,
+          event.user?.username
+        );
+        console.log(`Processed task-MR mappings for MR !${mergeRequestIid}`);
+      }
+    } catch (taskMappingError) {
+      console.error(`Error processing task mappings for MR !${mergeRequestIid}:`, taskMappingError);
+    }
+
     console.log(`Successfully processed merge request event for project ${projectId}, MR !${mergeRequestIid}`);
   } catch (error) {
     console.error('Error processing merge request event:', error);
@@ -556,6 +574,26 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
         console.log(`Processed performance metrics for merged MR !${mergeRequestIid}`);
       } catch (metricsError) {
         console.error(`Error processing performance metrics for MR !${mergeRequestIid}:`, metricsError);
+      }
+
+      // Update task completion status for associated Notion tasks
+      try {
+        await taskMRMappingService.updateTaskCompletionOnMerge(projectId, mergeRequestIid);
+        console.log(`Updated task completion status for merged MR !${mergeRequestIid}`);
+      } catch (taskError) {
+        console.error(`Error updating task completion for MR !${mergeRequestIid}:`, taskError);
+      }
+
+      // Trigger completion rate recalculation
+      try {
+        await completionRateService.onMergeRequestMerged(
+          projectId,
+          mergeRequestIid,
+          updateData.author_username
+        );
+        console.log(`Triggered completion rate recalculation for merged MR !${mergeRequestIid}`);
+      } catch (completionRateError) {
+        console.error(`Error recalculating completion rate for MR !${mergeRequestIid}:`, completionRateError);
       }
     } catch (updateError) {
       console.error(`Error updating merge request tracking data for MR !${mergeRequestIid}:`, updateError);

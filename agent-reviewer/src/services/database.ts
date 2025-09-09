@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
 import { MergeRequestTrackingRecord, UserMRStatisticsRecord } from '../models/merge-request.js';
-import { DeveloperPerformanceMetrics, MRQualityMetrics, NotionIssue } from '../types/performance.js';
+import { DeveloperPerformanceMetrics, MRQualityMetrics, NotionIssue, NotionTask, TaskMRMapping, FeatureCompletionRate } from '../types/performance.js';
 import { WhatsAppConfiguration, WhatsAppConfigurationRecord } from '../models/whatsapp.js';
 
 dotenv.config();
@@ -698,6 +698,55 @@ class DatabaseService {
         )
       `);
 
+      // Create feature completion rate tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS notion_tasks (
+          id SERIAL PRIMARY KEY,
+          notion_page_id TEXT NOT NULL UNIQUE,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL,
+          assignee_id INTEGER,
+          assignee_username TEXT,
+          assignee_name TEXT,
+          project_id INTEGER,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          completed_at TIMESTAMP WITH TIME ZONE,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS task_mr_mappings (
+          id SERIAL PRIMARY KEY,
+          notion_task_id INTEGER NOT NULL REFERENCES notion_tasks(id) ON DELETE CASCADE,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          merge_request_id INTEGER NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(notion_task_id, project_id, merge_request_iid)
+        )
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS feature_completion_rates (
+          id SERIAL PRIMARY KEY,
+          developer_id INTEGER,
+          username TEXT NOT NULL,
+          project_id INTEGER NOT NULL,
+          month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+          year INTEGER NOT NULL CHECK (year >= 2020),
+          total_tasks INTEGER NOT NULL DEFAULT 0,
+          tasks_with_mrs INTEGER NOT NULL DEFAULT 0,
+          completed_tasks INTEGER NOT NULL DEFAULT 0,
+          completion_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+          calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(username, project_id, month, year)
+        )
+      `);
+
       // Create indexes for developer performance tables
       await client.query('CREATE INDEX IF NOT EXISTS idx_developer_performance_username ON developer_performance(username)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_developer_performance_project ON developer_performance(project_id)');
@@ -709,6 +758,17 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_project ON issue_metrics(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_username ON issue_metrics(username)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_issue_metrics_status ON issue_metrics(status)');
+
+      // Create indexes for feature completion rate tables
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_tasks_page_id ON notion_tasks(notion_page_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_tasks_assignee ON notion_tasks(assignee_username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_tasks_project ON notion_tasks(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_notion_tasks_status ON notion_tasks(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_task_mr_mappings_task ON task_mr_mappings(notion_task_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_task_mr_mappings_mr ON task_mr_mappings(project_id, merge_request_iid)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_developer ON feature_completion_rates(username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_project ON feature_completion_rates(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_date ON feature_completion_rates(year, month)');
 
       console.log('Database schema initialized');
     } catch (error) {
@@ -2903,6 +2963,251 @@ class DatabaseService {
     `;
 
     const result = await this.query(query, [notificationType]);
+    return result.rows;
+  }
+
+  // Feature Completion Rate Methods
+
+  /**
+   * Create or update a Notion task
+   */
+  async upsertNotionTask(task: Omit<NotionTask, 'id' | 'created_at' | 'updated_at'>): Promise<NotionTask> {
+    const query = `
+      INSERT INTO notion_tasks (
+        notion_page_id, title, status, assignee_id, assignee_username,
+        assignee_name, project_id, completed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (notion_page_id)
+      DO UPDATE SET
+        title = EXCLUDED.title,
+        status = EXCLUDED.status,
+        assignee_id = EXCLUDED.assignee_id,
+        assignee_username = EXCLUDED.assignee_username,
+        assignee_name = EXCLUDED.assignee_name,
+        project_id = EXCLUDED.project_id,
+        completed_at = EXCLUDED.completed_at,
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const result = await this.query(query, [
+      task.notion_page_id,
+      task.title,
+      task.status,
+      task.assignee_id,
+      task.assignee_username,
+      task.assignee_name,
+      task.project_id,
+      task.completed_at
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Get Notion task by page ID
+   */
+  async getNotionTaskByPageId(pageId: string): Promise<NotionTask | null> {
+    const query = `
+      SELECT * FROM notion_tasks
+      WHERE notion_page_id = $1
+    `;
+
+    const result = await this.query(query, [pageId]);
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Get Notion tasks by assignee and date range
+   */
+  async getNotionTasksByAssignee(
+    assigneeUsername: string,
+    dateFrom?: Date,
+    dateTo?: Date,
+    projectId?: number
+  ): Promise<NotionTask[]> {
+    let query = `
+      SELECT * FROM notion_tasks
+      WHERE assignee_username = $1
+    `;
+    const params: any[] = [assigneeUsername];
+    let paramIndex = 2;
+
+    if (dateFrom) {
+      query += ` AND created_at >= $${paramIndex}`;
+      params.push(dateFrom);
+      paramIndex++;
+    }
+
+    if (dateTo) {
+      query += ` AND created_at <= $${paramIndex}`;
+      params.push(dateTo);
+      paramIndex++;
+    }
+
+    if (projectId) {
+      query += ` AND project_id = $${paramIndex}`;
+      params.push(projectId);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await this.query(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Create a task-MR mapping
+   */
+  async createTaskMRMapping(mapping: Omit<TaskMRMapping, 'id' | 'created_at' | 'updated_at'>): Promise<TaskMRMapping> {
+    const query = `
+      INSERT INTO task_mr_mappings (
+        notion_task_id, project_id, merge_request_iid, merge_request_id
+      ) VALUES ($1, $2, $3, $4)
+      ON CONFLICT (notion_task_id, project_id, merge_request_iid)
+      DO UPDATE SET
+        merge_request_id = EXCLUDED.merge_request_id,
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const result = await this.query(query, [
+      mapping.notion_task_id,
+      mapping.project_id,
+      mapping.merge_request_iid,
+      mapping.merge_request_id
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Get task-MR mappings for a task
+   */
+  async getTaskMRMappings(taskId: number): Promise<TaskMRMapping[]> {
+    const query = `
+      SELECT tmm.*, mrt.title as mr_title, mrt.status as mr_status, mrt.merged_at as mr_merged_at
+      FROM task_mr_mappings tmm
+      LEFT JOIN merge_request_tracking mrt ON tmm.project_id = mrt.project_id
+        AND tmm.merge_request_iid = mrt.merge_request_iid
+      WHERE tmm.notion_task_id = $1
+    `;
+
+    const result = await this.query(query, [taskId]);
+    return result.rows;
+  }
+
+  /**
+   * Get task-MR mappings for a merge request
+   */
+  async getTaskMRMappingsByMR(projectId: number, mergeRequestIid: number): Promise<TaskMRMapping[]> {
+    const query = `
+      SELECT tmm.*, nt.title as task_title
+      FROM task_mr_mappings tmm
+      LEFT JOIN notion_tasks nt ON tmm.notion_task_id = nt.id
+      WHERE tmm.project_id = $1 AND tmm.merge_request_iid = $2
+    `;
+
+    const result = await this.query(query, [projectId, mergeRequestIid]);
+    return result.rows;
+  }
+
+  /**
+   * Create or update feature completion rate
+   */
+  async upsertFeatureCompletionRate(rate: Omit<FeatureCompletionRate, 'id' | 'created_at' | 'updated_at'>): Promise<FeatureCompletionRate> {
+    const query = `
+      INSERT INTO feature_completion_rates (
+        developer_id, username, project_id, month, year,
+        total_tasks, tasks_with_mrs, completed_tasks, completion_rate
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT (username, project_id, month, year)
+      DO UPDATE SET
+        developer_id = EXCLUDED.developer_id,
+        total_tasks = EXCLUDED.total_tasks,
+        tasks_with_mrs = EXCLUDED.tasks_with_mrs,
+        completed_tasks = EXCLUDED.completed_tasks,
+        completion_rate = EXCLUDED.completion_rate,
+        calculated_at = NOW(),
+        updated_at = NOW()
+      RETURNING *
+    `;
+
+    const result = await this.query(query, [
+      rate.developer_id,
+      rate.username,
+      rate.project_id,
+      rate.month,
+      rate.year,
+      rate.total_tasks,
+      rate.tasks_with_mrs,
+      rate.completed_tasks,
+      rate.completion_rate
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Get feature completion rates with filters
+   */
+  async getFeatureCompletionRates(filters: {
+    username?: string;
+    projectId?: number;
+    month?: number;
+    year?: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<FeatureCompletionRate[]> {
+    let query = `
+      SELECT fcr.*, p.name as project_name
+      FROM feature_completion_rates fcr
+      LEFT JOIN projects p ON fcr.project_id = p.project_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters.username) {
+      query += ` AND fcr.username = $${paramIndex}`;
+      params.push(filters.username);
+      paramIndex++;
+    }
+
+    if (filters.projectId) {
+      query += ` AND fcr.project_id = $${paramIndex}`;
+      params.push(filters.projectId);
+      paramIndex++;
+    }
+
+    if (filters.month) {
+      query += ` AND fcr.month = $${paramIndex}`;
+      params.push(filters.month);
+      paramIndex++;
+    }
+
+    if (filters.year) {
+      query += ` AND fcr.year = $${paramIndex}`;
+      params.push(filters.year);
+      paramIndex++;
+    }
+
+    if (filters.dateFrom) {
+      query += ` AND DATE(fcr.year || '-' || LPAD(fcr.month::text, 2, '0') || '-01') >= $${paramIndex}`;
+      params.push(filters.dateFrom);
+      paramIndex++;
+    }
+
+    if (filters.dateTo) {
+      query += ` AND DATE(fcr.year || '-' || LPAD(fcr.month::text, 2, '0') || '-01') <= $${paramIndex}`;
+      params.push(filters.dateTo);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY fcr.year DESC, fcr.month DESC, fcr.username`;
+
+    const result = await this.query(query, params);
     return result.rows;
   }
 }
