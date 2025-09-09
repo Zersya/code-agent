@@ -610,7 +610,7 @@
                       <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                           <span class="text-sm font-medium" :class="getSuccessRateColor(user.success_rate)">
-                            {{ user.success_rate.toFixed(1) }}%
+                            {{ user.success_rate?.toFixed(1) }}%
                           </span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
@@ -624,7 +624,7 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ user.avg_merge_time_hours.toFixed(1) }}h
+                    {{ user.avg_merge_time_hours?.toFixed(1) }}h
                   </td>
                 </tr>
               </tbody>
@@ -685,7 +685,7 @@
                       <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                           <span class="text-sm font-medium" :class="getSuccessRateColor(project.success_rate)">
-                            {{ project.success_rate.toFixed(1) }}%
+                            {{ project.success_rate?.toFixed(1) }}%
                           </span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
@@ -699,7 +699,7 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ project.avg_merge_time_hours.toFixed(1) }}h
+                    {{ project.avg_merge_time_hours?.toFixed(1) }}h
                   </td>
                 </tr>
               </tbody>
@@ -759,7 +759,7 @@
                       :style="{ width: (item.value / getMaxMergeTime() * 100) + '%' }"
                     ></div>
                   </div>
-                  <span class="text-sm text-gray-600 w-12 text-right">{{ item.value.toFixed(1) }}h</span>
+                  <span class="text-sm text-gray-600 w-12 text-right">{{ item.value?.toFixed(1) }}h</span>
                 </div>
               </div>
             </div>
