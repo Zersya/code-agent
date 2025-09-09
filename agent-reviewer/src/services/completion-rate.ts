@@ -71,7 +71,7 @@ export class CompletionRateService {
           taskStatus: task.status,
           hasAssociatedMR,
           mrStatus: mrMapping?.mr_status,
-          mrMergedAt: mrMapping?.mr_merged_at,
+          mrMergedAt: mrMapping?.mr_merged_at ? new Date(mrMapping.mr_merged_at) : undefined,
           isCompleted
         });
       }
