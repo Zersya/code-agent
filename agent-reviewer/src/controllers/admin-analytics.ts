@@ -820,6 +820,33 @@ export async function getIssueTrackingAnalytics(req: Request, res: Response) {
 }
 
 
+// Simple in-memory cache for issue categories per date range
+const issueCategoriesCache = new Map<string, { expires: number, data: Array<{ category: string, count: number, percentage: number }> }>();
+const ISSUE_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function makeIssueCatCacheKey(dateFrom: Date, dateTo: Date): string {
+  return `${dateFrom.toISOString()}__${dateTo.toISOString()}`;
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length) as any;
+  let idx = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (true) {
+      const current = idx++;
+      if (current >= items.length) break;
+      try {
+        results[current] = await fn(items[current]);
+      } catch (e) {
+        // store undefined to keep index alignment
+        results[current] = undefined as any;
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 // Compute Issue Categories by analyzing MR review comments within the given date range
 async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
   type Category = 'Code Quality' | 'Security' | 'Performance' | 'Documentation' | 'Testing'
@@ -862,6 +889,92 @@ async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
   const zeroResult = categories.map(cat => ({ category: cat, count: 0, percentage: 0 }))
 
   try {
+    // Fast path with cache + per-note fetching and concurrency limit
+    const cacheKey = makeIssueCatCacheKey(dateFrom, dateTo);
+    const cached = issueCategoriesCache.get(cacheKey);
+    if (cached && Date.now() < cached.expires) {
+      return cached.data;
+    }
+
+    // Fetch reviewed MRs with review_comment_id and dedupe note entries
+    const fastReviewsRes = await dbService.query(
+      `
+      SELECT project_id, review_comment_id
+      FROM merge_request_reviews
+      WHERE reviewed_at BETWEEN $1 AND $2
+        AND review_comment_id IS NOT NULL
+      `,
+      [dateFrom, dateTo]
+    );
+
+    if (!fastReviewsRes.rows || fastReviewsRes.rows.length === 0) {
+      const zero = zeroResult;
+      issueCategoriesCache.set(cacheKey, { expires: Date.now() + ISSUE_CATEGORIES_CACHE_TTL_MS, data: zero });
+      return zero;
+    }
+
+    type Entry = { projectId: number, noteId: number };
+    const seen = new Set<string>();
+    const entries: Entry[] = [];
+    for (const row of fastReviewsRes.rows) {
+      const projectId = Number(row.project_id);
+      const noteId = Number(row.review_comment_id);
+      if (!Number.isFinite(projectId) || !Number.isFinite(noteId)) continue;
+      const key = `${projectId}:${noteId}`;
+      if (!seen.has(key)) { seen.add(key); entries.push({ projectId, noteId }); }
+    }
+
+    const fastCounts: Record<Category, number> = {
+      'Code Quality': 0,
+      'Security': 0,
+      'Performance': 0,
+      'Documentation': 0,
+      'Testing': 0,
+    };
+
+    const CONCURRENCY = 8;
+    const perNoteCounts = await mapWithConcurrency(entries, CONCURRENCY, async (e) => {
+      try {
+        const note = await gitlabService.getNote(e.projectId, e.noteId);
+        const body: string = typeof note?.body === 'string' ? note.body : '';
+        const text = body.toLowerCase();
+        const local: Record<Category, number> = {
+          'Code Quality': 0,
+          'Security': 0,
+          'Performance': 0,
+          'Documentation': 0,
+          'Testing': 0,
+        };
+        for (const cat of categories) {
+          const patterns = KEYWORDS[cat];
+          let matches = 0;
+          for (const re of patterns) {
+            const found = text.match(re);
+            if (found) matches += found.length;
+          }
+          local[cat] += matches;
+        }
+        return local;
+      } catch {
+        return undefined as any;
+      }
+    });
+
+    for (const local of perNoteCounts) {
+      if (!local) continue;
+      for (const cat of categories) fastCounts[cat] += local[cat];
+    }
+
+    const fastTotal = Object.values(fastCounts).reduce((a, b) => a + b, 0);
+    const fastResult = categories.map(cat => ({
+      category: cat,
+      count: fastCounts[cat],
+      percentage: fastTotal > 0 ? Math.round((fastCounts[cat] / fastTotal) * 100) : 0,
+    }));
+
+    issueCategoriesCache.set(cacheKey, { expires: Date.now() + ISSUE_CATEGORIES_CACHE_TTL_MS, data: fastResult });
+    return fastResult;
+
     // Fetch reviewed MRs with recorded review comment IDs in the date range
     const reviewsRes = await dbService.query(
       `
