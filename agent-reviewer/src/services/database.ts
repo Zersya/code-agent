@@ -2,9 +2,9 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { CodeEmbedding, ProjectMetadata, EmbeddingBatch, DocumentationSource, DocumentationEmbedding, ProjectDocumentationMapping } from '../models/embedding.js';
 import { WebhookProcessingRecord, WebhookProcessingStatus } from '../models/webhook.js';
-import { MergeRequestTrackingRecord, UserMRStatisticsRecord } from '../models/merge-request.js';
+
 import { DeveloperPerformanceMetrics, MRQualityMetrics, NotionIssue, NotionTask, TaskMRMapping, FeatureCompletionRate } from '../types/performance.js';
-import { WhatsAppConfiguration, WhatsAppConfigurationRecord } from '../models/whatsapp.js';
+import { WhatsAppConfigurationRecord } from '../models/whatsapp.js';
 
 dotenv.config();
 
@@ -109,7 +109,7 @@ class DatabaseService {
     }
   }
 
-  private async initializeSchema(): Promise<void> {
+  async initializeSchema(): Promise<void> {
     const client = await this.pool.connect();
     let vectorExtensionAvailable = false;
 

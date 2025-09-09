@@ -307,7 +307,7 @@ class CompletionRateIntegrationVerifier {
       ];
 
       for (const endpoint of requiredEndpoints) {
-        if (typeof analyticsModule[endpoint] !== 'function') {
+        if (typeof (analyticsModule as any)[endpoint] !== 'function') {
           console.log(`   ❌ Endpoint ${endpoint} is not exported or not a function`);
           return false;
         }
@@ -341,7 +341,7 @@ async function main() {
 }
 
 // Run if called directly
-if (import.meta.main) {
+if (require.main === module) {
   main().catch(console.error);
 }
 
