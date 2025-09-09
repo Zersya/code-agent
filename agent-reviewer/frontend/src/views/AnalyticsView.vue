@@ -138,7 +138,7 @@
                   {{ month.name }}
                 </div>
               </div>
-              
+
               <div class="flex">
                 <!-- Day labels -->
                 <div class="flex flex-col text-xs text-gray-500 mr-2 w-10">
@@ -150,12 +150,12 @@
                   <div class="h-3 mb-1 flex items-center">Fri</div>
                   <div class="h-3 mb-1 flex items-center">Sat</div>
                 </div>
-                
+
                 <!-- Heatmap grid -->
                 <div class="flex-1">
                   <div class="grid gap-1" :style="{ gridTemplateColumns: `repeat(${heatmapWeeks.length}, 12px)`, gridTemplateRows: 'repeat(7, 12px)' }">
-                    <div 
-                      v-for="(day, index) in heatmapData" 
+                    <div
+                      v-for="(day, index) in heatmapData"
                       :key="index"
                       class="w-3 h-3 rounded-sm transition-all duration-200"
                       :class="getHeatmapColor(day.reviews)"
@@ -166,7 +166,7 @@
                   </div>
                 </div>
               </div>
-              
+
               <!-- Legend -->
               <div class="flex items-center justify-end mt-3 text-xs text-gray-500">
                 <span class="mr-2">Less</span>
@@ -180,9 +180,9 @@
                 <span class="ml-2">More</span>
               </div>
             </div>
-            
+
             <!-- Tooltip -->
-            <div 
+            <div
               v-if="tooltip.show"
               class="absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg pointer-events-none"
               :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
@@ -324,7 +324,7 @@
     </div>
 
     <!-- Issue Categories Section -->
-    <div class="mb-8">
+    <div v-if="hasIssueCategories" class="mb-8">
       <h2 class="text-xl font-bold text-gray-900 mb-6">Issue Categories</h2>
 
       <BaseCard title="Issue Distribution">
@@ -782,7 +782,7 @@
       @dismiss="analyticsStore.clearError"
       class="mt-6"
     />
-    
+
 
   </div>
 </template>
@@ -859,6 +859,13 @@ const debugAnalyticsData = computed(() => {
   return analyticsStore.analytics
 })
 
+// Show Issue Categories only if data has meaningful values
+const hasIssueCategories = computed(() => {
+  const list = analyticsStore.analytics.issueCategories as Array<{ count?: number; percentage?: number }> | undefined
+  return Array.isArray(list) && list.some(c => ((c?.count ?? 0) > 0) || ((c?.percentage ?? 0) > 0))
+})
+
+
 // Heatmap computed properties
 const heatmapData = computed(() => {
   const today = new Date()
@@ -879,7 +886,7 @@ const heatmapData = computed(() => {
   for (let week = 0; week < totalWeeks; week++) {
     for (let day = 0; day < 7; day++) {
       const date = addDays(startDayOfGrid, week * 7 + day)
-      
+
       // Only include dates from the last year up to today
       if (date >= startDate && date <= today) {
         const dateStr = format(date, 'yyyy-MM-dd')
@@ -930,7 +937,7 @@ const heatmapWeeks = computed(() => {
 const heatmapMonths = computed(() => {
   const months: Array<{ name: string; offset: number; width: number }> = []
   let lastMonth = -1
-  
+
   heatmapWeeks.value.forEach((week, index) => {
     const month = getMonth(addDays(week, 3)) // Check middle of the week for month
     if (month !== lastMonth) {
@@ -951,7 +958,7 @@ const heatmapMonths = computed(() => {
     const prevWidth = i > 0 ? months[i - 1].width : 0;
     months[i].offset = (months[i].width - prevWidth) * 13; // 12px width + 1px gap
   }
-  
+
   // Clean up width property
   months.forEach(m => m.width = 24);
 
@@ -966,9 +973,9 @@ const getHeatmapColor = (value: number) => {
   // -1 indicates a placeholder cell that should be transparent
   if (value < 0) return 'bg-transparent'
   if (value === 0) return 'bg-gray-100'
-  
+
   const intensity = value / maxHeatmapValue.value
-  
+
   if (intensity <= 0.25) return 'bg-green-200'
   if (intensity <= 0.5) return 'bg-green-300'
   if (intensity <= 0.75) return 'bg-green-500'
@@ -1023,7 +1030,7 @@ const handleDateRangeChange = () => {
     const days = parseInt(selectedDateRange.value)
     const from = format(subDays(new Date(), days), 'yyyy-MM-dd')
     const to = format(new Date(), 'yyyy-MM-dd')
-    
+
     analyticsStore.fetchAnalytics({ from, to })
   }
 }

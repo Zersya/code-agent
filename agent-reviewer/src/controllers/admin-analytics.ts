@@ -3,6 +3,7 @@ import { dbService } from '../services/database.js';
 import { queueService } from '../services/queue.js';
 import { performanceService } from '../services/performance.js';
 import { format, subDays, startOfDay } from 'date-fns';
+import { gitlabService } from '../services/gitlab.js';
 
 /**
  * Get comprehensive embedding system metrics
@@ -485,7 +486,7 @@ async function getMergeRequestMetrics(dateFrom: Date, dateTo: Date) {
 export const getAnalytics = async (req: Request, res: Response): Promise<void> => {
   try {
     const { from, to } = req.query;
-    
+
     const dateFrom = from ? new Date(from as string) : subDays(new Date(), 30);
     const dateTo = to ? new Date(to as string) : new Date();
 
@@ -529,7 +530,7 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
     // Get top projects by review activity
     const topProjectsQuery = `
-      SELECT 
+      SELECT
         p.name as "projectName",
         COUNT(mrr.id) as "reviewCount",
         100.0 as "approvalRate"
@@ -544,7 +545,7 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
     // Get review trends (daily data for the last 30 days)
     const reviewTrendsQuery = `
-      SELECT 
+      SELECT
         DATE(reviewed_at) as date,
         COUNT(*) as reviews,
         COUNT(*) as approvals,
@@ -606,14 +607,8 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     // Get merge request metrics
     const mrMetrics = await getMergeRequestMetrics(dateFrom, dateTo);
 
-    // Issue categories (enhanced with actual data when available)
-    const issueCategories = [
-      { category: 'Code Quality', count: 0, percentage: 0 },
-      { category: 'Security', count: 0, percentage: 0 },
-      { category: 'Performance', count: 0, percentage: 0 },
-      { category: 'Documentation', count: 0, percentage: 0 },
-      { category: 'Testing', count: 0, percentage: 0 }
-    ];
+    // Compute Issue Categories from MR review comments within the date range
+    const issueCategories = await computeIssueCategories(dateFrom, dateTo);
 
     const analyticsData = {
       // Basic metrics
@@ -755,7 +750,7 @@ export async function getDeveloperPerformanceAnalytics(req: Request, res: Respon
     };
 
     const result = await performanceService.getDeveloperPerformance(filters);
-    
+
     res.json({
       success: true,
       data: result
@@ -782,7 +777,7 @@ export async function getMRQualityAnalytics(req: Request, res: Response) {
     };
 
     const result = await performanceService.getMRQualityMetrics(filters);
-    
+
     res.json({
       success: true,
       data: result
@@ -810,7 +805,7 @@ export async function getIssueTrackingAnalytics(req: Request, res: Response) {
     };
 
     const result = await performanceService.getIssueTrackingMetrics(filters);
-    
+
     res.json({
       success: true,
       data: result
@@ -821,5 +816,135 @@ export async function getIssueTrackingAnalytics(req: Request, res: Response) {
       success: false,
       error: 'Failed to get issue tracking analytics'
     });
+  }
+}
+
+
+// Compute Issue Categories by analyzing MR review comments within the given date range
+async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
+  type Category = 'Code Quality' | 'Security' | 'Performance' | 'Documentation' | 'Testing'
+
+  const categories: Category[] = [
+    'Code Quality',
+    'Security',
+    'Performance',
+    'Documentation',
+    'Testing',
+  ]
+
+  // Keyword patterns for simple categorization
+  const KEYWORDS: Record<Category, RegExp[]> = {
+    'Security': [
+      /\bxss\b/gi, /sql\s*injection/gi, /csrf/gi, /ssrf/gi, /\brce\b/gi, /secret(s)?/gi,
+      /credential(s)?/gi, /auth(entication|orization)?/gi, /\bjwt\b/gi, /vulnerab(le|ility)/gi,
+      /insecure/gi, /exploit/gi, /saniti[sz]e/gi, /escap(e|ing)/gi
+    ],
+    'Performance': [
+      /\bn\+1\b/gi, /performance/gi, /\bperf\b/gi, /slow/gi, /latency/gi, /throughput/gi,
+      /memory/gi, /leak/gi, /optimi[sz]e/gi, /complexity/gi, /big\s*o/gi, /cache/gi
+    ],
+    'Testing': [
+      /test(s|ing)?/gi, /unit\s*test/gi, /integration\s*test/gi, /coverage/gi,
+      /mock/gi, /assert/gi, /spec/gi, /\be2e\b/gi
+    ],
+    'Documentation': [
+      /doc(s|umentation)?/gi, /comment(s)?/gi, /readme/gi, /guide/gi, /inline\s*doc/gi,
+      /javadoc/gi, /tsdoc/gi
+    ],
+    'Code Quality': [
+      /refactor/gi, /duplicate/gi, /naming/gi, /lint/gi, /eslint/gi, /prettier/gi,
+      /format(ting)?/gi, /maintainab(le|ility)/gi, /dead\s*code/gi, /smell/gi,
+      /complex(ity)?/gi
+    ],
+  }
+
+  // Default zeroed result
+  const zeroResult = categories.map(cat => ({ category: cat, count: 0, percentage: 0 }))
+
+  try {
+    // Fetch reviewed MRs with recorded review comment IDs in the date range
+    const reviewsRes = await dbService.query(
+      `
+      SELECT project_id, merge_request_iid, review_comment_id
+      FROM merge_request_reviews
+      WHERE reviewed_at BETWEEN $1 AND $2
+        AND review_comment_id IS NOT NULL
+      `,
+      [dateFrom, dateTo]
+    )
+
+    if (!reviewsRes.rows || reviewsRes.rows.length === 0) {
+      return zeroResult
+    }
+
+    // Group by MR to minimize API calls
+    type Group = { projectId: number, mrIid: number, reviewCommentIds: number[] }
+    const groupsMap = new Map<string, Group>()
+    for (const row of reviewsRes.rows) {
+      const key = `${row.project_id}:${row.merge_request_iid}`
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          projectId: Number(row.project_id),
+          mrIid: Number(row.merge_request_iid),
+          reviewCommentIds: [],
+        })
+      }
+      if (row.review_comment_id) {
+        groupsMap.get(key)!.reviewCommentIds.push(Number(row.review_comment_id))
+      }
+    }
+
+    const counts: Record<Category, number> = {
+      'Code Quality': 0,
+      'Security': 0,
+      'Performance': 0,
+      'Documentation': 0,
+      'Testing': 0,
+    }
+
+    // Iterate groups, fetch comments once per MR, analyze matched notes
+    for (const group of groupsMap.values()) {
+      try {
+        const comments = await gitlabService.getMergeRequestComments(group.projectId, group.mrIid)
+        if (!Array.isArray(comments) || comments.length === 0) continue
+
+        const bodyById = new Map<number, string>()
+        for (const c of comments) {
+          if (typeof c?.id === 'number' && typeof c?.body === 'string') {
+            bodyById.set(c.id, c.body)
+          }
+        }
+
+        for (const noteId of group.reviewCommentIds) {
+          const body = bodyById.get(noteId)
+          if (!body) continue
+          const text = body.toLowerCase()
+
+          // Count occurrences per category
+          for (const cat of categories) {
+            const patterns = KEYWORDS[cat]
+            let matches = 0
+            for (const re of patterns) {
+              const found = text.match(re)
+              if (found) matches += found.length
+            }
+            counts[cat] += matches
+          }
+        }
+      } catch (err) {
+        console.warn(`Skipping MR !${group.mrIid} in project ${group.projectId} due to error:`, err)
+        continue
+      }
+    }
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0)
+    return categories.map(cat => ({
+      category: cat,
+      count: counts[cat],
+      percentage: total > 0 ? Math.round((counts[cat] / total) * 100) : 0,
+    }))
+  } catch (error) {
+    console.error('Error computing issue categories:', error)
+    return zeroResult
   }
 }
