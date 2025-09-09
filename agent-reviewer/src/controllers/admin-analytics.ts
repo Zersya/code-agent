@@ -1029,19 +1029,19 @@ async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
         }
 
         for (const noteId of group.reviewCommentIds) {
-          const body = bodyById.get(noteId)
-          if (!body) continue
-          const text = body.toLowerCase()
+          const body = bodyById.get(noteId);
+          if (typeof body !== 'string') continue;
+          const text = body.toLowerCase();
 
           // Count occurrences per category
           for (const cat of categories) {
-            const patterns = KEYWORDS[cat]
-            let matches = 0
+            const patterns = KEYWORDS[cat];
+            let matches = 0;
             for (const re of patterns) {
-              const found = text.match(re)
-              if (found) matches += found.length
+              const count = (text.match(re) ?? []).length;
+              matches += count;
             }
-            counts[cat] += matches
+            counts[cat] += matches;
           }
         }
       } catch (err) {
