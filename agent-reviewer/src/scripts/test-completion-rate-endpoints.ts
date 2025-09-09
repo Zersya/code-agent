@@ -84,17 +84,61 @@ async function testCompletionRateEndpoints() {
 
       // Create sample task-MR mappings
       const tasks = await dbService.query('SELECT id, notion_page_id FROM notion_tasks LIMIT 2');
-      
+
       for (let i = 0; i < tasks.rows.length; i++) {
         const task = tasks.rows[i];
         await dbService.createTaskMRMapping({
           notion_task_id: task.id,
           project_id: 1,
           merge_request_iid: 100 + i,
-          merge_request_id: 1000 + i,
-          is_merged: i === 0, // First one is merged
-          merged_at: i === 0 ? new Date().toISOString() : null
+          merge_request_id: 1000 + i
         });
+      }
+
+      // Create sample merge request tracking records to simulate merged MRs
+      for (let i = 0; i < tasks.rows.length; i++) {
+        const mergeRequestData = {
+          project_id: 1,
+          merge_request_iid: 100 + i,
+          merge_request_id: 1000 + i,
+          title: `Sample MR ${i + 1}`,
+          description: `Test merge request ${i + 1}`,
+          source_branch: `feature/test-${i + 1}`,
+          target_branch: 'main',
+          author_username: i === 0 ? 'john-doe' : 'jane-smith',
+          author_name: i === 0 ? 'John Doe' : 'Jane Smith',
+          status: i === 0 ? 'merged' : 'opened', // First one is merged
+          merged_at: i === 0 ? new Date() : null,
+          created_at: new Date(),
+          updated_at: new Date()
+        };
+
+        // Insert merge request tracking record
+        await dbService.query(`
+          INSERT INTO merge_request_tracking (
+            project_id, merge_request_iid, merge_request_id, title, description,
+            source_branch, target_branch, author_username, author_name,
+            status, merged_at, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          ON CONFLICT (project_id, merge_request_iid) DO UPDATE SET
+            status = EXCLUDED.status,
+            merged_at = EXCLUDED.merged_at,
+            updated_at = EXCLUDED.updated_at
+        `, [
+          mergeRequestData.project_id,
+          mergeRequestData.merge_request_iid,
+          mergeRequestData.merge_request_id,
+          mergeRequestData.title,
+          mergeRequestData.description,
+          mergeRequestData.source_branch,
+          mergeRequestData.target_branch,
+          mergeRequestData.author_username,
+          mergeRequestData.author_name,
+          mergeRequestData.status,
+          mergeRequestData.merged_at,
+          mergeRequestData.created_at,
+          mergeRequestData.updated_at
+        ]);
       }
       console.log('✅ Sample mappings created');
     }

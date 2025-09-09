@@ -159,13 +159,13 @@ export interface TaskMRMapping {
   project_id: number;
   merge_request_iid: number;
   merge_request_id: number;
-  created_at: Date;
-  updated_at?: Date;
-  // Joined fields
+  created_at?: string;
+  updated_at?: string;
+  // Joined fields from merge_request_tracking
   task_title?: string;
   mr_title?: string;
   mr_status?: string;
-  mr_merged_at?: Date;
+  mr_merged_at?: string;
 }
 
 export interface FeatureCompletionRate {
