@@ -1031,7 +1031,7 @@ async function computeIssueCategories(dateFrom: Date, dateTo: Date) {
         for (const noteId of group.reviewCommentIds) {
           const body = bodyById.get(noteId);
           if (typeof body !== 'string') continue;
-          const text = body.toLowerCase();
+          const text = body!.toLowerCase();
 
           // Count occurrences per category
           for (const cat of categories) {
