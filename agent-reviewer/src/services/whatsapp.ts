@@ -52,11 +52,10 @@ export class WhatsAppService {
     }
 
     try {
-      const url = `${this.baseUrl}/client/sendMessage/${this.session}`;
+      const url = `${this.baseUrl}/webhook/send-whatsapp-message'`;
       
       const payload = {
         chatId: this.formatPhoneNumber(message.to),
-        contentType: 'string',
         content: message.message
       };
 
