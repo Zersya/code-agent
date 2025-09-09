@@ -309,7 +309,6 @@ export class CompletionRateService {
       throw error;
     }
   }
-}
 
   /**
    * Get completion rates with filters
