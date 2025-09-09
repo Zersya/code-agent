@@ -36,14 +36,51 @@ async function testCompletionRateEndpoints() {
 
     // Test 2: Check for sample data
     console.log('\n2️⃣ Checking for sample data...');
-    
+
     const notionTasksCount = await dbService.query('SELECT COUNT(*) as count FROM notion_tasks');
     const mappingsCount = await dbService.query('SELECT COUNT(*) as count FROM task_mr_mappings');
     const ratesCount = await dbService.query('SELECT COUNT(*) as count FROM feature_completion_rates');
-    
+
     console.log(`📝 Notion tasks: ${notionTasksCount.rows[0].count}`);
     console.log(`🔗 Task-MR mappings: ${mappingsCount.rows[0].count}`);
     console.log(`📈 Completion rates: ${ratesCount.rows[0].count}`);
+
+    // Test 2.1: Analyze actual data
+    console.log('\n🔍 Analyzing actual data...');
+
+    // Check assignees in notion tasks
+    const assigneesQuery = await dbService.query(`
+      SELECT assignee_username, assignee_name, COUNT(*) as task_count
+      FROM notion_tasks
+      WHERE assignee_username IS NOT NULL
+      GROUP BY assignee_username, assignee_name
+      ORDER BY task_count DESC
+      LIMIT 10
+    `);
+    console.log('👥 Top assignees:', assigneesQuery.rows);
+
+    // Check date ranges
+    const dateRangeQuery = await dbService.query(`
+      SELECT
+        MIN(created_at) as earliest_task,
+        MAX(created_at) as latest_task,
+        EXTRACT(YEAR FROM MIN(created_at)) as earliest_year,
+        EXTRACT(MONTH FROM MIN(created_at)) as earliest_month,
+        EXTRACT(YEAR FROM MAX(created_at)) as latest_year,
+        EXTRACT(MONTH FROM MAX(created_at)) as latest_month
+      FROM notion_tasks
+    `);
+    console.log('📅 Date range:', dateRangeQuery.rows[0]);
+
+    // Check completion rates by month
+    const monthlyRatesQuery = await dbService.query(`
+      SELECT year, month, COUNT(*) as rate_count
+      FROM feature_completion_rates
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+      LIMIT 10
+    `);
+    console.log('📊 Monthly completion rates:', monthlyRatesQuery.rows);
 
     // Test 3: Create sample data if none exists
     if (parseInt(notionTasksCount.rows[0].count) === 0) {
@@ -143,23 +180,59 @@ async function testCompletionRateEndpoints() {
       console.log('✅ Sample mappings created');
     }
 
-    // Test 4: Test completion rate calculation
-    console.log('\n4️⃣ Testing completion rate calculation...');
-    
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
+    // Test 4: Test completion rate calculation with real data
+    console.log('\n4️⃣ Testing completion rate calculation with real data...');
 
     try {
-      const johnResult = await completionRateService.calculateCompletionRate('john-doe', month, year, 1);
-      console.log('👤 John Doe completion rate:', johnResult);
+      // Get the most recent month with data
+      const recentDataQuery = await dbService.query(`
+        SELECT year, month, COUNT(*) as rate_count
+        FROM feature_completion_rates
+        WHERE rate_count > 0
+        ORDER BY year DESC, month DESC
+        LIMIT 1
+      `);
 
-      const janeResult = await completionRateService.calculateCompletionRate('jane-smith', month, year, 1);
-      console.log('👤 Jane Smith completion rate:', janeResult);
+      let testMonth, testYear;
+      if (recentDataQuery.rows.length > 0) {
+        testYear = recentDataQuery.rows[0].year;
+        testMonth = recentDataQuery.rows[0].month;
+        console.log(`📅 Using month with data: ${testYear}-${testMonth}`);
+      } else {
+        // Fallback to current month if no completion rates exist yet
+        const now = new Date();
+        testMonth = now.getMonth() + 1;
+        testYear = now.getFullYear();
+        console.log(`📅 No completion rates found, using current month: ${testYear}-${testMonth}`);
+      }
 
-      const teamResult = await completionRateService.getTeamCompletionRates(month, year, 1);
+      // Get actual assignees from the database
+      const assigneesQuery = await dbService.query(`
+        SELECT assignee_username
+        FROM notion_tasks
+        WHERE assignee_username IS NOT NULL
+        GROUP BY assignee_username
+        ORDER BY COUNT(*) DESC
+        LIMIT 2
+      `);
+
+      const testUsers = assigneesQuery.rows.length > 0
+        ? assigneesQuery.rows.map(row => row.assignee_username)
+        : ['john-doe', 'jane-smith']; // fallback
+
+      console.log(`👥 Testing with users: ${testUsers.join(', ')}`);
+
+      // Test individual completion rates
+      for (const username of testUsers) {
+        const result = await completionRateService.calculateCompletionRate(username, testMonth, testYear, 1);
+        console.log(`👤 ${username} completion rate:`, result);
+      }
+
+      // Test team completion rates
+      const teamResult = await completionRateService.getTeamCompletionRates(testMonth, testYear, 1);
       console.log('👥 Team completion rates:', teamResult);
 
+      // Test stats
       const statsResult = await completionRateService.getCompletionRateStats(1);
       console.log('📊 Completion rate stats:', statsResult);
 
@@ -169,17 +242,36 @@ async function testCompletionRateEndpoints() {
       console.error('❌ Completion rate calculation failed:', calcError);
     }
 
-    // Test 5: Test API endpoint simulation
-    console.log('\n5️⃣ Testing API endpoint simulation...');
-    
-    // Simulate the API calls that the frontend would make
-    const mockFilters = { month: `${year}-${month.toString().padStart(2, '0')}` };
-    console.log('🔍 Using filters:', mockFilters);
+    // Test 5: Test API endpoint simulation with real data
+    console.log('\n5️⃣ Testing API endpoint simulation with real data...');
 
     try {
+      // Get the most recent month with data for API simulation
+      const recentDataQuery = await dbService.query(`
+        SELECT year, month
+        FROM feature_completion_rates
+        ORDER BY year DESC, month DESC
+        LIMIT 1
+      `);
+
+      let apiTestMonth, apiTestYear;
+      if (recentDataQuery.rows.length > 0) {
+        apiTestYear = recentDataQuery.rows[0].year;
+        apiTestMonth = recentDataQuery.rows[0].month;
+      } else {
+        // Fallback to current month
+        const now = new Date();
+        apiTestMonth = now.getMonth() + 1;
+        apiTestYear = now.getFullYear();
+      }
+
+      // Simulate the API calls that the frontend would make
+      const mockFilters = { month: `${apiTestYear}-${apiTestMonth.toString().padStart(2, '0')}` };
+      console.log('🔍 Using filters:', mockFilters);
+
       // Parse month from filter
       const [filterYear, filterMonth] = mockFilters.month.split('-').map(Number);
-      
+
       const teamRatesResponse = await completionRateService.getTeamCompletionRates(filterMonth, filterYear, 1);
       console.log('📡 Team rates API response:', {
         success: true,

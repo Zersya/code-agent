@@ -1001,7 +1001,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { format, subDays, startOfWeek, addDays, getMonth } from 'date-fns'
+import { format, subDays, subMonths, startOfWeek, addDays, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -1010,7 +1010,8 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
 const selectedDateRange = ref('30')
-const selectedCompletionRateMonth = ref(format(new Date(), 'yyyy-MM'))
+// Default to a month that's more likely to have data (3 months ago)
+const selectedCompletionRateMonth = ref(format(subMonths(new Date(), 3), 'yyyy-MM'))
 
 const customDateRange = reactive({
   from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
