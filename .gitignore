@@ -5,3 +5,6 @@
 .env.production.local
 
 feedbacks/
+
+node_modules/
+dist/
