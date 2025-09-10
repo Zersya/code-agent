@@ -790,6 +790,64 @@ export class NotionService {
   }
 
   /**
+
+  /**
+   * Extract a date by exact Notion property names (handles date, created_time, last_edited_time, and formula)
+   */
+  private extractDateByName(properties: Record<string, any>, names: string[]): Date | undefined {
+    for (const candidate of names) {
+      const prop = (properties as any)[candidate];
+      if (!prop) continue;
+      try {
+        switch (prop.type) {
+          case 'date': {
+            const v = prop.date?.start || prop.date?.end;
+            if (v) {
+              const d = new Date(v);
+              if (!isNaN(d.getTime())) return d;
+            }
+            break;
+          }
+          case 'created_time': {
+            const v = prop.created_time;
+            if (v) {
+              const d = new Date(v);
+              if (!isNaN(d.getTime())) return d;
+            }
+            break;
+          }
+          case 'last_edited_time': {
+            const v = prop.last_edited_time;
+            if (v) {
+              const d = new Date(v);
+              if (!isNaN(d.getTime())) return d;
+            }
+            break;
+          }
+          case 'formula': {
+            const f = prop.formula;
+            if (f?.type === 'string' && f.string) {
+              const d = new Date(f.string);
+              if (!isNaN(d.getTime())) return d;
+            } else if (f?.type === 'number' && typeof f.number === 'number') {
+              const n = f.number;
+              const ms = n > 1e12 ? n : n > 1e10 ? n : n * 1000; // heuristic
+              const d = new Date(ms);
+              if (!isNaN(d.getTime())) return d;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      } catch {
+        // ignore parse errors and continue to next candidate
+      }
+    }
+    return undefined;
+  }
+
+/**
    * Extract task status from Notion page properties
    */
   private extractTaskStatus(properties: Record<string, any>): string {
@@ -1123,14 +1181,19 @@ export class NotionService {
       const assigneeInfo = this.extractAssigneeInfo(pageContent.properties);
       const status = this.extractTaskStatus(pageContent.properties);
 
-      // Determine completion date based on status
-      const completedAt = this.isTaskCompleted(status) ? new Date() : undefined;
+      // Determine completion date from explicit property first, then fallback to status-based
+      const completedAtProp = this.extractDateByName(pageContent.properties, ['Completed At']);
+      const completedAt = completedAtProp || (this.isTaskCompleted(status) ? new Date() : undefined);
 
-      // Extract estimation/developer timing fields from Notion (best-effort by common names)
-      const estimationStart = this.extractDateProperty(pageContent.properties, ['estimation start', 'sprint start', 'est start']);
-      const estimationEnd = this.extractDateProperty(pageContent.properties, ['estimation end', 'sprint end', 'est end']);
-      const developerStart = this.extractDateProperty(pageContent.properties, ['developer start', 'dev start', 'start']);
-      const developerEnd = this.extractDateProperty(pageContent.properties, ['developer end', 'dev end', 'end']);
+      // Extract estimation/developer timing fields using exact property names with fallback
+      const estimationStart = this.extractDateByName(pageContent.properties, ['Estimation Start', 'Estimation Start Non Sprint'])
+        || this.extractDateProperty(pageContent.properties, ['estimation start', 'sprint start', 'est start']);
+      const estimationEnd = this.extractDateByName(pageContent.properties, ['Estimation End', 'Estimation End Non Sprint'])
+        || this.extractDateProperty(pageContent.properties, ['estimation end', 'sprint end', 'est end']);
+      const developerStart = this.extractDateByName(pageContent.properties, ['Start Development'])
+        || this.extractDateProperty(pageContent.properties, ['developer start', 'dev start', 'start development']);
+      const developerEnd = this.extractDateByName(pageContent.properties, ['End Development'])
+        || this.extractDateProperty(pageContent.properties, ['developer end', 'dev end', 'end development']);
 
       // Create task data
       const taskData = {

@@ -1022,6 +1022,11 @@ interface CompletionRateBreakdownLite {
   mrStatus?: string
   mrMergedAt?: string | Date
   isCompleted: boolean
+  estimationStart?: string | Date
+  estimationEnd?: string | Date
+  developerStart?: string | Date
+  developerEnd?: string | Date
+  completedAt?: string | Date
 }
 type DevWithBreakdown = CompletionRateResponse & { taskBreakdown?: CompletionRateBreakdownLite[] }
 const selectedDev = ref<DevWithBreakdown | null>(null)
@@ -1032,9 +1037,13 @@ const devTaskColumns: TableColumn[] = [
   { key: 'taskTitle', label: 'Task', type: 'text' },
   { key: 'taskStatus', label: 'Task Status', type: 'text' },
   { key: 'hasAssociatedMR', label: 'Has MR', type: 'boolean' },
-
   { key: 'mrStatus', label: 'MR Status', type: 'text' },
   { key: 'mrMergedAt', label: 'Merged At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'estimationStart', label: 'Est. Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'estimationEnd', label: 'Est. End', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'developerStart', label: 'Dev Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'developerEnd', label: 'Dev End', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'completedAt', label: 'Completed At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
 ]
 const devTaskRows = computed(() => (selectedDev.value?.taskBreakdown || []) as CompletionRateBreakdownLite[])
 

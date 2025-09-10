@@ -200,6 +200,12 @@ export interface CompletionRateBreakdown {
   mrStatus?: string;
   mrMergedAt?: Date;
   isCompleted: boolean;
+  // Timing fields for validation/analytics
+  estimationStart?: Date;
+  estimationEnd?: Date;
+  developerStart?: Date;
+  developerEnd?: Date;
+  completedAt?: Date;
 }
 
 export interface CompletionRateResponse {

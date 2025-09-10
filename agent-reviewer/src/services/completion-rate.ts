@@ -72,7 +72,12 @@ export class CompletionRateService {
           hasAssociatedMR,
           mrStatus: mrMapping?.mr_status,
           mrMergedAt: mrMapping?.mr_merged_at ? new Date(mrMapping.mr_merged_at) : undefined,
-          isCompleted
+          isCompleted,
+          estimationStart: task.estimation_start,
+          estimationEnd: task.estimation_end,
+          developerStart: task.developer_start,
+          developerEnd: task.developer_end,
+          completedAt: task.completed_at
         });
       }
 
