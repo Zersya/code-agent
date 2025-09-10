@@ -3050,13 +3050,13 @@ class DatabaseService {
     let paramIndex = 2;
 
     if (dateFrom) {
-      query += ` AND created_at >= $${paramIndex}`;
+      query += ` AND COALESCE(estimation_start, developer_start, created_at) >= $${paramIndex}`;
       params.push(dateFrom);
       paramIndex++;
     }
 
     if (dateTo) {
-      query += ` AND created_at <= $${paramIndex}`;
+      query += ` AND COALESCE(estimation_start, developer_start, created_at) <= $${paramIndex}`;
       params.push(dateTo);
       paramIndex++;
     }
@@ -3075,7 +3075,7 @@ class DatabaseService {
       paramIndex++;
     }
 
-    query += ` ORDER BY created_at DESC`;
+    query += ` ORDER BY COALESCE(estimation_start, developer_start, created_at) DESC`;
 
     const result = await this.query(query, params);
     return result.rows;
