@@ -206,6 +206,10 @@ export interface CompletionRateBreakdown {
   developerStart?: Date;
   developerEnd?: Date;
   completedAt?: Date;
+  // Links & identifiers for UI actions
+  notionPageId?: string;
+  mrProjectId?: number;
+  mrIid?: number;
 }
 
 export interface CompletionRateResponse {

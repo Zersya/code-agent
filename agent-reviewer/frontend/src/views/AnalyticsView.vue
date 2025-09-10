@@ -665,6 +665,23 @@
               <div class="max-w-xs truncate" :title="value">{{ value }}</div>
             </template>
           </BaseTable>
+            <template #cell-notionLink="{ row }">
+              <div class="whitespace-nowrap">
+                <a v-if="row.notionPageId" :href="`https://www.notion.so/${row.notionPageId.replace(/-/g, '')}`" target="_blank" rel="noopener noreferrer" :title="'Open in Notion'">
+                  <BaseButton size="xs" variant="secondary">View Notion</BaseButton>
+                </a>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+            </template>
+            <template #cell-mrLink="{ row }">
+              <div class="whitespace-nowrap">
+                <a v-if="row.hasAssociatedMR && row.mrProjectId && row.mrIid" :href="`https://repopo.transtrack.id/projects/${row.mrProjectId}/merge_requests/${row.mrIid}`" target="_blank" rel="noopener noreferrer" :title="'Open MR'">
+                  <BaseButton size="xs" variant="primary">View MR</BaseButton>
+                </a>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+            </template>
+
         </BaseModal>
 
 
@@ -1027,6 +1044,9 @@ interface CompletionRateBreakdownLite {
   developerStart?: string | Date
   developerEnd?: string | Date
   completedAt?: string | Date
+  notionPageId?: string
+  mrProjectId?: number
+  mrIid?: number
 }
 type DevWithBreakdown = CompletionRateResponse & { taskBreakdown?: CompletionRateBreakdownLite[] }
 const selectedDev = ref<DevWithBreakdown | null>(null)
@@ -1044,6 +1064,8 @@ const devTaskColumns: TableColumn[] = [
   { key: 'developerStart', label: 'Dev Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'developerEnd', label: 'Dev End', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'completedAt', label: 'Completed At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'notionLink', label: 'Notion', type: 'text' },
+  { key: 'mrLink', label: 'MR', type: 'text' },
 ]
 const devTaskRows = computed(() => (selectedDev.value?.taskBreakdown || []) as CompletionRateBreakdownLite[])
 

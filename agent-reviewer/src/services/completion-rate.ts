@@ -77,7 +77,10 @@ export class CompletionRateService {
           estimationEnd: task.estimation_end,
           developerStart: task.developer_start,
           developerEnd: task.developer_end,
-          completedAt: task.completed_at
+          completedAt: task.completed_at,
+          notionPageId: task.notion_page_id,
+          mrProjectId: mrMapping?.project_id,
+          mrIid: mrMapping?.merge_request_iid
         });
       }
 
