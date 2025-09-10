@@ -173,6 +173,8 @@ export interface TaskMRMapping {
   mr_status?: string;
   mr_merged_at?: string;
   mr_web_url?: string;
+  mr_approved_at?: string;
+  mr_created_at?: string;
 }
 
 export interface FeatureCompletionRate {
@@ -208,9 +210,12 @@ export interface CompletionRateBreakdown {
   developerStart?: Date;
   developerEnd?: Date;
   completedAt?: Date;
+  // MR timing fields
+  approvalAt?: Date;
   // Derived analytics
   devLeadTimeHours?: number;
   qaTimeHours?: number;
+  approvalTimeHours?: number;
   estimationOverrunHours?: number;
   isLate?: boolean;
   // Links & identifiers for UI actions

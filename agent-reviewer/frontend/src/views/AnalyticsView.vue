@@ -1047,9 +1047,12 @@ interface CompletionRateBreakdownLite {
   developerStart?: string | Date
   developerEnd?: string | Date
   completedAt?: string | Date
+  // MR timing
+  approvalAt?: string | Date
   // Derived analytics
   devLeadTimeHours?: number
   qaTimeHours?: number
+  approvalTimeHours?: number
   estimationOverrunHours?: number
   isLate?: boolean
   // Links
@@ -1069,6 +1072,7 @@ const devTaskColumns: TableColumn[] = [
   { key: 'hasAssociatedMR', label: 'Has MR', type: 'boolean' },
   { key: 'mrStatus', label: 'MR Status', type: 'text' },
   { key: 'mrMergedAt', label: 'Merged At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'approvalAt', label: 'Approval At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'estimationStart', label: 'Est. Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'estimationEnd', label: 'Est. End', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'developerStart', label: 'Dev Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
@@ -1076,6 +1080,7 @@ const devTaskColumns: TableColumn[] = [
   { key: 'completedAt', label: 'Completed At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'devLeadTimeHours', label: 'Dev Lead (h)', type: 'number' },
   { key: 'qaTimeHours', label: 'QA (h)', type: 'number' },
+  { key: 'approvalTimeHours', label: 'Approval Time (h)', type: 'number' },
   { key: 'estimationOverrunHours', label: 'Overrun (h)', type: 'number' },
   { key: 'isLate', label: 'Late', type: 'boolean' },
   { key: 'notionLink', label: 'Notion', type: 'text' },

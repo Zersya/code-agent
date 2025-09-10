@@ -561,6 +561,9 @@ class DatabaseService {
           UNIQUE(project_id, merge_request_iid)
         )
       `);
+      // Ensure approval timestamp column exists for MRs
+      await client.query(`ALTER TABLE merge_request_tracking ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`);
+
 
       // Create user MR statistics table
       await client.query(`
@@ -3114,7 +3117,9 @@ class DatabaseService {
    */
   async getTaskMRMappings(taskId: number): Promise<TaskMRMapping[]> {
     const query = `
-      SELECT tmm.*, mrt.title as mr_title, mrt.status as mr_status, mrt.merged_at as mr_merged_at, mrt.web_url as mr_web_url
+      SELECT tmm.*, mrt.title as mr_title, mrt.status as mr_status,
+        mrt.merged_at as mr_merged_at, mrt.web_url as mr_web_url,
+        mrt.approved_at as mr_approved_at, mrt.created_at as mr_created_at
       FROM task_mr_mappings tmm
       LEFT JOIN merge_request_tracking mrt ON tmm.project_id = mrt.project_id
         AND tmm.merge_request_iid = mrt.merge_request_iid

@@ -80,6 +80,10 @@ export class CompletionRateService {
         const estimationOverrunHours = diffHours(doneAt, estEnd);
         const isLate = typeof estimationOverrunHours === 'number' ? estimationOverrunHours > 0 : undefined;
 
+        const mrCreatedAt = (mrMapping as any)?.mr_created_at ? new Date((mrMapping as any).mr_created_at) : undefined;
+        const approvalAt = (mrMapping as any)?.mr_approved_at ? new Date((mrMapping as any).mr_approved_at) : undefined;
+        const approvalTimeHours = diffHours(approvalAt, mrCreatedAt);
+
         taskBreakdown.push({
           taskId: task.id!,
           taskTitle: task.title,
@@ -93,8 +97,12 @@ export class CompletionRateService {
           developerStart: task.developer_start,
           developerEnd: task.developer_end,
           completedAt: task.completed_at,
+          // MR timing
+          approvalAt,
+          // Derived analytics
           devLeadTimeHours,
           qaTimeHours,
+          approvalTimeHours,
           estimationOverrunHours,
           isLate,
           notionPageId: task.notion_page_id,
