@@ -179,12 +179,12 @@ app.get('/api/analytics/developers', adminAuth, getDeveloperPerformanceAnalytics
 app.get('/api/analytics/merge-requests', adminAuth, getMRQualityAnalytics);
 app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
 
-// Feature Completion Rate Analytics endpoints
-app.get('/api/analytics/completion-rate/:developerId', adminAuth, getCompletionRate);
+// Feature Completion Rate Analytics endpoints (register specific routes BEFORE the generic :developerId route)
 app.get('/api/analytics/completion-rate/team', adminAuth, getTeamCompletionRates);
 app.get('/api/analytics/completion-rate/trends/:developerId', adminAuth, getCompletionRateTrends);
 app.get('/api/analytics/completion-rate/projects/:projectId', adminAuth, getProjectCompletionRates);
 app.get('/api/analytics/completion-rate/stats', adminAuth, getCompletionRateStats);
+app.get('/api/analytics/completion-rate/:developerId', adminAuth, getCompletionRate);
 
 // WhatsApp Configuration endpoints
 app.get('/api/whatsapp/configurations', adminAuth, getWhatsAppConfigurations);

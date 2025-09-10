@@ -1251,22 +1251,34 @@ export async function getProjectCompletionRates(req: Request, res: Response) {
  */
 export async function getCompletionRateStats(req: Request, res: Response) {
   try {
-    const { projectId, dateFrom, dateTo } = req.query;
-
-    // For now, return basic stats - this can be enhanced later
-    const result = {
-      totalDevelopers: 0,
-      avgCompletionRate: 0,
-      totalTasks: 0,
-      totalCompletedTasks: 0,
-      topPerformers: [],
-      monthlyTrends: []
+    const { projectId, dateFrom, dateTo, month } = req.query as {
+      projectId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      month?: string; // YYYY-MM
     };
 
-    res.json({
-      success: true,
-      data: result
-    });
+    // If month is provided, convert to date range; else use optional dateFrom/dateTo
+    let fromDate: Date | undefined;
+    let toDate: Date | undefined;
+
+    if (month) {
+      const [y, m] = month.split('-').map(Number);
+      // from first day to last day of the month
+      fromDate = new Date(y, (m - 1), 1);
+      toDate = new Date(y, m, 0, 23, 59, 59);
+    } else {
+      fromDate = dateFrom ? new Date(dateFrom) : undefined;
+      toDate = dateTo ? new Date(dateTo) : undefined;
+    }
+
+    const stats = await completionRateService.getCompletionRateStats(
+      projectId ? parseInt(projectId) : undefined,
+      fromDate,
+      toDate
+    );
+
+    res.json({ success: true, data: stats });
   } catch (error) {
     console.error('Error getting completion rate stats:', error);
     res.status(500).json({
