@@ -518,15 +518,7 @@
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-bold text-gray-900">Feature Completion Rate Analytics</h2>
         <div class="flex space-x-3">
-          <select
-            v-model="selectedCompletionRateMonth"
-            @change="handleCompletionRateMonthChange"
-            class="input text-sm"
-          >
-            <option v-for="month in availableMonths" :key="month.value" :value="month.value">
-              {{ month.label }}
-            </option>
-          </select>
+
           <BaseButton
             @click="refreshCompletionRates"
             :loading="analyticsStore.isLoading"
@@ -1034,7 +1026,7 @@ interface CompletionRateBreakdownLite {
 type DevWithBreakdown = CompletionRateResponse & { taskBreakdown?: CompletionRateBreakdownLite[] }
 const selectedDev = ref<DevWithBreakdown | null>(null)
 const openDevTasks = (dev: DevWithBreakdown) => { selectedDev.value = dev; showDevModal.value = true }
-const devModalTitle = computed(() => selectedDev.value ? `${selectedDev.value.username} — Tasks & MRs (${analyticsStore.completionRateData.teamRates?.month || selectedCompletionRateMonth})` : 'Tasks & MRs')
+const devModalTitle = computed(() => selectedDev.value ? `${selectedDev.value.username} — Tasks & MRs (${analyticsStore.completionRateData.teamRates?.month || currentCompletionMonth.value})` : 'Tasks & MRs')
 type TableColumn = { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }
 const devTaskColumns: TableColumn[] = [
   { key: 'taskTitle', label: 'Task', type: 'text' },
@@ -1053,8 +1045,12 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
 const selectedDateRange = ref('30')
-// Default to a month that's more likely to have data (this month)
-const selectedCompletionRateMonth = ref(format(subMonths(new Date(), 0), 'yyyy-MM'))
+// Derive completion-rate month from the top-level date filter (use end date)
+const currentCompletionMonth = computed(() => {
+  const toStr = selectedDateRange.value === 'custom' ? customDateRange.to : format(new Date(), 'yyyy-MM-dd')
+  const toDate = new Date(toStr)
+  return format(toDate, 'yyyy-MM')
+})
 
 const customDateRange = reactive({
   from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -1068,21 +1064,6 @@ const tooltip = reactive({
   content: ''
 })
 
-// Computed properties for completion rates
-const availableMonths = computed(() => {
-  const months = []
-  const now = new Date()
-
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push({
-      value: format(date, 'yyyy-MM'),
-      label: format(date, 'MMMM yyyy')
-    })
-  }
-
-  return months
-})
 
 
 // Helper functions
@@ -1332,6 +1313,8 @@ const handleDateRangeChange = () => {
     const to = format(new Date(), 'yyyy-MM-dd')
 
     analyticsStore.fetchAnalytics({ from, to })
+    // Also update completion rates to match the top-level date filter
+    refreshCompletionRates()
   }
 }
 
@@ -1340,6 +1323,8 @@ const applyCustomDateRange = () => {
     from: customDateRange.from,
     to: customDateRange.to
   })
+  // Also update completion rates to match the top-level date filter
+  refreshCompletionRates()
 }
 
 const refreshAnalytics = async () => {
@@ -1358,15 +1343,12 @@ const refreshAnalytics = async () => {
   }
 }
 
-const handleCompletionRateMonthChange = () => {
-  refreshCompletionRates()
-}
 
 const refreshCompletionRates = async () => {
   try {
     console.log('🔄 Starting completion rate refresh...')
     const filters = {
-      month: selectedCompletionRateMonth.value
+      month: currentCompletionMonth.value
     }
 
 

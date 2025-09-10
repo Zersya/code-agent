@@ -715,6 +715,13 @@ class DatabaseService {
         )
       `);
 
+      // Ensure timing columns exist for Notion tasks
+      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS estimation_start TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS estimation_end TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS developer_start TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS developer_end TIMESTAMPTZ`);
+
+
       await client.query(`
         CREATE TABLE IF NOT EXISTS task_mr_mappings (
           id SERIAL PRIMARY KEY,
@@ -1533,7 +1540,7 @@ class DatabaseService {
         SET auto_review_enabled = $2, updated_at = NOW()
         WHERE project_id = $1
       `, [projectId, enabled]);
-      
+
       console.log(`Updated auto review enabled for project ${projectId}: ${enabled}`);
     } catch (error) {
       console.error('Error updating auto review enabled status:', error);
@@ -1586,7 +1593,7 @@ class DatabaseService {
         SET auto_approve_enabled = $2, updated_at = NOW()
         WHERE project_id = $1
       `, [projectId, enabled]);
-      
+
       console.log(`Updated auto approve enabled for project ${projectId}: ${enabled}`);
     } catch (error) {
       console.error('Error updating auto approve enabled status:', error);
@@ -2612,19 +2619,19 @@ class DatabaseService {
   ): Promise<DeveloperPerformanceMetrics[]> {
     const conditions = ['performance_date BETWEEN $1 AND $2'];
     const params: any[] = [dateFrom, dateTo];
-    
+
     if (developerId) {
       conditions.push(`developer_id = $${params.length + 1}`);
       params.push(developerId);
     }
-    
+
     if (projectId) {
       conditions.push(`project_id = $${params.length + 1}`);
       params.push(projectId);
     }
-    
+
     const query = `
-      SELECT 
+      SELECT
         dp.*,
         u.username,
         u.name as developer_name,
@@ -2635,7 +2642,7 @@ class DatabaseService {
       WHERE ${conditions.join(' AND ')}
       ORDER BY dp.performance_date DESC, dp.quality_score DESC
     `;
-    
+
     const result = await this.query(query, params);
     return result.rows;
   }
@@ -2664,7 +2671,7 @@ class DatabaseService {
         avg_resolution_time_days = EXCLUDED.avg_resolution_time_days,
         updated_at = NOW()
     `;
-    
+
     await this.query(query, [
       metrics.developer_id,
       metrics.project_id,
@@ -2690,14 +2697,14 @@ class DatabaseService {
   ): Promise<MRQualityMetrics[]> {
     const conditions = ['mqm.created_at BETWEEN $1 AND $2'];
     const params: any[] = [dateFrom, dateTo];
-    
+
     if (developerId) {
       conditions.push(`mqm.developer_id = $${params.length + 1}`);
       params.push(developerId);
     }
-    
+
     const query = `
-      SELECT 
+      SELECT
         mqm.*,
         mrt.title as mr_title,
         mrt.source_branch,
@@ -2707,7 +2714,7 @@ class DatabaseService {
       WHERE ${conditions.join(' AND ')}
       ORDER BY mqm.created_at DESC
     `;
-    
+
     const result = await this.query(query, params);
     return result.rows;
   }
@@ -2736,7 +2743,7 @@ class DatabaseService {
         code_complexity_score = EXCLUDED.code_complexity_score,
         updated_at = NOW()
     `;
-    
+
     await this.query(query, [
       metrics.merge_request_id,
       metrics.developer_id,
@@ -2762,18 +2769,18 @@ class DatabaseService {
   ): Promise<NotionIssue[]> {
     const conditions = ['created_at BETWEEN $1 AND $2', 'issue_type = $3'];
     const params: any[] = [dateFrom, dateTo, issueType];
-    
+
     if (projectId) {
       conditions.push(`project_id = $${params.length + 1}`);
       params.push(projectId);
     }
-    
+
     const query = `
       SELECT * FROM notion_issues
       WHERE ${conditions.join(' AND ')}
       ORDER BY created_at DESC
     `;
-    
+
     const result = await this.query(query, params);
     return result.rows;
   }
@@ -2795,14 +2802,14 @@ class DatabaseService {
         status = EXCLUDED.status,
         priority_level = EXCLUDED.priority_level,
         assignee_id = EXCLUDED.assignee_id,
-        resolved_at = CASE 
-          WHEN EXCLUDED.status = 'Resolved' AND notion_issues.status != 'Resolved' 
-          THEN NOW() 
-          ELSE notion_issues.resolved_at 
+        resolved_at = CASE
+          WHEN EXCLUDED.status = 'Resolved' AND notion_issues.status != 'Resolved'
+          THEN NOW()
+          ELSE notion_issues.resolved_at
         END,
         updated_at = NOW()
     `;
-    
+
     await this.query(query, [
       issue.id,
       issue.notion_page_id,
@@ -2975,8 +2982,9 @@ class DatabaseService {
     const query = `
       INSERT INTO notion_tasks (
         notion_page_id, title, status, assignee_id, assignee_username,
-        assignee_name, project_id, completed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        assignee_name, project_id, completed_at,
+        estimation_start, estimation_end, developer_start, developer_end
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       ON CONFLICT (notion_page_id)
       DO UPDATE SET
         title = EXCLUDED.title,
@@ -2986,6 +2994,10 @@ class DatabaseService {
         assignee_name = EXCLUDED.assignee_name,
         project_id = EXCLUDED.project_id,
         completed_at = EXCLUDED.completed_at,
+        estimation_start = EXCLUDED.estimation_start,
+        estimation_end = EXCLUDED.estimation_end,
+        developer_start = EXCLUDED.developer_start,
+        developer_end = EXCLUDED.developer_end,
         updated_at = NOW()
       RETURNING *
     `;
@@ -2998,7 +3010,11 @@ class DatabaseService {
       task.assignee_username,
       task.assignee_name,
       task.project_id,
-      task.completed_at
+      task.completed_at,
+      task.estimation_start,
+      task.estimation_end,
+      task.developer_start,
+      task.developer_end
     ]);
 
     return result.rows[0];

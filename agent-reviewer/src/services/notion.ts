@@ -772,6 +772,25 @@ export class NotionService {
   }
 
   /**
+
+  /**
+   * Extract a date from Notion page properties by candidate names
+   */
+  private extractDateProperty(properties: Record<string, any>, candidateNames: string[]): Date | undefined {
+    for (const [propertyName, property] of Object.entries(properties)) {
+      const propertyNameLower = propertyName.toLowerCase();
+      if (!candidateNames.some((n) => propertyNameLower.includes(n.toLowerCase()))) continue;
+      if ((property as any).type === 'date') {
+        const dateVal = (property as any).date?.start || (property as any).date?.end;
+        if (dateVal) {
+          const d = new Date(dateVal);
+          if (!isNaN(d.getTime())) return d;
+        }
+      }
+    }
+    return undefined;
+  }
+
    * Extract task status from Notion page properties
    */
   private extractTaskStatus(properties: Record<string, any>): string {
@@ -1103,6 +1122,12 @@ export class NotionService {
       // Determine completion date based on status
       const completedAt = this.isTaskCompleted(status) ? new Date() : undefined;
 
+      // Extract estimation/developer timing fields from Notion (best-effort by common names)
+      const estimationStart = this.extractDateProperty(pageContent.properties, ['estimation start', 'sprint start', 'est start']);
+      const estimationEnd = this.extractDateProperty(pageContent.properties, ['estimation end', 'sprint end', 'est end']);
+      const developerStart = this.extractDateProperty(pageContent.properties, ['developer start', 'dev start', 'start']);
+      const developerEnd = this.extractDateProperty(pageContent.properties, ['developer end', 'dev end', 'end']);
+
       // Create task data
       const taskData = {
         notion_page_id: pageContent.id,
@@ -1112,7 +1137,11 @@ export class NotionService {
         assignee_username: assigneeInfo.assigneeUsername,
         assignee_name: assigneeInfo.assigneeName,
         project_id: projectId,
-        completed_at: completedAt
+        completed_at: completedAt,
+        estimation_start: estimationStart,
+        estimation_end: estimationEnd,
+        developer_start: developerStart,
+        developer_end: developerEnd
       };
 
       // Store in database

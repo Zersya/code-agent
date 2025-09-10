@@ -148,6 +148,11 @@ export interface NotionTask {
   project_id?: number;
   created_at: Date;
   completed_at?: Date;
+  // Additional timing fields from Notion for later calculations
+  estimation_start?: Date;
+  estimation_end?: Date;
+  developer_start?: Date;
+  developer_end?: Date;
   updated_at?: Date;
   // Joined fields
   project_name?: string;
