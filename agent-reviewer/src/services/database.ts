@@ -2548,6 +2548,9 @@ class DatabaseService {
     } finally {
       client.release();
     }
+    }
+
+
 
   /**
    * Set approved_at timestamp for a merge request if not already set or if earlier than provided
