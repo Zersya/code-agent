@@ -23,7 +23,7 @@
           :disabled="isLoading"
           class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
         >
-          Test Stats
+          Test Derived Stats
         </button>
         <button
           @click="testDirectAPI"
@@ -63,9 +63,9 @@
         <pre class="text-sm bg-gray-100 p-4 rounded overflow-auto max-h-64">{{ JSON.stringify(teamRates, null, 2) }}</pre>
       </div>
 
-      <!-- Stats -->
+      <!-- Derived Stats -->
       <div class="bg-white p-6 rounded-lg shadow">
-        <h3 class="text-lg font-semibold mb-4">Completion Rate Stats</h3>
+        <h3 class="text-lg font-semibold mb-4">Derived Completion Rate Stats</h3>
         <pre class="text-sm bg-gray-100 p-4 rounded overflow-auto max-h-64">{{ JSON.stringify(stats, null, 2) }}</pre>
       </div>
 
@@ -150,22 +150,25 @@ const testTeamRates = async () => {
 const testStats = async () => {
   isLoading.value = true
   error.value = null
-  
+
   try {
-    addLog('Stats Test', 'Starting completion rate stats test...', 'info')
-    
+    addLog('Derived Stats Test', 'Deriving completion rate stats from team data...', 'info')
+
     const filters = { month: '2024-01' }
     addLog('Filters', JSON.stringify(filters), 'info')
-    
-    await analyticsStore.fetchCompletionRateStats(filters)
-    
-    stats.value = analyticsStore.completionRateData.stats
-    addLog('Stats Success', 'Stats fetched successfully', 'success')
-    
+
+    if (!analyticsStore.completionRateData.teamRates) {
+      await analyticsStore.fetchTeamCompletionRates(filters)
+      addLog('Team Rates', 'Fetched team rates for deriving stats', 'success')
+    }
+
+    stats.value = analyticsStore.derivedCompletionStats
+    addLog('Derived Stats Success', 'Derived stats computed from team data', 'success')
+
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error'
     error.value = errorMessage
-    addLog('Stats Error', errorMessage, 'error')
+    addLog('Derived Stats Error', errorMessage, 'error')
   } finally {
     isLoading.value = false
   }
@@ -174,22 +177,24 @@ const testStats = async () => {
 const testDirectAPI = async () => {
   isLoading.value = true
   error.value = null
-  
+
   try {
     addLog('Direct API Test', 'Testing direct API calls...', 'info')
-    
+
     // Test team rates API directly
     addLog('API Call', 'Calling getTeamCompletionRates...', 'info')
     const teamResponse = await completionRateApi.getTeamCompletionRates({ month: '2024-01' })
     addLog('Team API Response', JSON.stringify(teamResponse), teamResponse.success ? 'success' : 'error')
-    
-    // Test stats API directly
-    addLog('API Call', 'Calling getCompletionRateStats...', 'info')
-    const statsResponse = await completionRateApi.getCompletionRateStats({ month: '2024-01' })
-    addLog('Stats API Response', JSON.stringify(statsResponse), statsResponse.success ? 'success' : 'error')
-    
+
+    // Stats API removed; derive from team data instead
+    addLog('Stats API', 'Stats endpoint removed. Deriving from team data in store...', 'info')
+    if (!analyticsStore.completionRateData.teamRates) {
+      await analyticsStore.fetchTeamCompletionRates({ month: '2024-01' })
+    }
+    addLog('Derived Stats', JSON.stringify(analyticsStore.derivedCompletionStats), 'success')
+
     addLog('Direct API Test Complete', 'All direct API calls completed', 'success')
-    
+
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error'
     error.value = errorMessage

@@ -30,7 +30,6 @@ import type {
   TeamCompletionRateResponse,
   CompletionRateTrendsResponse,
   ProjectCompletionRateResponse,
-  CompletionRateStatsResponse,
   CompletionRateFilters
 } from '@/types/performance'
 import type {
