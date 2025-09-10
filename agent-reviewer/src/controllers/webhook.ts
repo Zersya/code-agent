@@ -162,6 +162,7 @@ function extractRepopoToken(req: Request): string | null {
  */
 async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRepopo: boolean, repopoToken?: string | null) {
   try {
+    const action = event.object_attributes.action || 'unknown';
     const trackingData = {
       project_id: event.project.id,
       merge_request_iid: event.object_attributes.iid,
@@ -174,9 +175,10 @@ async function saveMergeRequestTrackingData(event: GitLabMergeRequestEvent, isRe
       source_branch: event.object_attributes.source_branch,
       target_branch: event.object_attributes.target_branch,
       status: event.object_attributes.state,
-      action: event.object_attributes.action || 'unknown',
+      action,
       created_at: new Date(event.object_attributes.created_at),
       updated_at: new Date(event.object_attributes.updated_at),
+      approved_at: action === 'approved' ? new Date(event.object_attributes.updated_at) : null,
       merged_at: null, // Will be updated when merge event is processed
       closed_at: null, // Will be updated when close event is processed
       merge_commit_sha: null, // Will be updated when merge event is processed

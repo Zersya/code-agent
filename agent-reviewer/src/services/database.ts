@@ -2519,10 +2519,10 @@ class DatabaseService {
         INSERT INTO merge_request_tracking (
           project_id, merge_request_iid, merge_request_id, title, description,
           author_id, author_username, author_name, source_branch, target_branch,
-          status, action, created_at, updated_at, merged_at, closed_at,
+          status, action, created_at, updated_at, approved_at, merged_at, closed_at,
           merge_commit_sha, repository_url, web_url, is_repopo_event, repopo_token
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         ON CONFLICT (project_id, merge_request_iid)
         DO UPDATE SET
           title = EXCLUDED.title,
@@ -2530,6 +2530,7 @@ class DatabaseService {
           status = EXCLUDED.status,
           action = EXCLUDED.action,
           updated_at = EXCLUDED.updated_at,
+          approved_at = COALESCE(merge_request_tracking.approved_at, EXCLUDED.approved_at),
           merged_at = EXCLUDED.merged_at,
           closed_at = EXCLUDED.closed_at,
           merge_commit_sha = EXCLUDED.merge_commit_sha
@@ -2537,7 +2538,7 @@ class DatabaseService {
         mrData.project_id, mrData.merge_request_iid, mrData.merge_request_id,
         mrData.title, mrData.description, mrData.author_id, mrData.author_username,
         mrData.author_name, mrData.source_branch, mrData.target_branch,
-        mrData.status, mrData.action, mrData.created_at, mrData.updated_at,
+        mrData.status, mrData.action, mrData.created_at, mrData.updated_at, mrData.approved_at,
         mrData.merged_at, mrData.closed_at, mrData.merge_commit_sha,
         mrData.repository_url, mrData.web_url, mrData.is_repopo_event, mrData.repopo_token
       ]);
@@ -2547,7 +2548,31 @@ class DatabaseService {
     } finally {
       client.release();
     }
+
+  /**
+   * Set approved_at timestamp for a merge request if not already set or if earlier than provided
+   */
+  async setMRApprovedAt(projectId: number, mergeRequestIid: number, approvedAt: Date): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(
+        `UPDATE merge_request_tracking
+         SET approved_at = CASE
+           WHEN approved_at IS NULL OR approved_at > $3 THEN $3
+           ELSE approved_at
+         END
+         WHERE project_id = $1 AND merge_request_iid = $2`,
+        [projectId, mergeRequestIid, approvedAt]
+      );
+    } catch (error) {
+      console.error('Error updating MR approved_at:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
+
+
 
   /**
    * Update user MR statistics

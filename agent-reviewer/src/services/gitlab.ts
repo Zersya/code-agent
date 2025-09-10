@@ -491,6 +491,31 @@ export class GitLabService {
 
     return binaryExtensions.includes(extension);
   }
+
+  /**
+   * Get the first approval timestamp for a merge request by scanning system notes
+   */
+  async getMergeRequestApprovalAt(projectId: number | string, mergeRequestIid: number): Promise<Date | undefined> {
+    try {
+      const response = await gitlabApi.get(`/projects/${encodeURIComponent(projectId.toString())}/merge_requests/${mergeRequestIid}/notes`, {
+        params: {
+          per_page: 100,
+          order_by: 'created_at',
+          sort: 'asc',
+        },
+      });
+      const notes: any[] = response.data || [];
+      const approvalNotes = notes.filter(n => n.system && typeof n.body === 'string' && /approved this merge request/i.test(n.body));
+      if (approvalNotes.length > 0) {
+        return new Date(approvalNotes[0].created_at);
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error fetching MR approval timestamp from notes:', error);
+      return undefined;
+    }
+  }
+
 }
 
 export const gitlabService = new GitLabService();
