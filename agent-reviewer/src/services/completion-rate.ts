@@ -134,12 +134,46 @@ export class CompletionRateService {
       const params: any[] = [startDate, endDate];
 
       if (projectId) {
-        query += ` AND project_id = $3`;
+        // Include tasks that either have project_id set or are linked via mappings to this project
+        query += ` AND (
+          project_id = $3
+          OR EXISTS (
+            SELECT 1 FROM task_mr_mappings tmm
+            WHERE tmm.notion_task_id = notion_tasks.id
+              AND tmm.project_id = $3
+          )
+        )`;
         params.push(projectId);
       }
 
-      const result = await dbService.query(query, params);
-      const developers = result.rows.map(row => row.assignee_username);
+      let result = await dbService.query(query, params);
+      let developers = result.rows.map(row => row.assignee_username);
+
+      // Fallback: if no developers found, relax filters to help diagnostics
+      if (developers.length === 0) {
+        console.warn(`No developers found for ${year}-${month} (projectId: ${projectId ?? 'all'}). Retrying without date filter as fallback...`);
+        let fallbackQuery = `
+          SELECT DISTINCT assignee_username
+          FROM notion_tasks
+          WHERE assignee_username IS NOT NULL
+        `;
+        const fallbackParams: any[] = [];
+        if (projectId) {
+          fallbackQuery += ` AND (
+            project_id = $1
+            OR EXISTS (
+              SELECT 1 FROM task_mr_mappings tmm
+              WHERE tmm.notion_task_id = notion_tasks.id
+                AND tmm.project_id = $1
+            )
+          )`;
+          fallbackParams.push(projectId);
+        }
+        fallbackQuery += ` ORDER BY assignee_username ASC LIMIT 20`;
+        const fb = await dbService.query(fallbackQuery, fallbackParams);
+        developers = fb.rows.map(r => r.assignee_username);
+        console.warn(`Fallback developer candidates:`, developers);
+      }
 
       console.log(`Found ${developers.length} developers with tasks in ${year}-${month}`);
 

@@ -3046,7 +3046,15 @@ class DatabaseService {
     }
 
     if (projectId) {
-      query += ` AND project_id = $${paramIndex}`;
+      // Include tasks that either have project_id set or are linked via mappings to this project
+      query += ` AND (
+        project_id = $${paramIndex}
+        OR EXISTS (
+          SELECT 1 FROM task_mr_mappings tmm
+          WHERE tmm.notion_task_id = notion_tasks.id
+            AND tmm.project_id = $${paramIndex}
+        )
+      )`;
       params.push(projectId);
       paramIndex++;
     }
