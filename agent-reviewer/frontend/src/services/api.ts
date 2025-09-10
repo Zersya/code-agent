@@ -294,11 +294,6 @@ export const completionRateApi = {
     console.log('🌐 API: getProjectCompletionRates called for project:', projectId, 'with filters:', filters)
     return apiClient.get<ProjectCompletionRateResponse>(`/analytics/completion-rate/projects/${projectId}`, filters)
   },
-
-  getCompletionRateStats: (filters?: CompletionRateFilters): Promise<ApiResponse<CompletionRateStatsResponse>> => {
-    console.log('🌐 API: getCompletionRateStats called with filters:', filters)
-    return apiClient.get<CompletionRateStatsResponse>('/analytics/completion-rate/stats', filters)
-  },
 }
 
 // WhatsApp API

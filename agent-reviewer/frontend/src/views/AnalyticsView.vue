@@ -543,11 +543,11 @@
         <BaseCard title="Overall Completion Rate">
           <div class="text-center">
             <p class="text-3xl font-bold text-green-600">
-              {{ analyticsStore.completionRateData.stats?.overallCompletionRate?.toFixed(1) || '0' }}%
+              {{ analyticsStore.derivedCompletionStats.overallCompletionRate?.toFixed(1) || '0' }}%
             </p>
             <p class="text-sm text-gray-600">Average completion rate</p>
             <p class="text-xs text-gray-500 mt-1">
-              {{ analyticsStore.completionRateData.stats?.totalDevelopers || 0 }} developers
+              {{ analyticsStore.derivedCompletionStats.totalDevelopers || 0 }} developers
             </p>
           </div>
         </BaseCard>
@@ -555,11 +555,11 @@
         <BaseCard title="Total Tasks">
           <div class="text-center">
             <p class="text-3xl font-bold text-blue-600">
-              {{ analyticsStore.completionRateData.stats?.totalTasks?.toLocaleString() || '0' }}
+              {{ analyticsStore.derivedCompletionStats.totalTasks?.toLocaleString() || '0' }}
             </p>
             <p class="text-sm text-gray-600">Tasks tracked</p>
             <p class="text-xs text-gray-500 mt-1">
-              {{ analyticsStore.completionRateData.stats?.totalCompletedTasks || 0 }} completed
+              {{ analyticsStore.derivedCompletionStats.totalCompletedTasks || 0 }} completed
             </p>
           </div>
         </BaseCard>
@@ -579,13 +579,13 @@
         <BaseCard title="Top Performer">
           <div class="text-center">
             <p class="text-2xl font-bold text-orange-600">
-              {{ getTopPerformer()?.username || 'N/A' }}
+              {{ analyticsStore.derivedCompletionStats.topPerformers?.[0]?.username || 'N/A' }}
             </p>
             <p class="text-sm text-gray-600">
-              {{ getTopPerformer()?.completionRate?.toFixed(1) || '0' }}% completion
+              {{ analyticsStore.derivedCompletionStats.topPerformers?.[0]?.completionRate?.toFixed(1) || '0' }}% completion
             </p>
             <p class="text-xs text-gray-500 mt-1">
-              {{ getTopPerformer()?.totalTasks || 0 }} tasks
+              {{ analyticsStore.derivedCompletionStats.topPerformers?.[0]?.totalTasks || 0 }} tasks
             </p>
           </div>
         </BaseCard>
@@ -668,14 +668,14 @@
         <!-- Monthly Trends Chart -->
         <BaseCard title="Monthly Completion Rate Trends">
           <div class="space-y-4">
-            <div v-if="!analyticsStore.completionRateData.stats?.monthlyTrends?.length" class="text-center text-gray-500 py-8">
+            <div v-if="!analyticsStore.derivedCompletionStats.monthlyTrends?.length" class="text-center text-gray-500 py-8">
               <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <p>No trend data available</p>
             </div>
             <div v-else class="space-y-3">
-              <div v-for="trend in analyticsStore.completionRateData.stats?.monthlyTrends?.slice(0, 6)" :key="`${trend.year}-${trend.month}`" class="flex items-center justify-between">
+              <div v-for="trend in analyticsStore.derivedCompletionStats.monthlyTrends?.slice(0, 6)" :key="`${trend.year}-${trend.month}`" class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
                   <span class="text-sm font-medium text-gray-900">{{ formatMonthYear(trend.month, trend.year) }}</span>
                 </div>
@@ -696,14 +696,14 @@
         <!-- Top Performers -->
         <BaseCard title="Top Performers">
           <div class="space-y-3">
-            <div v-if="!analyticsStore.completionRateData.stats?.topPerformers?.length" class="text-center text-gray-500 py-8">
+            <div v-if="!analyticsStore.derivedCompletionStats.topPerformers?.length" class="text-center text-gray-500 py-8">
               <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <p>No performance data available</p>
             </div>
             <div v-else>
-              <div v-for="(performer, index) in analyticsStore.completionRateData.stats?.topPerformers?.slice(0, 5)" :key="performer.username" class="flex items-center justify-between">
+              <div v-for="(performer, index) in analyticsStore.derivedCompletionStats.topPerformers?.slice(0, 5)" :key="performer.username" class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
                   <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" :class="getPerformerRankColor(index)">
                     {{ index + 1 }}
@@ -1010,8 +1010,8 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
 const selectedDateRange = ref('30')
-// Default to a month that's more likely to have data (3 months ago)
-const selectedCompletionRateMonth = ref(format(subMonths(new Date(), 3), 'yyyy-MM'))
+// Default to a month that's more likely to have data (this month)
+const selectedCompletionRateMonth = ref(format(subMonths(new Date(), 0), 'yyyy-MM'))
 
 const customDateRange = reactive({
   from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -1041,10 +1041,6 @@ const availableMonths = computed(() => {
   return months
 })
 
-const getTopPerformer = () => {
-  const performers = analyticsStore.completionRateData.stats?.topPerformers
-  return performers && performers.length > 0 ? performers[0] : null
-}
 
 // Helper functions
 const getInitials = (name: string): string => {
@@ -1335,11 +1331,6 @@ const refreshCompletionRates = async () => {
     console.log('📊 Fetching team completion rates...')
     await analyticsStore.fetchTeamCompletionRates(filters)
     console.log('✅ Team completion rates fetched')
-
-    // Fetch completion rate stats
-    console.log('📈 Fetching completion rate stats...')
-    await analyticsStore.fetchCompletionRateStats(filters)
-    console.log('✅ Completion rate stats fetched')
 
     console.log('🎉 Completion rate data loaded:', analyticsStore.completionRateData)
   } catch (error) {

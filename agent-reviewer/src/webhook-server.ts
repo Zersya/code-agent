@@ -31,8 +31,7 @@ import {
   getCompletionRate,
   getTeamCompletionRates,
   getCompletionRateTrends,
-  getProjectCompletionRates,
-  getCompletionRateStats
+  getProjectCompletionRates
 } from './controllers/admin-analytics.js';
 import {
   getWhatsAppConfigurations,
@@ -183,7 +182,6 @@ app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
 app.get('/api/analytics/completion-rate/team', adminAuth, getTeamCompletionRates);
 app.get('/api/analytics/completion-rate/trends/:developerId', adminAuth, getCompletionRateTrends);
 app.get('/api/analytics/completion-rate/projects/:projectId', adminAuth, getProjectCompletionRates);
-app.get('/api/analytics/completion-rate/stats', adminAuth, getCompletionRateStats);
 app.get('/api/analytics/completion-rate/:developerId', adminAuth, getCompletionRate);
 
 // WhatsApp Configuration endpoints

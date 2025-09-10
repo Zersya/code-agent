@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { AnalyticsData } from '@/types'
 import { analyticsApi, completionRateApi } from '@/services/api'
 import type {
   CompletionRateResponse,
   TeamCompletionRateResponse,
   CompletionRateTrendsResponse,
-  CompletionRateStatsResponse,
   CompletionRateFilters
 } from '@/types/performance'
 
@@ -109,7 +108,6 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     teamRates?: TeamCompletionRateResponse;
     individualRates: Record<string, CompletionRateResponse>;
     trends: Record<string, CompletionRateTrendsResponse>;
-    stats?: CompletionRateStatsResponse;
   }>({
     individualRates: {},
     trends: {}
@@ -181,30 +179,29 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     }
   }
 
-  const fetchCompletionRateStats = async (filters?: CompletionRateFilters) => {
-    console.log('🏪 Store: fetchCompletionRateStats called with filters:', filters)
-    isLoading.value = true
-    error.value = null
+  // Derived stats computed from teamRates only (no /stats API)
+  const derivedCompletionStats = computed(() => {
+    const team = completionRateData.value.teamRates
+    const developers = team?.developers || []
 
-    try {
-      console.log('🌐 Store: Making API call to getCompletionRateStats...')
-      const response = await completionRateApi.getCompletionRateStats(filters)
-      console.log('📡 Store: API response received:', response)
+    const totalDevelopers = developers.length
+    const totalTasks = developers.reduce((acc, d) => acc + (d.totalTasks || 0), 0)
+    const totalCompletedTasks = developers.reduce((acc, d) => acc + (d.completedTasks || 0), 0)
+    const overallCompletionRate = totalTasks > 0 ? (totalCompletedTasks / totalTasks) * 100 : 0
 
-      if (response.success && response.data) {
-        completionRateData.value.stats = response.data
-        console.log('✅ Store: Stats updated:', completionRateData.value.stats)
-      } else {
-        error.value = response.message || 'Failed to fetch completion rate stats'
-        console.error('❌ Store: API response error:', response)
-      }
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch completion rate stats'
-      console.error('💥 Store: Exception caught:', err)
-    } finally {
-      isLoading.value = false
+    const topPerformers = [...developers]
+      .sort((a, b) => (b.completionRate - a.completionRate) || (b.totalTasks - a.totalTasks))
+      .map(d => ({ username: d.username, completionRate: d.completionRate, totalTasks: d.totalTasks }))
+
+    return {
+      totalDevelopers,
+      totalTasks,
+      totalCompletedTasks,
+      overallCompletionRate,
+      topPerformers,
+      monthlyTrends: [] as Array<{ month: number; year: number; avgCompletionRate: number; totalTasks: number }>
     }
-  }
+  })
 
   const clearError = () => {
     error.value = null
@@ -213,12 +210,12 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   return {
     analytics,
     completionRateData,
+    derivedCompletionStats,
     isLoading,
     error,
     fetchAnalytics,
     fetchTeamCompletionRates,
     fetchCompletionRateTrends,
-    fetchCompletionRateStats,
     clearError
   }
 })
