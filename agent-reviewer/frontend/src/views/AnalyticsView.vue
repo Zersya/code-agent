@@ -1006,7 +1006,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { format, subDays, subMonths, startOfWeek, addDays, getMonth } from 'date-fns'
+import { format, subDays, startOfWeek, addDays, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
 import type { CompletionRateResponse } from '@/types/performance'
 import BaseModal from '@/components/BaseModal.vue'
