@@ -616,7 +616,7 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="developer in analyticsStore.completionRateData.teamRates?.developers || []" :key="developer.username" class="hover:bg-gray-50">
+                <tr v-for="developer in analyticsStore.completionRateData.teamRates?.developers || []" :key="developer.username" class="hover:bg-gray-50 cursor-pointer" @click="openDevTasks(developer)">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                       <div class="flex-shrink-0 h-8 w-8">
@@ -662,6 +662,19 @@
           </div>
         </BaseCard>
       </div>
+        <BaseModal :show="showDevModal" :title="devModalTitle" size="xl" @close="showDevModal = false">
+          <BaseTable
+            :columns="devTaskColumns"
+            :data="devTaskRows"
+            :loading="analyticsStore.isLoading"
+            empty-message="No tasks found for this period"
+          >
+            <template #cell-taskTitle="{ value }">
+              <div class="max-w-xs truncate" :title="value">{{ value }}</div>
+            </template>
+          </BaseTable>
+        </BaseModal>
+
 
       <!-- Completion Rate Trends -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -1003,6 +1016,36 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { format, subDays, subMonths, startOfWeek, addDays, getMonth } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
+import type { CompletionRateResponse } from '@/types/performance'
+import BaseModal from '@/components/BaseModal.vue'
+import BaseTable from '@/components/BaseTable.vue'
+
+
+// === Developer tasks modal state ===
+const showDevModal = ref(false)
+interface CompletionRateBreakdownLite {
+  taskTitle: string
+  taskStatus: string
+  hasAssociatedMR: boolean
+  mrStatus?: string
+  mrMergedAt?: string | Date
+  isCompleted: boolean
+}
+type DevWithBreakdown = CompletionRateResponse & { taskBreakdown?: CompletionRateBreakdownLite[] }
+const selectedDev = ref<DevWithBreakdown | null>(null)
+const openDevTasks = (dev: DevWithBreakdown) => { selectedDev.value = dev; showDevModal.value = true }
+const devModalTitle = computed(() => selectedDev.value ? `${selectedDev.value.username} — Tasks & MRs (${analyticsStore.completionRateData.teamRates?.month || selectedCompletionRateMonth})` : 'Tasks & MRs')
+type TableColumn = { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }
+const devTaskColumns: TableColumn[] = [
+  { key: 'taskTitle', label: 'Task', type: 'text' },
+  { key: 'taskStatus', label: 'Task Status', type: 'text' },
+  { key: 'hasAssociatedMR', label: 'Has MR', type: 'boolean' },
+
+  { key: 'mrStatus', label: 'MR Status', type: 'text' },
+  { key: 'mrMergedAt', label: 'Merged At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+]
+const devTaskRows = computed(() => (selectedDev.value?.taskBreakdown || []) as CompletionRateBreakdownLite[])
+
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseInput from '@/components/BaseInput.vue'
@@ -1325,6 +1368,8 @@ const refreshCompletionRates = async () => {
     const filters = {
       month: selectedCompletionRateMonth.value
     }
+
+
     console.log('📅 Using filters:', filters)
 
     // Fetch team completion rates
