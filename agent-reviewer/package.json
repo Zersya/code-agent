@@ -16,6 +16,7 @@
     "test:dashboard": "node test-dashboard.js",
     "setup:documentation": "ts-node scripts/setup-documentation.ts",
     "backfill-completion-rates": "node dist/scripts/backfill-completion-rates.js",
+    "backfill-notion-timing-fields": "node dist/scripts/backfill-notion-timing-fields.js",
     "verify-completion-rate-integration": "node dist/scripts/verify-completion-rate-integration.js",
     "test-completion-rate-endpoints": "node dist/scripts/test-completion-rate-endpoints.js"
   },
