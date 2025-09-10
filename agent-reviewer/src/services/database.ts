@@ -3114,7 +3114,7 @@ class DatabaseService {
    */
   async getTaskMRMappings(taskId: number): Promise<TaskMRMapping[]> {
     const query = `
-      SELECT tmm.*, mrt.title as mr_title, mrt.status as mr_status, mrt.merged_at as mr_merged_at
+      SELECT tmm.*, mrt.title as mr_title, mrt.status as mr_status, mrt.merged_at as mr_merged_at, mrt.web_url as mr_web_url
       FROM task_mr_mappings tmm
       LEFT JOIN merge_request_tracking mrt ON tmm.project_id = mrt.project_id
         AND tmm.merge_request_iid = mrt.merge_request_iid

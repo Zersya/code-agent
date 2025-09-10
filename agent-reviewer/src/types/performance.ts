@@ -172,6 +172,7 @@ export interface TaskMRMapping {
   mr_title?: string;
   mr_status?: string;
   mr_merged_at?: string;
+  mr_web_url?: string;
 }
 
 export interface FeatureCompletionRate {
@@ -216,6 +217,7 @@ export interface CompletionRateBreakdown {
   notionPageId?: string;
   mrProjectId?: number;
   mrIid?: number;
+  mrWebUrl?: string;
 }
 
 export interface CompletionRateResponse {

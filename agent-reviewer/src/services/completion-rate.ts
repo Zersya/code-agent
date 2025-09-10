@@ -99,7 +99,8 @@ export class CompletionRateService {
           isLate,
           notionPageId: task.notion_page_id,
           mrProjectId: mrMapping?.project_id,
-          mrIid: mrMapping?.merge_request_iid
+          mrIid: mrMapping?.merge_request_iid,
+          mrWebUrl: (mrMapping as any)?.mr_web_url
         });
       }
 

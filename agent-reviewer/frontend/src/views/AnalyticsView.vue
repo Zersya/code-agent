@@ -674,7 +674,9 @@
             </template>
             <template #cell-mrLink="{ item }">
               <div class="whitespace-nowrap">
-                <a v-if="item.hasAssociatedMR && item.mrProjectId && item.mrIid" :href="`https://repopo.transtrack.id/projects/${item.mrProjectId}/merge_requests/${item.mrIid}`" target="_blank" rel="noopener noreferrer" :title="'Open MR'">
+                <a v-if="item.hasAssociatedMR && (item.mrWebUrl || (item.mrProjectId && item.mrIid))"
+                   :href="item.mrWebUrl || `https://repopo.transtrack.id/projects/${item.mrProjectId}/merge_requests/${item.mrIid}`"
+                   target="_blank" rel="noopener noreferrer" :title="'Open MR'">
                   <BaseButton size="xs" variant="primary">View MR</BaseButton>
                 </a>
                 <span v-else class="text-gray-400">-</span>
@@ -1054,6 +1056,7 @@ interface CompletionRateBreakdownLite {
   notionPageId?: string
   mrProjectId?: number
   mrIid?: number
+  mrWebUrl?: string
 }
 type DevWithBreakdown = CompletionRateResponse & { taskBreakdown?: CompletionRateBreakdownLite[] }
 const selectedDev = ref<DevWithBreakdown | null>(null)
