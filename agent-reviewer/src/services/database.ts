@@ -716,10 +716,10 @@ class DatabaseService {
       `);
 
       // Ensure timing columns exist for Notion tasks
-      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS estimation_start TIMESTAMPTZ`);
-      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS estimation_end TIMESTAMPTZ`);
-      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS developer_start TIMESTAMPTZ`);
-      await client.query(`ALTER TABLE IF NOT EXISTS notion_tasks ADD COLUMN IF NOT EXISTS developer_end TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS estimation_start TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS estimation_end TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS developer_start TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS developer_end TIMESTAMPTZ`);
 
 
       await client.query(`
