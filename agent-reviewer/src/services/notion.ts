@@ -772,8 +772,6 @@ export class NotionService {
   }
 
   /**
-
-  /**
    * Extract a date from Notion page properties by candidate names
    */
   private extractDateProperty(properties: Record<string, any>, candidateNames: string[]): Date | undefined {
@@ -791,6 +789,7 @@ export class NotionService {
     return undefined;
   }
 
+  /**
    * Extract task status from Notion page properties
    */
   private extractTaskStatus(properties: Record<string, any>): string {
@@ -1114,6 +1113,11 @@ export class NotionService {
     try {
       // Import dbService here to avoid circular dependency
       const { dbService } = await import('./database.js');
+
+      // touch originalUrl to satisfy TS noUnusedParameters and keep for future use
+      if (originalUrl) {
+        // no-op: originalUrl is preserved for potential future linkage/logging
+      }
 
       // Extract assignee and status information
       const assigneeInfo = this.extractAssigneeInfo(pageContent.properties);
