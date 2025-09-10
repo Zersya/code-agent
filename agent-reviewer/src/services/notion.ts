@@ -262,7 +262,7 @@ export class NotionService {
   /**
    * Fetch page content from Notion API
    */
-  private async fetchPageContent(pageId: string): Promise<NotionPageContent> {
+  public async fetchPageContent(pageId: string): Promise<NotionPageContent> {
     if (!this.client) {
       throw new Error('Notion client is not initialized');
     }
