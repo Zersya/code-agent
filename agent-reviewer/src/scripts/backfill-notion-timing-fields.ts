@@ -1,12 +1,12 @@
 /*
   Backfill Notion timing fields for existing tasks.
-  - Hydrates: estimation_start, estimation_end, developer_start, developer_end, completed_at
+  - Hydrates: estimation_start, estimation_end, developer_start, developer_end, completed_at, ready_to_test_at
   - By default processes only tasks missing any of these fields.
   - Use --all to process all tasks.
 
   Usage examples:
-    bun run src/scripts/backfill-notion-timing-fields.ts
-    bun run src/scripts/backfill-notion-timing-fields.ts --all
+    npm run backfill-notion-timing-fields
+    npm run backfill-notion-timing-fields -- --all
 */
 
 import { dbService } from '../services/database.js'
@@ -21,6 +21,7 @@ interface Row {
   developer_start: string | null
   developer_end: string | null
   completed_at: string | null
+  ready_to_test_at: string | null
 }
 
 async function main() {
@@ -31,10 +32,10 @@ async function main() {
 
   const whereClause = processAll
     ? ''
-    : `WHERE estimation_start IS NULL OR estimation_end IS NULL OR developer_start IS NULL OR developer_end IS NULL OR completed_at IS NULL`
+    : `WHERE estimation_start IS NULL OR estimation_end IS NULL OR developer_start IS NULL OR developer_end IS NULL OR completed_at IS NULL OR ready_to_test_at IS NULL`
 
   const query = `
-    SELECT id, notion_page_id, project_id, estimation_start, estimation_end, developer_start, developer_end, completed_at
+    SELECT id, notion_page_id, project_id, estimation_start, estimation_end, developer_start, developer_end, completed_at, ready_to_test_at
     FROM notion_tasks
     ${whereClause}
     ORDER BY id ASC

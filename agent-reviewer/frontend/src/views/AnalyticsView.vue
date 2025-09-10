@@ -664,23 +664,24 @@
             <template #cell-taskTitle="{ value }">
               <div class="max-w-xs truncate" :title="value">{{ value }}</div>
             </template>
-          </BaseTable>
-            <template #cell-notionLink="{ row }">
+            <template #cell-notionLink="{ item }">
               <div class="whitespace-nowrap">
-                <a v-if="row.notionPageId" :href="`https://www.notion.so/${row.notionPageId.replace(/-/g, '')}`" target="_blank" rel="noopener noreferrer" :title="'Open in Notion'">
+                <a v-if="item.notionPageId" :href="`https://www.notion.so/${item.notionPageId.replace(/-/g, '')}`" target="_blank" rel="noopener noreferrer" :title="'Open in Notion'">
                   <BaseButton size="xs" variant="secondary">View Notion</BaseButton>
                 </a>
                 <span v-else class="text-gray-400">-</span>
               </div>
             </template>
-            <template #cell-mrLink="{ row }">
+            <template #cell-mrLink="{ item }">
               <div class="whitespace-nowrap">
-                <a v-if="row.hasAssociatedMR && row.mrProjectId && row.mrIid" :href="`https://repopo.transtrack.id/projects/${row.mrProjectId}/merge_requests/${row.mrIid}`" target="_blank" rel="noopener noreferrer" :title="'Open MR'">
+                <a v-if="item.hasAssociatedMR && item.mrProjectId && item.mrIid" :href="`https://repopo.transtrack.id/projects/${item.mrProjectId}/merge_requests/${item.mrIid}`" target="_blank" rel="noopener noreferrer" :title="'Open MR'">
                   <BaseButton size="xs" variant="primary">View MR</BaseButton>
                 </a>
                 <span v-else class="text-gray-400">-</span>
               </div>
             </template>
+
+          </BaseTable>
 
         </BaseModal>
 
@@ -1044,6 +1045,12 @@ interface CompletionRateBreakdownLite {
   developerStart?: string | Date
   developerEnd?: string | Date
   completedAt?: string | Date
+  // Derived analytics
+  devLeadTimeHours?: number
+  qaTimeHours?: number
+  estimationOverrunHours?: number
+  isLate?: boolean
+  // Links
   notionPageId?: string
   mrProjectId?: number
   mrIid?: number
@@ -1064,6 +1071,10 @@ const devTaskColumns: TableColumn[] = [
   { key: 'developerStart', label: 'Dev Start', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'developerEnd', label: 'Dev End', type: 'date', format: 'MMM dd, yyyy HH:mm' },
   { key: 'completedAt', label: 'Completed At', type: 'date', format: 'MMM dd, yyyy HH:mm' },
+  { key: 'devLeadTimeHours', label: 'Dev Lead (h)', type: 'number' },
+  { key: 'qaTimeHours', label: 'QA (h)', type: 'number' },
+  { key: 'estimationOverrunHours', label: 'Overrun (h)', type: 'number' },
+  { key: 'isLate', label: 'Late', type: 'boolean' },
   { key: 'notionLink', label: 'Notion', type: 'text' },
   { key: 'mrLink', label: 'MR', type: 'text' },
 ]

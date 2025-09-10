@@ -1194,6 +1194,8 @@ export class NotionService {
         || this.extractDateProperty(pageContent.properties, ['developer start', 'dev start', 'start development']);
       const developerEnd = this.extractDateByName(pageContent.properties, ['End Development'])
         || this.extractDateProperty(pageContent.properties, ['developer end', 'dev end', 'end development']);
+      const readyToTestAt = this.extractDateByName(pageContent.properties, ['Ready To Test At'])
+        || this.extractDateProperty(pageContent.properties, ['ready to test', 'ready_to_test']);
 
       // Create task data
       const taskData = {
@@ -1208,7 +1210,8 @@ export class NotionService {
         estimation_start: estimationStart,
         estimation_end: estimationEnd,
         developer_start: developerStart,
-        developer_end: developerEnd
+        developer_end: developerEnd,
+        ready_to_test_at: readyToTestAt
       };
 
       // Store in database

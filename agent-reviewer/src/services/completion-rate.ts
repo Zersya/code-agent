@@ -65,6 +65,21 @@ export class CompletionRateService {
 
         // Add to breakdown
         const mrMapping = mrMappings[0]; // Take first MR if multiple
+        const toDate = (v: any) => (v ? new Date(v) : undefined);
+        const diffHours = (end?: Date, start?: Date) =>
+          end && start ? Math.round(((end.getTime() - start.getTime()) / 36e5) * 10) / 10 : undefined;
+
+        const devStart = toDate(task.developer_start);
+        const devEnd = toDate(task.developer_end);
+        const estEnd = toDate(task.estimation_end);
+        const doneAt = toDate(task.completed_at);
+        const rttAt = toDate((task as any).ready_to_test_at);
+
+        const devLeadTimeHours = diffHours(devEnd, devStart);
+        const qaTimeHours = diffHours(doneAt, rttAt);
+        const estimationOverrunHours = diffHours(doneAt, estEnd);
+        const isLate = typeof estimationOverrunHours === 'number' ? estimationOverrunHours > 0 : undefined;
+
         taskBreakdown.push({
           taskId: task.id!,
           taskTitle: task.title,
@@ -78,6 +93,10 @@ export class CompletionRateService {
           developerStart: task.developer_start,
           developerEnd: task.developer_end,
           completedAt: task.completed_at,
+          devLeadTimeHours,
+          qaTimeHours,
+          estimationOverrunHours,
+          isLate,
           notionPageId: task.notion_page_id,
           mrProjectId: mrMapping?.project_id,
           mrIid: mrMapping?.merge_request_iid
@@ -137,7 +156,7 @@ export class CompletionRateService {
         SELECT DISTINCT assignee_username
         FROM notion_tasks
         WHERE assignee_username IS NOT NULL
-          AND created_at BETWEEN $1 AND $2
+          AND COALESCE(estimation_start, developer_start, created_at) BETWEEN $1 AND $2
       `;
       const params: any[] = [startDate, endDate];
 

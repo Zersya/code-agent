@@ -153,6 +153,7 @@ export interface NotionTask {
   estimation_end?: Date;
   developer_start?: Date;
   developer_end?: Date;
+  ready_to_test_at?: Date;
   updated_at?: Date;
   // Joined fields
   project_name?: string;
@@ -206,6 +207,11 @@ export interface CompletionRateBreakdown {
   developerStart?: Date;
   developerEnd?: Date;
   completedAt?: Date;
+  // Derived analytics
+  devLeadTimeHours?: number;
+  qaTimeHours?: number;
+  estimationOverrunHours?: number;
+  isLate?: boolean;
   // Links & identifiers for UI actions
   notionPageId?: string;
   mrProjectId?: number;
