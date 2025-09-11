@@ -831,7 +831,12 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="user in analyticsStore.analytics.mergeRequestMetrics.mrsByUser" :key="user.username" class="hover:bg-gray-50">
+                <tr
+                  v-for="user in analyticsStore.analytics.mergeRequestMetrics.mrsByUser"
+                  :key="user.username"
+                  class="hover:bg-gray-50 cursor-pointer"
+                  @click="openMRListForUser(user.username)"
+                >
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                       <div class="flex-shrink-0 h-8 w-8">
@@ -909,7 +914,12 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="project in analyticsStore.analytics.mergeRequestMetrics.mrsByProject" :key="project.project_id" class="hover:bg-gray-50">
+                <tr
+                  v-for="project in analyticsStore.analytics.mergeRequestMetrics.mrsByProject"
+                  :key="project.project_id"
+                  class="hover:bg-gray-50 cursor-pointer"
+                  @click="openMRListForProject(project.project_id, project.project_name)"
+                >
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                       <div class="flex-shrink-0 h-8 w-8">
