@@ -657,7 +657,7 @@
         <BaseModal :show="showDevModal" :title="devModalTitle" size="xl" @close="showDevModal = false">
           <BaseTable
             :columns="devTaskColumns"
-            :data="devTaskRows"
+            :data="devTaskRowsFiltered"
             :loading="analyticsStore.isLoading"
             empty-message="No tasks found for this period"
           >
@@ -1086,7 +1086,46 @@ const devTaskColumns: TableColumn[] = [
   { key: 'notionLink', label: 'Notion', type: 'text' },
   { key: 'mrLink', label: 'MR', type: 'text' },
 ]
-const devTaskRows = computed(() => (selectedDev.value?.taskBreakdown || []) as CompletionRateBreakdownLite[])
+
+// Active date range derived from top-level filter
+const activeDateRange = computed(() => {
+  if (selectedDateRange.value === 'custom') {
+    return { from: new Date(customDateRange.from), to: new Date(customDateRange.to) }
+  }
+  const days = parseInt(selectedDateRange.value || '30')
+  return { from: subDays(new Date(), days), to: new Date() }
+})
+
+function parseMaybeDate(v?: string | Date): Date | undefined {
+  if (!v) return undefined
+  const d = typeof v === 'string' ? new Date(v) : v
+  return isNaN(d.getTime()) ? undefined : d
+}
+
+function getRowReferenceDate(row: CompletionRateBreakdownLite): Date | undefined {
+  // Mirror backend logic preference: estimationStart -> developerStart -> completedAt -> approvalAt -> mrMergedAt
+  return (
+    parseMaybeDate(row.estimationStart) ||
+    parseMaybeDate(row.developerStart) ||
+    parseMaybeDate(row.completedAt) ||
+    parseMaybeDate(row.approvalAt) ||
+    parseMaybeDate(row.mrMergedAt)
+  )
+}
+
+const devTaskRowsFiltered = computed(() => {
+  const rows = (selectedDev.value?.taskBreakdown || []) as CompletionRateBreakdownLite[]
+  const { from, to } = activeDateRange.value
+  if (!from || !to) return rows
+  const fromMs = from.getTime()
+  const toMs = to.getTime()
+  return rows.filter(r => {
+    const d = getRowReferenceDate(r)
+    if (!d) return false
+    const t = d.getTime()
+    return t >= fromMs && t <= toMs
+  })
+})
 
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
