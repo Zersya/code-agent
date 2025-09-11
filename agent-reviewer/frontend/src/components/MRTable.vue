@@ -52,6 +52,11 @@
       {{ value ? formatMergeTime(value) : '-' }}
     </template>
 
+    <template #cell-approval_time_hours="{ value }">
+      {{ value ? formatMergeTime(value) : '-' }}
+    </template>
+
+
     <template #cell-is_repopo_event="{ value }">
       <span :class="value ? 'text-purple-600' : 'text-blue-600'" class="font-medium">
         {{ value ? 'Repopo' : 'GitLab' }}
@@ -100,6 +105,7 @@ const columns = computed(() => [
   { key: 'critical_issues_count', label: 'Issues', sortable: true },
   { key: 'created_at', label: 'Created', sortable: true, type: 'date' as const },
   { key: 'merge_time_hours', label: 'Merge Time', sortable: false },
+  { key: 'approval_time_hours', label: 'Approval Time', sortable: false },
   { key: 'is_repopo_event', label: 'Source', sortable: false },
   { key: 'actions', label: '', sortable: false }
 ])

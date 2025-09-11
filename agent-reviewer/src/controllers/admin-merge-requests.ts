@@ -151,16 +151,22 @@ export const getMergeRequests = async (req: Request, res: Response): Promise<voi
         mrt.updated_at,
         mrt.merged_at,
         mrt.closed_at,
+        mrt.approved_at,
         mrt.merge_commit_sha,
         mrt.repository_url,
         mrt.web_url,
         mrt.is_repopo_event,
         p.name as project_name,
-        CASE 
-          WHEN mrt.merged_at IS NOT NULL AND mrt.created_at IS NOT NULL 
-          THEN EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at)) / 3600 
-          ELSE NULL 
+        CASE
+          WHEN mrt.merged_at IS NOT NULL AND mrt.created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at)) / 3600
+          ELSE NULL
         END as merge_time_hours,
+        CASE
+          WHEN mrt.approved_at IS NOT NULL AND mrt.created_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (mrt.approved_at - mrt.created_at)) / 3600
+          ELSE NULL
+        END as approval_time_hours,
         mrr.status as review_status,
         mrr.reviewer_type,
         mrr.critical_issues_count,

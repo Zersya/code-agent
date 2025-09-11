@@ -1193,8 +1193,8 @@ async function openMRListForUser(username: string) {
   try {
     const resp = await mergeRequestApi.getMergeRequests({
       authorUsername: username,
-      from_date: format(from, 'yyyy-MM-dd'),
-      to_date: format(to, 'yyyy-MM-dd'),
+      dateFrom: format(from, 'yyyy-MM-dd'),
+      dateTo: format(to, 'yyyy-MM-dd'),
       limit: 100
     })
     mrList.value = (resp.success && resp.data) ? resp.data : []
@@ -1211,8 +1211,8 @@ async function openMRListForProject(projectId: number, projectName?: string) {
   try {
     const resp = await mergeRequestApi.getMergeRequests({
       projectId,
-      from_date: format(from, 'yyyy-MM-dd'),
-      to_date: format(to, 'yyyy-MM-dd'),
+      dateFrom: format(from, 'yyyy-MM-dd'),
+      dateTo: format(to, 'yyyy-MM-dd'),
       limit: 100
     })
     mrList.value = (resp.success && resp.data) ? resp.data : []

@@ -353,7 +353,9 @@ export interface MergeRequestDetails {
   updated_at: string
   merged_at?: string
   closed_at?: string
+  approved_at?: string
   merge_time_hours?: number
+  approval_time_hours?: number
   repository_url: string
   web_url: string
   is_repopo_event: boolean
@@ -438,8 +440,12 @@ export interface MergeRequestListParams {
   projectId?: number
   authorUsername?: string
   status?: 'opened' | 'merged' | 'closed' | ''
+  // Legacy names used in some places; backend expects dateFrom/dateTo
   from_date?: string
   to_date?: string
+  // Preferred names for backend filtering by created_at
+  dateFrom?: string
+  dateTo?: string
   search?: string
 }
 
