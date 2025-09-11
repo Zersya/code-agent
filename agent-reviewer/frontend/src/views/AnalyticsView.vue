@@ -825,9 +825,6 @@
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Avg Merge Time
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MRs
-                  </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -876,9 +873,6 @@
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ user.avg_merge_time_hours?.toFixed(1) }}h
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <BaseButton size="sm" @click.stop="openMRListForUser(user.username)">View</BaseButton>
-                  </td>
                 </tr>
               </tbody>
             </table>
@@ -907,9 +901,6 @@
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Avg Merge Time
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MRs
                   </th>
                 </tr>
               </thead>
@@ -961,9 +952,6 @@
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ project.avg_merge_time_hours?.toFixed(1) }}h
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <BaseButton size="sm" @click.stop="openMRListForProject(project.project_id, project.project_name)">View</BaseButton>
                   </td>
                 </tr>
               </tbody>
