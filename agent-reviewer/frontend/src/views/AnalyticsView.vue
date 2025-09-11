@@ -622,10 +622,10 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ developer.totalTasks }}
+                    {{ getFilteredTotalTasks(developer) }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ developer.completedTasks }}
+                    {{ getFilteredCompletedTasks(developer) }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
@@ -646,7 +646,7 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ developer.tasksWithMRs }}
+                    {{ getFilteredTasksWithMRs(developer) }}
                   </td>
                 </tr>
               </tbody>
@@ -686,6 +686,11 @@
           </BaseTable>
 
         </BaseModal>
+
+        <BaseModal :show="showMRListModal" :title="mrListTitle" size="xl" @close="showMRListModal = false">
+          <MRTable :mergeRequests="mrList" :loading="mrListLoading" />
+        </BaseModal>
+
 
 
       <!-- Completion Rate Trends -->
@@ -820,6 +825,9 @@
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Avg Merge Time
                   </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    MRs
+                  </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -863,6 +871,9 @@
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ user.avg_merge_time_hours?.toFixed(1) }}h
                   </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <BaseButton size="sm" @click.stop="openMRListForUser(user.username)">View</BaseButton>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -891,6 +902,9 @@
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Avg Merge Time
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    MRs
                   </th>
                 </tr>
               </thead>
@@ -937,6 +951,9 @@
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {{ project.avg_merge_time_hours?.toFixed(1) }}h
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <BaseButton size="sm" @click.stop="openMRListForProject(project.project_id, project.project_name)">View</BaseButton>
                   </td>
                 </tr>
               </tbody>
@@ -1126,6 +1143,74 @@ const devTaskRowsFiltered = computed(() => {
     return t >= fromMs && t <= toMs
   })
 })
+
+// Helpers to filter a developer's breakdown by active date range
+function filterBreakdownByDate(breakdown?: CompletionRateBreakdownLite[]): CompletionRateBreakdownLite[] {
+  const items = breakdown || []
+  const { from, to } = activeDateRange.value
+  if (!from || !to) return items
+  const fromMs = from.getTime(), toMs = to.getTime()
+  return items.filter(r => {
+    const d = getRowReferenceDate(r)
+    return d ? (d.getTime() >= fromMs && d.getTime() <= toMs) : false
+  })
+}
+
+function getFilteredTotalTasks(dev: DevWithBreakdown): number {
+  return filterBreakdownByDate(dev.taskBreakdown).length
+}
+function getFilteredCompletedTasks(dev: DevWithBreakdown): number {
+  return filterBreakdownByDate(dev.taskBreakdown).filter(r => r.isCompleted).length
+}
+function getFilteredTasksWithMRs(dev: DevWithBreakdown): number {
+  return filterBreakdownByDate(dev.taskBreakdown).filter(r => r.hasAssociatedMR).length
+}
+
+// MR list modal (for Developer/Project Performance sections)
+import { mergeRequestApi } from '@/services/api'
+import MRTable from '@/components/MRTable.vue'
+import type { MergeRequestDetails } from '@/types'
+
+const showMRListModal = ref(false)
+const mrListTitle = ref('')
+const mrList = ref<MergeRequestDetails[]>([])
+const mrListLoading = ref(false)
+
+async function openMRListForUser(username: string) {
+  const { from, to } = activeDateRange.value
+  mrListTitle.value = `MRs by ${username}`
+  mrListLoading.value = true
+  try {
+    const resp = await mergeRequestApi.getMergeRequests({
+      authorUsername: username,
+      from_date: format(from, 'yyyy-MM-dd'),
+      to_date: format(to, 'yyyy-MM-dd'),
+      limit: 100
+    })
+    mrList.value = (resp.success && resp.data) ? resp.data : []
+  } finally {
+    mrListLoading.value = false
+    showMRListModal.value = true
+  }
+}
+
+async function openMRListForProject(projectId: number, projectName?: string) {
+  const { from, to } = activeDateRange.value
+  mrListTitle.value = `MRs for ${projectName || 'Project ' + projectId}`
+  mrListLoading.value = true
+  try {
+    const resp = await mergeRequestApi.getMergeRequests({
+      projectId,
+      from_date: format(from, 'yyyy-MM-dd'),
+      to_date: format(to, 'yyyy-MM-dd'),
+      limit: 100
+    })
+    mrList.value = (resp.success && resp.data) ? resp.data : []
+  } finally {
+    mrListLoading.value = false
+    showMRListModal.value = true
+  }
+}
 
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
