@@ -528,6 +528,22 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
       return;
     }
 
+    // Ensure task-MR mappings exist at merge time (idempotent)
+    try {
+      if (event.object_attributes.description) {
+        await taskMRMappingService.processMergeRequestForTaskMapping(
+          projectId,
+          mergeRequestIid,
+          event.object_attributes.id,
+          event.object_attributes.description,
+          event.user?.username
+        );
+        console.log(`Processed task-MR mappings (merge event) for MR !${mergeRequestIid}`);
+      }
+    } catch (taskMappingError) {
+      console.error(`Error processing task mappings on merge for MR !${mergeRequestIid}:`, taskMappingError);
+    }
+
     // Update merge request tracking data with merged_at timestamp and merge_commit_sha
     try {
       const updateData = {
@@ -688,6 +704,53 @@ async function processRepopoMergeCompletionEvent(event: RepopoWebhookEvent) {
       } catch (metricsError) {
         console.error(`Error processing performance metrics for Repopo MR !${mergeRequestIid}:`, metricsError);
       }
+
+      // Ensure task-MR mappings exist at merge time (idempotent)
+      try {
+        if (event.object_attributes.description) {
+          await taskMRMappingService.processMergeRequestForTaskMapping(
+            projectId,
+            mergeRequestIid,
+            event.object_attributes.id,
+            event.object_attributes.description,
+            event.user?.username
+          );
+          console.log(`Processed task-MR mappings (merge event) for Repopo MR !${mergeRequestIid}`);
+        }
+      } catch (taskMappingError) {
+        console.error(`Error processing task mappings on Repopo merge for MR !${mergeRequestIid}:`, taskMappingError);
+      }
+
+      // Update task completion status for associated Notion tasks (Repopo)
+      try {
+        await taskMRMappingService.updateTaskCompletionOnMerge(projectId, mergeRequestIid);
+        console.log(`Updated task completion status for merged Repopo MR !${mergeRequestIid}`);
+      } catch (taskError) {
+        console.error(`Error updating task completion for Repopo MR !${mergeRequestIid}:`, taskError);
+      }
+
+      // Trigger completion rate recalculation (Repopo)
+      try {
+        await completionRateService.onMergeRequestMerged(
+          projectId,
+          mergeRequestIid,
+          updateData.author_username
+        );
+        console.log(`Triggered completion rate recalculation for merged Repopo MR !${mergeRequestIid}`);
+      } catch (completionRateError) {
+        console.error(`Error recalculating completion rate for Repopo MR !${mergeRequestIid}:`, completionRateError);
+      }
+
+      try {
+        await performanceService.processMRForQualityMetrics(
+          event.object_attributes.id,
+          projectId,
+          updateData.author_id
+        );
+        console.log(`Processed performance metrics for merged Repopo MR !${mergeRequestIid}`);
+      } catch (metricsError) {
+        console.error(`Error processing performance metrics for Repopo MR !${mergeRequestIid}:`, metricsError);
+      }
     } catch (updateError) {
       console.error(`Error updating Repopo merge request tracking data for MR !${mergeRequestIid}:`, updateError);
     }
@@ -751,15 +814,18 @@ async function processRepopoMergeRequestEvent(event: RepopoWebhookEvent) {
     // First, process the merge request normally to generate embeddings
     await processMergeRequestEvent(event);
 
-    // Then, trigger the review process
-    console.log(`Starting review for merge request !${mergeRequestIid} in project ${projectId}`);
-
-    try {
-      // Submit the review (this will add a comment and approve if appropriate)
-      await reviewService.submitReview(projectId, mergeRequestIid);
-      console.log(`Successfully reviewed merge request !${mergeRequestIid} in project ${projectId}`);
-    } catch (reviewError) {
-      console.error(`Error reviewing merge request !${mergeRequestIid} in project ${projectId}:`, reviewError);
+    // Then, trigger the review process only on MR creation (not updates)
+    if ((event.object_attributes.action || '') === 'open') {
+      console.log(`Starting review for merge request !${mergeRequestIid} in project ${projectId} (action=open)`);
+      try {
+        // Submit the review (this will add a comment and approve if appropriate)
+        await reviewService.submitReview(projectId, mergeRequestIid);
+        console.log(`Successfully reviewed merge request !${mergeRequestIid} in project ${projectId}`);
+      } catch (reviewError) {
+        console.error(`Error reviewing merge request !${mergeRequestIid} in project ${projectId}:`, reviewError);
+      }
+    } else {
+      console.log(`Skipping review for MR !${mergeRequestIid} (action=${event.object_attributes.action}). Reviews only run on creation or emoji reactions.`);
     }
   } catch (error) {
     console.error('Error processing Repopo merge request event:', error);
@@ -828,33 +894,22 @@ async function processEmojiEvent(event: GitLabEmojiEvent) {
       return;
     }
 
-    // Only process emojis on notes/comments
-    if (event.object_attributes.awardable_type !== 'Note' || !event.note) {
-      console.log('Emoji is not on a note, skipping');
+    // Process emojis on Notes (comments) or directly on Merge Requests
+    const awardableType = event.object_attributes.awardable_type;
+    if (awardableType !== 'Note' && awardableType !== 'MergeRequest') {
+      console.log(`Emoji is on unsupported awardable_type=${awardableType}, skipping`);
       return;
     }
 
-    // Check if the note is on a merge request
     if (!event.merge_request) {
-      console.log('Note is not on a merge request, skipping');
+      console.log('Emoji event does not include merge_request context, skipping');
       return;
     }
-
-    // Check if the note contains the trigger phrase for re-review
-    // const noteBody = event.note.note;
-    // const triggerPhrase = 'Merge request has already been reviewed';
-
-    // if (!noteBody.includes(triggerPhrase)) {
-    //   console.log('Note does not contain re-review trigger phrase, skipping');
-    //   return;
-    // }
-
-    // console.log(`Emoji ${event.object_attributes.name} added to note with re-review trigger phrase, triggering re-review`);
 
     const projectId = event.project_id;
     const mergeRequestIid = event.merge_request.iid;
 
-    await triggerReReview(projectId, mergeRequestIid, 'emoji_reaction');
+    await triggerReReview(projectId, mergeRequestIid, `emoji_reaction_${awardableType.toLowerCase()}`);
   } catch (error) {
     console.error('Error processing emoji event:', error);
   }
