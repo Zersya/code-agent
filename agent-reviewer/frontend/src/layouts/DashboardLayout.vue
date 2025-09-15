@@ -32,13 +32,6 @@
                   Merge Requests
                 </router-link>
                 <router-link
-                  to="/status"
-                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                  active-class="border-primary-500 text-primary-600"
-                >
-                  Status
-                </router-link>
-                <router-link
                   to="/analytics"
                   class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
                   active-class="border-primary-500 text-primary-600"
@@ -93,6 +86,13 @@
                   >
                     WhatsApp Settings
                   </router-link>
+                  <router-link
+                    to="/status"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    @click="showMoreDropdown = false"
+                  >
+                    Status
+                  </router-link>
                 </div>
               </div>
 
@@ -111,13 +111,6 @@
                   active-class="border-primary-500 text-primary-600"
                 >
                   MRs
-                </router-link>
-                <router-link
-                  to="/status"
-                  class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                  active-class="border-primary-500 text-primary-600"
-                >
-                  Status
                 </router-link>
                 <router-link
                   to="/analytics"
@@ -165,13 +158,6 @@
                 active-class="border-primary-500 text-primary-600"
               >
                 MRs
-              </router-link>
-              <router-link
-                to="/status"
-                class="flex items-center border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-                active-class="border-primary-500 text-primary-600"
-              >
-                Status
               </router-link>
               <router-link
                 to="/analytics"
@@ -325,7 +311,7 @@ const showMoreDropdown = ref(false)
 
 // Check if current route is in the "More" dropdown to highlight the dropdown
 const isMoreDropdownActive = computed(() => {
-  const moreRoutes = ['/repository-embedding', '/documentation', '/auto-review-settings']
+  const moreRoutes = ['/repository-embedding', '/documentation', '/auto-review-settings', '/whatsapp-settings', '/status']
   return moreRoutes.includes(route.path)
 })
 

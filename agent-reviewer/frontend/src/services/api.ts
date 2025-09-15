@@ -30,6 +30,7 @@ import type {
   TeamCompletionRateResponse,
   CompletionRateTrendsResponse,
   ProjectCompletionRateResponse,
+  CompletionRateStatsResponse,
   CompletionRateFilters
 } from '@/types/performance'
 import type {
@@ -292,6 +293,11 @@ export const completionRateApi = {
   getProjectCompletionRates: (projectId: number, filters?: CompletionRateFilters): Promise<ApiResponse<ProjectCompletionRateResponse>> => {
     console.log('🌐 API: getProjectCompletionRates called for project:', projectId, 'with filters:', filters)
     return apiClient.get<ProjectCompletionRateResponse>(`/analytics/completion-rate/projects/${projectId}`, filters)
+  },
+
+  getCompletionRateStats: (filters?: { month?: string; projectId?: number; dateFrom?: string; dateTo?: string }): Promise<ApiResponse<CompletionRateStatsResponse>> => {
+    console.log('🌐 API: getCompletionRateStats called with filters:', filters)
+    return apiClient.get<CompletionRateStatsResponse>('/analytics/completion-rate/stats', filters)
   },
 }
 

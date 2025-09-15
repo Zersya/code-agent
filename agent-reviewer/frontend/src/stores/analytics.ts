@@ -6,6 +6,7 @@ import type {
   CompletionRateResponse,
   TeamCompletionRateResponse,
   CompletionRateTrendsResponse,
+  CompletionRateStatsResponse,
   CompletionRateFilters
 } from '@/types/performance'
 
@@ -113,6 +114,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     trends: {}
   })
 
+  const completionRateStats = ref<CompletionRateStatsResponse | null>(null)
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -179,6 +182,25 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     }
   }
 
+  const fetchCompletionRateStats = async (filters?: { month?: string; projectId?: number; dateFrom?: string; dateTo?: string }) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await completionRateApi.getCompletionRateStats(filters)
+
+      if (response.success && response.data) {
+        completionRateStats.value = response.data
+      } else {
+        error.value = response.message || 'Failed to fetch completion rate stats'
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to fetch completion rate stats'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // Derived stats computed from teamRates only (no /stats API)
   const derivedCompletionStats = computed(() => {
     const team = completionRateData.value.teamRates
@@ -199,7 +221,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       totalCompletedTasks,
       overallCompletionRate,
       topPerformers,
-      monthlyTrends: [] as Array<{ month: number; year: number; avgCompletionRate: number; totalTasks: number }>
+      monthlyTrends: completionRateStats.value?.monthlyTrends || []
     }
   })
 
@@ -216,6 +238,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     fetchAnalytics,
     fetchTeamCompletionRates,
     fetchCompletionRateTrends,
+    fetchCompletionRateStats,
+    completionRateStats,
     clearError
   }
 })

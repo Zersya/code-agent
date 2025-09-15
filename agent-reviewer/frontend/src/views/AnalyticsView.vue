@@ -13,6 +13,9 @@
           @change="handleDateRangeChange"
           class="input"
         >
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="this_week">This Week</option>
           <option value="7">Last 7 days</option>
           <option value="30">Last 30 days</option>
           <option value="90">Last 90 days</option>
@@ -1480,13 +1483,31 @@ const getLanguageColor = (language: string) => {
 
 const handleDateRangeChange = () => {
   if (selectedDateRange.value !== 'custom') {
-    const days = parseInt(selectedDateRange.value)
-    const from = format(subDays(new Date(), days), 'yyyy-MM-dd')
-    const to = format(new Date(), 'yyyy-MM-dd')
+    let from: string
+    let to: string
+
+    if (selectedDateRange.value === 'today') {
+      const today = new Date()
+      from = format(today, 'yyyy-MM-dd')
+      to = format(today, 'yyyy-MM-dd')
+    } else if (selectedDateRange.value === 'yesterday') {
+      const y = subDays(new Date(), 1)
+      from = format(y, 'yyyy-MM-dd')
+      to = format(y, 'yyyy-MM-dd')
+    } else if (selectedDateRange.value === 'this_week') {
+      const start = startOfWeek(new Date(), { weekStartsOn: 1 })
+      from = format(start, 'yyyy-MM-dd')
+      to = format(new Date(), 'yyyy-MM-dd')
+    } else {
+      const days = parseInt(selectedDateRange.value)
+      from = format(subDays(new Date(), days), 'yyyy-MM-dd')
+      to = format(new Date(), 'yyyy-MM-dd')
+    }
 
     analyticsStore.fetchAnalytics({ from, to })
-    // Also update completion rates to match the top-level date filter
+    // Also update completion rates and stats to match the top-level date filter
     refreshCompletionRates()
+    refreshCompletionRateStats(from, to)
   }
 }
 
@@ -1495,8 +1516,9 @@ const applyCustomDateRange = () => {
     from: customDateRange.from,
     to: customDateRange.to
   })
-  // Also update completion rates to match the top-level date filter
+  // Also update completion rates and stats to match the top-level date filter
   refreshCompletionRates()
+  refreshCompletionRateStats(customDateRange.from, customDateRange.to)
 }
 
 const refreshAnalytics = async () => {
@@ -1515,6 +1537,18 @@ const refreshAnalytics = async () => {
   }
 }
 
+
+const refreshCompletionRateStats = async (from?: string, to?: string) => {
+  try {
+    const filters = from && to
+      ? { dateFrom: from, dateTo: to }
+      : { month: currentCompletionMonth.value }
+
+    await analyticsStore.fetchCompletionRateStats(filters)
+  } catch (error) {
+    console.error('❌ Error refreshing completion rate stats:', error)
+  }
+}
 
 const refreshCompletionRates = async () => {
   try {
