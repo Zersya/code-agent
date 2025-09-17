@@ -1117,73 +1117,7 @@
       class="mt-6"
       @dismiss="analyticsStore.clearError"
     />
-      @dismiss="analyticsStore.clearError"
-import { analyticsApi } from '@/services/api'
 
-// === Bug Fix Lead Time modal state ===
-const showBugFixModal = ref(false)
-const bugFixLoading = ref(false)
-const bugFixModalTitle = ref('Bug Fix Lead Times')
-interface BugFixLeadTimeRecord {
-  project_id: number
-  project_name: string
-  merge_request_iid: number
-  merge_request_id: number
-  mr_title: string
-  mr_web_url: string
-  notion_task_id?: number
-  task_title: string
-  issue_type?: string
-  notion_created_at?: string | Date
-  merged_at?: string | Date
-  lead_time_hours?: number
-}
-const bugFixColumns: TableColumn[] = [
-  { key: 'task_title', label: 'Task', type: 'text' },
-  { key: 'issue_type', label: 'Type', type: 'text' },
-  { key: 'mr_title', label: 'Merge Request', type: 'text' },
-  { key: 'project_name', label: 'Project', type: 'text' },
-  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
-  { key: 'merged_at', label: 'MR Merged', type: 'date' },
-  { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
-]
-const bugFixRows = ref<BugFixLeadTimeRecord[]>([])
-
-const getActiveAnalyticsDateRange = () => {
-  if (selectedDateRange.value === 'custom') {
-    return { from: customDateRange.from, to: customDateRange.to }
-  }
-  const now = new Date()
-  const days = selectedDateRange.value === '7d' ? 7 : selectedDateRange.value === '14d' ? 14 : 30
-  return { from: format(subDays(now, days), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
-}
-
-const openBugFixLeadTimesForUser = async (username: string) => {
-  try {
-    bugFixLoading.value = true
-    showBugFixModal.value = true
-    bugFixModalTitle.value = `Bug Fix Lead Times - ${username}`
-    const { from, to } = getActiveAnalyticsDateRange()
-    const resp = await analyticsApi.getBugFixLeadTimeDetails({ username, from, to })
-    if (resp.success) {
-      bugFixRows.value = resp.data || []
-    } else {
-      bugFixRows.value = []
-      console.error('Failed to load bug fix details:', resp.error)
-    }
-  } catch (e) {
-    console.error('Error loading bug fix details:', e)
-    bugFixRows.value = []
-  } finally {
-    bugFixLoading.value = false
-  }
-}
-
-      class="mt-6"
-    />
-
-
-  </div>
 </template>
 
 <script setup lang="ts">
