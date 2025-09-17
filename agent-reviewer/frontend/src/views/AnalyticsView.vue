@@ -374,7 +374,7 @@
             </div>
             <div v-else>
               <div
-                v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper.slice(0, 5)"
+                v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper"
                 :key="dev.username"
                 class="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
                 @click="openBugFixLeadTimesForUser(dev.username)"
