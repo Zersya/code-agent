@@ -167,7 +167,7 @@ class BugFixLeadTimeBackfillService {
       `SELECT 1 FROM bug_fix_lead_times WHERE project_id = $1 AND merge_request_iid = $2 LIMIT 1`,
       [projectId, mrIid]
     )
-    return res.rowCount > 0
+    return res!.rowCount! > 0
   }
 
   private async countLeadTimesForMR(projectId: number, mrIid: number): Promise<number> {
