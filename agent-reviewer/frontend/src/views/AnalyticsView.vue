@@ -520,17 +520,6 @@
     <div class="mt-8">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-bold text-gray-900">Feature Completion Rate Analytics</h2>
-        <div class="flex space-x-3">
-
-          <BaseButton
-            @click="refreshCompletionRates"
-            :loading="analyticsStore.isLoading"
-            size="sm"
-            variant="secondary"
-          >
-            Refresh
-          </BaseButton>
-        </div>
       </div>
 
       <!-- Completion Rate Overview Cards -->
