@@ -1518,6 +1518,15 @@ const refreshAnalytics = async () => {
 
     await analyticsStore.fetchAnalytics(analyticsDateRange)
 
+    // Also refresh completion rates and stats to ensure all data is up to date
+    await refreshCompletionRates()
+    
+    if (selectedDateRange.value === 'custom') {
+      await refreshCompletionRateStats(customDateRange.from, customDateRange.to)
+    } else {
+      await refreshCompletionRateStats()
+    }
+
     // Debug: Log the analytics data to console
     console.log('Analytics data loaded:', analyticsStore.analytics)
     console.log('MR Metrics:', analyticsStore.analytics.mergeRequestMetrics)
