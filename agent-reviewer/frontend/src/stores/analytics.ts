@@ -93,6 +93,13 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       repopoVsGitlab: { repopo_count: 0, gitlab_count: 0 }
     },
 
+    // Bug Fix Lead Time metrics
+    bugFixLeadTime: {
+      avgByDeveloper: [],
+      trend: [],
+      distribution: []
+    },
+
     // Queue statistics
     queueStats: {
       total: 0,
@@ -125,9 +132,14 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
     try {
       const response = await analyticsApi.getAnalytics(dateRange)
-      
+
       if (response.success && response.data) {
-        analytics.value = response.data
+        // Merge to preserve defaults like bugFixLeadTime when backend doesn't send it yet
+        analytics.value = {
+          ...analytics.value,
+          ...response.data,
+          bugFixLeadTime: (response.data as any).bugFixLeadTime ?? analytics.value.bugFixLeadTime
+        } as any
       } else {
         error.value = response.message || 'Failed to fetch analytics'
       }
