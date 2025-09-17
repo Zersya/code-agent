@@ -373,7 +373,12 @@
               <p>No data available</p>
             </div>
             <div v-else>
-              <div v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper.slice(0, 5)" :key="dev.username" class="flex items-center justify-between">
+              <div
+                v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper.slice(0, 5)"
+                :key="dev.username"
+                class="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                @click="openBugFixLeadTimesForUser(dev.username)"
+              >
                 <div class="flex items-center space-x-3">
                   <div class="w-3 h-3 bg-indigo-500 rounded-full"></div>
                   <span class="text-sm font-medium text-gray-900">@{{ dev.username }}</span>
@@ -422,164 +427,6 @@
                 </div>
                 <div class="w-full bg-gray-100 rounded-full h-2">
                   <div class="bg-indigo-600 h-2 rounded-full" :style="{ width: Math.min(100, (b.count / (maxDistribution || 1)) * 100) + '%' }"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </BaseCard>
-      </div>
-    </div>
-
-
-    <!-- Embedding System Metrics -->
-    <div class="mb-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Embedding System Analytics</h2>
-
-      <!-- Embedding Overview Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <BaseCard title="Code Embeddings">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalFiles?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Files embedded</p>
-            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalProjects || 0 }} projects</p>
-          </div>
-        </BaseCard>
-
-        <BaseCard title="Documentation">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSections?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Doc sections</p>
-            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSources || 0 }} sources</p>
-          </div>
-        </BaseCard>
-
-        <BaseCard title="Processing Jobs">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-purple-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.totalJobs?.toLocaleString() || '0' }}</p>
-            <p class="text-sm text-gray-600">Total jobs</p>
-            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.successRate || 0 }}% success rate</p>
-          </div>
-        </BaseCard>
-
-        <BaseCard title="System Health">
-          <div class="text-center">
-            <p class="text-2xl font-bold text-orange-600">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.processingEfficiency || 0 }}%</p>
-            <p class="text-sm text-gray-600">Efficiency</p>
-            <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.embeddingCoverage || 0 }}% coverage</p>
-          </div>
-        </BaseCard>
-      </div>
-
-      <!-- Embedding Details Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Language Distribution -->
-        <BaseCard title="Language Distribution">
-          <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.length === 0" class="text-center text-gray-500 py-8">
-              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <p>No language data available</p>
-            </div>
-            <div v-else>
-              <div v-for="lang in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.slice(0, 8)" :key="lang.language" class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                  <div class="w-3 h-3 rounded-full" :class="getLanguageColor(lang.language)"></div>
-                  <span class="text-sm font-medium text-gray-900">{{ lang.language }}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <div class="w-20 bg-gray-200 rounded-full h-2">
-                    <div
-                      class="bg-blue-600 h-2 rounded-full"
-                      :style="{ width: lang.percentage + '%' }"
-                    ></div>
-                  </div>
-                  <span class="text-sm text-gray-600 w-12 text-right">{{ lang.fileCount }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </BaseCard>
-
-        <!-- Project Coverage -->
-        <BaseCard title="Project Coverage">
-          <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.length === 0" class="text-center text-gray-500 py-8">
-              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <p>No project coverage data available</p>
-            </div>
-            <div v-else>
-              <div v-for="project in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.slice(0, 6)" :key="project.projectName" class="border-b border-gray-200 pb-3 last:border-b-0">
-                <div class="flex items-center justify-between mb-1">
-                  <h4 class="text-sm font-medium text-gray-900 truncate">{{ project.projectName }}</h4>
-                  <span class="text-sm font-semibold text-blue-600">{{ project.embeddedFiles }} files</span>
-                </div>
-                <div class="text-xs text-gray-500">
-                  Last updated: {{ project.lastEmbedded ? formatDate(project.lastEmbedded) : 'Never' }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </BaseCard>
-      </div>
-
-      <!-- Embedding Jobs Status -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Job Status Distribution -->
-        <BaseCard title="Embedding Jobs Status">
-          <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-4">
-              <div class="text-center p-3 bg-green-50 rounded-lg">
-                <p class="text-lg font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.completed || 0 }}</p>
-                <p class="text-xs text-green-800">Completed</p>
-              </div>
-              <div class="text-center p-3 bg-blue-50 rounded-lg">
-                <p class="text-lg font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.processing || 0 }}</p>
-                <p class="text-xs text-blue-800">Processing</p>
-              </div>
-              <div class="text-center p-3 bg-yellow-50 rounded-lg">
-                <p class="text-lg font-bold text-yellow-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.pending || 0 }}</p>
-                <p class="text-xs text-yellow-800">Pending</p>
-              </div>
-              <div class="text-center p-3 bg-red-50 rounded-lg">
-                <p class="text-lg font-bold text-red-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.failed || 0 }}</p>
-                <p class="text-xs text-red-800">Failed</p>
-              </div>
-            </div>
-            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
-              <div class="flex justify-between items-center">
-                <span class="text-sm text-gray-600">Average Processing Time</span>
-                <span class="text-sm font-semibold text-gray-900">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime?.toFixed(1) || '0' }}m</span>
-              </div>
-            </div>
-          </div>
-        </BaseCard>
-
-        <!-- Documentation Frameworks -->
-        <BaseCard title="Documentation Frameworks">
-          <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution?.length === 0" class="text-center text-gray-500 py-8">
-              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p>No documentation frameworks available</p>
-            </div>
-            <div v-else>
-              <div v-for="framework in analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution" :key="framework.framework" class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                  <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span class="text-sm font-medium text-gray-900 capitalize">{{ framework.framework }}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <div class="w-16 bg-gray-200 rounded-full h-2">
-                    <div
-                      class="bg-green-600 h-2 rounded-full"
-                      :style="{ width: framework.percentage + '%' }"
-                    ></div>
-                  </div>
-                  <span class="text-sm text-gray-600 w-8 text-right">{{ framework.sectionCount }}</span>
                 </div>
               </div>
             </div>
@@ -753,6 +600,21 @@
 
         <BaseModal :show="showMRListModal" :title="mrListTitle" size="xl" @close="showMRListModal = false">
           <MRTable :mergeRequests="mrList" :loading="mrListLoading" />
+        </BaseModal>
+
+
+        <!-- Bug Fix Lead Time Details Modal -->
+        <BaseModal :show="showBugFixModal" :title="bugFixModalTitle" size="xl" @close="showBugFixModal = false">
+          <BaseTable
+            :columns="bugFixColumns"
+            :data="bugFixRows"
+            :loading="bugFixLoading"
+            empty-message="No bug fix records found for this period"
+          >
+            <template #cell-mr_title="{ item, value }">
+              <a :href="item.mr_web_url" class="text-indigo-600 hover:text-indigo-800" target="_blank" rel="noopener noreferrer">{{ value }}</a>
+            </template>
+          </BaseTable>
         </BaseModal>
 
 
@@ -1082,6 +944,163 @@
           </div>
         </BaseCard>
       </div>
+
+      <!-- Embedding System Metrics -->
+      <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Embedding System Analytics</h2>
+
+        <!-- Embedding Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <BaseCard title="Code Embeddings">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalFiles?.toLocaleString() || '0' }}</p>
+              <p class="text-sm text-gray-600">Files embedded</p>
+              <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.totalProjects || 0 }} projects</p>
+            </div>
+          </BaseCard>
+
+          <BaseCard title="Documentation">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSections?.toLocaleString() || '0' }}</p>
+              <p class="text-sm text-gray-600">Doc sections</p>
+              <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.totalSources || 0 }} sources</p>
+            </div>
+          </BaseCard>
+
+          <BaseCard title="Processing Jobs">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-purple-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.totalJobs?.toLocaleString() || '0' }}</p>
+              <p class="text-sm text-gray-600">Total jobs</p>
+              <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.successRate || 0 }}% success rate</p>
+            </div>
+          </BaseCard>
+
+          <BaseCard title="System Health">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-orange-600">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.processingEfficiency || 0 }}%</p>
+              <p class="text-sm text-gray-600">Efficiency</p>
+              <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.embeddingMetrics?.systemHealth?.embeddingCoverage || 0 }}% coverage</p>
+            </div>
+          </BaseCard>
+        </div>
+
+        <!-- Embedding Details Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <!-- Language Distribution -->
+          <BaseCard title="Language Distribution">
+            <div class="space-y-3">
+              <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.length === 0" class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p>No language data available</p>
+              </div>
+              <div v-else>
+                <div v-for="lang in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.languageDistribution?.slice(0, 8)" :key="lang.language" class="flex items-center justify-between">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full" :class="getLanguageColor(lang.language)"></div>
+                    <span class="text-sm font-medium text-gray-900">{{ lang.language }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                      <div
+                        class="bg-blue-600 h-2 rounded-full"
+                        :style="{ width: lang.percentage + '%' }"
+                      ></div>
+                    </div>
+                    <span class="text-sm text-gray-600 w-12 text-right">{{ lang.fileCount }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </BaseCard>
+
+          <!-- Project Coverage -->
+          <BaseCard title="Project Coverage">
+            <div class="space-y-3">
+              <div v-if="analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.length === 0" class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <p>No project coverage data available</p>
+              </div>
+              <div v-else>
+                <div v-for="project in analyticsStore.analytics.embeddingMetrics?.codeEmbeddings?.coverageByProject?.slice(0, 6)" :key="project.projectName" class="border-b border-gray-200 pb-3 last:border-b-0">
+                  <div class="flex items-center justify-between mb-1">
+                    <h4 class="text-sm font-medium text-gray-900 truncate">{{ project.projectName }}</h4>
+                    <span class="text-sm font-semibold text-blue-600">{{ project.embeddedFiles }} files</span>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    Last updated: {{ project.lastEmbedded ? formatDate(project.lastEmbedded) : 'Never' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </BaseCard>
+        </div>
+
+        <!-- Embedding Jobs Status -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Job Status Distribution -->
+          <BaseCard title="Embedding Jobs Status">
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="text-center p-3 bg-green-50 rounded-lg">
+                  <p class="text-lg font-bold text-green-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.completed || 0 }}</p>
+                  <p class="text-xs text-green-800">Completed</p>
+                </div>
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                  <p class="text-lg font-bold text-blue-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.processing || 0 }}</p>
+                  <p class="text-xs text-blue-800">Processing</p>
+                </div>
+                <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                  <p class="text-lg font-bold text-yellow-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.pending || 0 }}</p>
+                  <p class="text-xs text-yellow-800">Pending</p>
+                </div>
+                <div class="text-center p-3 bg-red-50 rounded-lg">
+                  <p class="text-lg font-bold text-red-600">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.jobsByStatus?.failed || 0 }}</p>
+                  <p class="text-xs text-red-800">Failed</p>
+                </div>
+              </div>
+              <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Average Processing Time</span>
+                  <span class="text-sm font-semibold text-gray-900">{{ analyticsStore.analytics.embeddingMetrics?.embeddingJobs?.avgProcessingTime?.toFixed(1) || '0' }}m</span>
+                </div>
+              </div>
+            </div>
+          </BaseCard>
+
+          <!-- Documentation Frameworks -->
+          <BaseCard title="Documentation Frameworks">
+            <div class="space-y-3">
+              <div v-if="analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution?.length === 0" class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p>No documentation frameworks available</p>
+              </div>
+              <div v-else>
+                <div v-for="framework in analyticsStore.analytics.embeddingMetrics?.documentationEmbeddings?.frameworkDistribution" :key="framework.framework" class="flex items-center justify-between">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span class="text-sm font-medium text-gray-900 capitalize">{{ framework.framework }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2">
+                      <div
+                        class="bg-green-600 h-2 rounded-full"
+                        :style="{ width: framework.percentage + '%' }"
+                      ></div>
+                    </div>
+                    <span class="text-sm text-gray-600 w-8 text-right">{{ framework.sectionCount }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </BaseCard>
+        </div>
+      </div>
     </div>
 
     <!-- Debug Info (only in development) -->
@@ -1095,7 +1114,71 @@
       title="Analytics Error"
       :message="analyticsStore.error"
       dismissible
+      class="mt-6"
       @dismiss="analyticsStore.clearError"
+    />
+      @dismiss="analyticsStore.clearError"
+import { analyticsApi } from '@/services/api'
+
+// === Bug Fix Lead Time modal state ===
+const showBugFixModal = ref(false)
+const bugFixLoading = ref(false)
+const bugFixModalTitle = ref('Bug Fix Lead Times')
+interface BugFixLeadTimeRecord {
+  project_id: number
+  project_name: string
+  merge_request_iid: number
+  merge_request_id: number
+  mr_title: string
+  mr_web_url: string
+  notion_task_id?: number
+  task_title: string
+  issue_type?: string
+  notion_created_at?: string | Date
+  merged_at?: string | Date
+  lead_time_hours?: number
+}
+const bugFixColumns: TableColumn[] = [
+  { key: 'task_title', label: 'Task', type: 'text' },
+  { key: 'issue_type', label: 'Type', type: 'text' },
+  { key: 'mr_title', label: 'Merge Request', type: 'text' },
+  { key: 'project_name', label: 'Project', type: 'text' },
+  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
+  { key: 'merged_at', label: 'MR Merged', type: 'date' },
+  { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
+]
+const bugFixRows = ref<BugFixLeadTimeRecord[]>([])
+
+const getActiveAnalyticsDateRange = () => {
+  if (selectedDateRange.value === 'custom') {
+    return { from: customDateRange.from, to: customDateRange.to }
+  }
+  const now = new Date()
+  const days = selectedDateRange.value === '7d' ? 7 : selectedDateRange.value === '14d' ? 14 : 30
+  return { from: format(subDays(now, days), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+}
+
+const openBugFixLeadTimesForUser = async (username: string) => {
+  try {
+    bugFixLoading.value = true
+    showBugFixModal.value = true
+    bugFixModalTitle.value = `Bug Fix Lead Times - ${username}`
+    const { from, to } = getActiveAnalyticsDateRange()
+    const resp = await analyticsApi.getBugFixLeadTimeDetails({ username, from, to })
+    if (resp.success) {
+      bugFixRows.value = resp.data || []
+    } else {
+      bugFixRows.value = []
+      console.error('Failed to load bug fix details:', resp.error)
+    }
+  } catch (e) {
+    console.error('Error loading bug fix details:', e)
+    bugFixRows.value = []
+  } finally {
+    bugFixLoading.value = false
+  }
+}
+
       class="mt-6"
     />
 
@@ -1110,6 +1193,67 @@ import { useAnalyticsStore } from '@/stores/analytics'
 import type { CompletionRateResponse } from '@/types/performance'
 import BaseModal from '@/components/BaseModal.vue'
 import BaseTable from '@/components/BaseTable.vue'
+
+import { analyticsApi } from '@/services/api'
+
+// === Bug Fix Lead Time modal state ===
+const showBugFixModal = ref(false)
+const bugFixLoading = ref(false)
+const bugFixModalTitle = ref('Bug Fix Lead Times')
+interface BugFixLeadTimeRecord {
+  project_id: number
+  project_name: string
+  merge_request_iid: number
+  merge_request_id: number
+  mr_title: string
+  mr_web_url: string
+  notion_task_id?: number
+  task_title: string
+  issue_type?: string
+  notion_created_at?: string | Date
+  merged_at?: string | Date
+  lead_time_hours?: number
+}
+const bugFixColumns: { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }[] = [
+  { key: 'task_title', label: 'Task', type: 'text' },
+  { key: 'issue_type', label: 'Type', type: 'text' },
+  { key: 'mr_title', label: 'Merge Request', type: 'text' },
+  { key: 'project_name', label: 'Project', type: 'text' },
+  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
+  { key: 'merged_at', label: 'MR Merged', type: 'date' },
+  { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
+]
+const bugFixRows = ref<BugFixLeadTimeRecord[]>([])
+
+const getActiveAnalyticsDateRange = () => {
+  if (selectedDateRange.value === 'custom') {
+    return { from: customDateRange.from, to: customDateRange.to }
+  }
+  const now = new Date()
+  const days = selectedDateRange.value === '7d' ? 7 : selectedDateRange.value === '14d' ? 14 : 30
+  return { from: format(subDays(now, days), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+}
+
+const openBugFixLeadTimesForUser = async (username: string) => {
+  try {
+    bugFixLoading.value = true
+    showBugFixModal.value = true
+    bugFixModalTitle.value = `Bug Fix Lead Times - ${username}`
+    const { from, to } = getActiveAnalyticsDateRange()
+    const resp = await analyticsApi.getBugFixLeadTimeDetails({ username, from, to })
+    if (resp.success) {
+      bugFixRows.value = resp.data || []
+    } else {
+      bugFixRows.value = []
+      console.error('Failed to load bug fix details:', resp.error)
+    }
+  } catch (e) {
+    console.error('Error loading bug fix details:', e)
+    bugFixRows.value = []
+  } finally {
+    bugFixLoading.value = false
+  }
+}
 
 
 // === Developer tasks modal state ===
@@ -1610,7 +1754,7 @@ const refreshAnalytics = async () => {
 
     // Also refresh completion rates and stats to ensure all data is up to date
     await refreshCompletionRates()
-    
+
     if (selectedDateRange.value === 'custom') {
       await refreshCompletionRateStats(customDateRange.from, customDateRange.to)
     } else {

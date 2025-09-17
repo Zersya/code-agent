@@ -747,6 +747,13 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     };
 
     res.json({
+
+/**
+ * Get detailed Bug Fix Lead Time records for a specific developer
+ * Applies date range filter and optional project filter
+ */
+
+
       success: true,
       data: analyticsData
     });
@@ -820,6 +827,13 @@ export const getSystemHealth = async (_req: Request, res: Response): Promise<voi
     console.error('Error getting system health:', error);
     res.status(500).json({
       success: false,
+
+/**
+ * Get detailed Bug Fix Lead Time records for a specific developer
+ * Applies date range filter and optional project filter
+ */
+
+
       error: 'Failed to fetch system health',
       message: error instanceof Error ? error.message : String(error)
     });
@@ -1373,5 +1387,77 @@ export async function getCompletionRateStats(req: Request, res: Response) {
       success: false,
       error: 'Failed to get completion rate stats'
     });
+  }
+}
+
+
+/**
+ * Get detailed Bug Fix Lead Time records for a specific developer
+ * Applies date range filter and optional project filter
+ */
+export async function getBugFixLeadTimeDetails(req: Request, res: Response) {
+  try {
+    const username = (req.query.username as string || '').trim();
+    const dateFrom = req.query.from ? new Date(req.query.from as string) : subDays(new Date(), 30);
+    const dateTo = req.query.to ? new Date(req.query.to as string) : new Date();
+    const projectId = req.query.projectId ? parseInt(req.query.projectId as string) : undefined;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit as string), 500) : 200;
+
+    if (!username) {
+      res.status(400).json({ success: false, error: 'username is required' });
+      return;
+    }
+
+    // Ensure table exists to avoid errors on fresh setups
+    const tableExists = await dbService.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables WHERE table_name = 'bug_fix_lead_times'
+      ) as exists
+    `);
+    if (!tableExists.rows[0]?.exists) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const params: any[] = [username, startOfDay(dateFrom), endOfDay(dateTo)];
+    let filterProject = '';
+    if (projectId && !Number.isNaN(projectId)) {
+      filterProject = ' AND bflt.project_id = $4 ';
+      params.push(projectId);
+    }
+
+    const query = `
+      SELECT
+        bflt.project_id,
+        COALESCE(p.name, 'Unknown Project') as project_name,
+        bflt.merge_request_iid,
+        bflt.merge_request_id,
+        mrt.title as mr_title,
+        mrt.web_url as mr_web_url,
+        bflt.notion_task_id,
+        COALESCE(nt.title, nt.notion_page_id) as task_title,
+        bflt.issue_type,
+        bflt.notion_created_at,
+        bflt.merged_at,
+        bflt.lead_time_hours
+      FROM bug_fix_lead_times bflt
+      LEFT JOIN notion_tasks nt ON nt.id = bflt.notion_task_id
+      LEFT JOIN merge_request_tracking mrt ON mrt.project_id = bflt.project_id AND mrt.merge_request_iid = bflt.merge_request_iid
+      LEFT JOIN projects p ON p.project_id = bflt.project_id
+      WHERE bflt.author_username = $1
+        AND bflt.merged_at BETWEEN $2 AND $3
+        ${filterProject}
+      ORDER BY bflt.merged_at DESC
+      LIMIT ${limit}
+    `;
+
+    const result = await dbService.query(query, params);
+
+    res.json({ success: true, data: result.rows });
+    return;
+  } catch (error) {
+    console.error('Error fetching bug fix lead time details:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch bug fix lead time details' });
+    return;
   }
 }

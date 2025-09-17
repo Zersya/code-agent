@@ -18,6 +18,7 @@
     "backfill-completion-rates": "node dist/scripts/backfill-completion-rates.js",
     "backfill-notion-timing-fields": "node dist/scripts/backfill-notion-timing-fields.js",
     "backfill-mr-approvals": "node dist/scripts/backfill-mr-approvals.js",
+    "backfill-bug-fix-lead-times": "node dist/scripts/backfill-bug-fix-lead-times.js",
     "verify-completion-rate-integration": "node dist/scripts/verify-completion-rate-integration.js",
     "test-completion-rate-endpoints": "node dist/scripts/test-completion-rate-endpoints.js"
   },
