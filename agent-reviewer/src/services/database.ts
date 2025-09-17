@@ -724,6 +724,9 @@ class DatabaseService {
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS developer_start TIMESTAMPTZ`);
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS developer_end TIMESTAMPTZ`);
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS ready_to_test_at TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS notion_created_at TIMESTAMPTZ`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS task_type TEXT`);
+
 
 
       await client.query(`
@@ -778,6 +781,30 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_task_mr_mappings_task ON task_mr_mappings(notion_task_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_task_mr_mappings_mr ON task_mr_mappings(project_id, merge_request_iid)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_developer ON feature_completion_rates(username)');
+      // Bug fix lead time metrics table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS bug_fix_lead_times (
+          id SERIAL PRIMARY KEY,
+          project_id INTEGER NOT NULL,
+          merge_request_iid INTEGER NOT NULL,
+          merge_request_id INTEGER NOT NULL,
+          author_id INTEGER,
+          author_username TEXT,
+          notion_task_id INTEGER REFERENCES notion_tasks(id) ON DELETE SET NULL,
+          notion_page_id TEXT,
+          issue_type TEXT,
+          notion_created_at TIMESTAMPTZ,
+          merged_at TIMESTAMPTZ,
+          lead_time_hours DECIMAL(10,2),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(project_id, merge_request_iid, notion_task_id)
+        )
+      `);
+
+      await client.query('CREATE INDEX IF NOT EXISTS idx_bflt_project ON bug_fix_lead_times(project_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_bflt_author ON bug_fix_lead_times(author_username)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_bflt_merged_at ON bug_fix_lead_times(merged_at)');
+
       await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_project ON feature_completion_rates(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_date ON feature_completion_rates(year, month)');
 
@@ -2631,12 +2658,51 @@ class DatabaseService {
         stats.last_merged
       ]);
     } catch (error) {
-      console.error('Error updating user MR statistics:', error);
-      throw error;
     } finally {
       client.release();
     }
   }
+
+  /**
+   * Record bug fix lead times for a merged MR by using task-MR mappings and notion_tasks
+   * Only records when task_type is 'issue' or 'bug' (case-insensitive) and merged_at is present
+   */
+  async recordBugFixLeadTimesForMR(projectId: number, mergeRequestIid: number, mergeRequestId: number): Promise<void> {
+    const query = `
+      WITH mapping AS (
+        SELECT t.id AS notion_task_id,
+               t.notion_page_id,
+               LOWER(COALESCE(t.task_type, '')) AS task_type,
+               COALESCE(t.notion_created_at, t.created_at) AS notion_created_at
+        FROM task_mr_mappings m
+        JOIN notion_tasks t ON t.id = m.notion_task_id
+        WHERE m.project_id = $1 AND m.merge_request_iid = $2
+      ), mr AS (
+        SELECT author_id, author_username, merged_at
+        FROM merge_request_tracking
+        WHERE project_id = $1 AND merge_request_iid = $2 AND merged_at IS NOT NULL
+        ORDER BY updated_at DESC
+        LIMIT 1
+      )
+      INSERT INTO bug_fix_lead_times (
+        project_id, merge_request_iid, merge_request_id,
+        author_id, author_username,
+        notion_task_id, notion_page_id, issue_type,
+        notion_created_at, merged_at, lead_time_hours
+      )
+      SELECT $1, $2, $3,
+             mr.author_id, mr.author_username,
+             m.notion_task_id, m.notion_page_id, m.task_type,
+             m.notion_created_at, mr.merged_at,
+             ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.notion_created_at)) / 3600.0, 2)
+      FROM mapping m, mr
+      WHERE m.task_type IN ('issue', 'bug')
+      ON CONFLICT (project_id, merge_request_iid, notion_task_id) DO NOTHING
+    `;
+
+    await this.query(query, [projectId, mergeRequestIid, mergeRequestId]);
+  }
+
 
   // Developer Performance Analytics Methods
 
@@ -3015,8 +3081,9 @@ class DatabaseService {
       INSERT INTO notion_tasks (
         notion_page_id, title, status, assignee_id, assignee_username,
         assignee_name, project_id, completed_at,
-        estimation_start, estimation_end, developer_start, developer_end, ready_to_test_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        estimation_start, estimation_end, developer_start, developer_end, ready_to_test_at,
+        task_type, notion_created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       ON CONFLICT (notion_page_id)
       DO UPDATE SET
         title = EXCLUDED.title,
@@ -3031,6 +3098,8 @@ class DatabaseService {
         developer_start = EXCLUDED.developer_start,
         developer_end = EXCLUDED.developer_end,
         ready_to_test_at = EXCLUDED.ready_to_test_at,
+        task_type = EXCLUDED.task_type,
+        notion_created_at = COALESCE(notion_tasks.notion_created_at, EXCLUDED.notion_created_at),
         updated_at = NOW()
       RETURNING *
     `;
@@ -3048,7 +3117,9 @@ class DatabaseService {
       task.estimation_end,
       task.developer_start,
       task.developer_end,
-      task.ready_to_test_at
+      task.ready_to_test_at,
+      (task as any).task_type,
+      (task as any).notion_created_at
     ]);
 
     return result.rows[0];

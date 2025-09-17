@@ -294,8 +294,9 @@ export class NotionService {
         title,
         properties: 'properties' in page ? page.properties : {},
         blocks: this.parseBlocks(blocks.results),
-        lastEditedTime: 'last_edited_time' in page ? page.last_edited_time : new Date().toISOString(),
-        url: 'url' in page ? page.url : '',
+        lastEditedTime: 'last_edited_time' in page ? (page as any).last_edited_time : new Date().toISOString(),
+        createdTime: 'created_time' in page ? (page as any).created_time : undefined,
+        url: 'url' in page ? (page as any).url : '',
       };
 
     } catch (error) {
@@ -1197,6 +1198,17 @@ export class NotionService {
       const readyToTestAt = this.extractDateByName(pageContent.properties, ['Ready To Test At'])
         || this.extractDateProperty(pageContent.properties, ['ready to test', 'ready_to_test']);
 
+      // Determine task type from Notion properties (select or multi_select named "Type")
+      let taskType: string | undefined;
+      for (const [key, prop] of Object.entries(pageContent.properties || {})) {
+        if (key.toLowerCase() === 'type') {
+          const p: any = prop as any;
+          if (p.type === 'select' && p.select?.name) taskType = String(p.select.name);
+          else if (p.type === 'multi_select' && Array.isArray(p.multi_select) && p.multi_select[0]?.name) taskType = String(p.multi_select[0].name);
+          break;
+        }
+      }
+
       // Create task data
       const taskData = {
         notion_page_id: pageContent.id,
@@ -1211,8 +1223,10 @@ export class NotionService {
         estimation_end: estimationEnd,
         developer_start: developerStart,
         developer_end: developerEnd,
-        ready_to_test_at: readyToTestAt
-      };
+        ready_to_test_at: readyToTestAt,
+        task_type: taskType ? taskType.toLowerCase() : undefined,
+        notion_created_at: pageContent.createdTime ? new Date(pageContent.createdTime) : undefined
+      } as any;
 
       // Store in database
       const storedTask = await dbService.upsertNotionTask(taskData);

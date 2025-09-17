@@ -608,6 +608,87 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     // Get merge request metrics
     const mrMetrics = await getMergeRequestMetrics(dateFrom, dateTo);
 
+    // Bug fix lead time metrics (Notion issue created -> MR merged)
+    // Ensure table exists check
+    const bfltTableExistsRes = await dbService.query(`
+      SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'bug_fix_lead_times')
+    `);
+    const bfltExists = bfltTableExistsRes.rows[0]?.exists === true;
+
+    let bugFixLeadTime = {
+      avgByDeveloper: [] as Array<{ username: string; avg_lead_time_hours: number; fixes: number }>,
+      trend: [] as Array<{ date: string; value: number }>,
+      distribution: [] as Array<{ bucket: string; count: number }>
+    };
+
+    if (bfltExists) {
+      // Average lead time by developer
+      const avgByDevQuery = `
+        SELECT author_username AS username,
+               ROUND(AVG(lead_time_hours)::numeric, 2) AS avg_lead_time_hours,
+               COUNT(*) AS fixes
+        FROM bug_fix_lead_times
+        WHERE merged_at BETWEEN $1 AND $2
+        GROUP BY author_username
+        HAVING author_username IS NOT NULL AND author_username <> ''
+        ORDER BY avg_lead_time_hours ASC
+        LIMIT 20
+      `;
+      const avgByDevRes = await dbService.query(avgByDevQuery, [dateFrom, dateTo]);
+
+      // Trend (daily average)
+      const trendQuery = `
+        SELECT DATE(merged_at) AS date,
+               ROUND(AVG(lead_time_hours)::numeric, 2) AS value
+        FROM bug_fix_lead_times
+        WHERE merged_at BETWEEN $1 AND $2
+        GROUP BY DATE(merged_at)
+        ORDER BY DATE(merged_at)
+      `;
+      const trendRes = await dbService.query(trendQuery, [dateFrom, dateTo]);
+
+      // Distribution buckets
+      const distQuery = `
+        SELECT bucket, COUNT(*) AS count
+        FROM (
+          SELECT CASE
+                   WHEN lead_time_hours < 6 THEN '0-6h'
+                   WHEN lead_time_hours < 24 THEN '6-24h'
+                   WHEN lead_time_hours < 48 THEN '24-48h'
+                   WHEN lead_time_hours < 120 THEN '48-120h'
+                   ELSE '>120h'
+                 END AS bucket
+          FROM bug_fix_lead_times
+          WHERE merged_at BETWEEN $1 AND $2
+        ) t
+        GROUP BY bucket
+        ORDER BY CASE bucket
+          WHEN '0-6h' THEN 1
+          WHEN '6-24h' THEN 2
+          WHEN '24-48h' THEN 3
+          WHEN '48-120h' THEN 4
+          ELSE 5
+        END
+      `;
+      const distRes = await dbService.query(distQuery, [dateFrom, dateTo]);
+
+      bugFixLeadTime = {
+        avgByDeveloper: avgByDevRes.rows.map((r: any) => ({
+          username: r.username,
+          avg_lead_time_hours: parseFloat(r.avg_lead_time_hours) || 0,
+          fixes: parseInt(r.fixes) || 0
+        })),
+        trend: trendRes.rows.map((r: any) => ({
+          date: format(new Date(r.date), 'yyyy-MM-dd'),
+          value: parseFloat(r.value) || 0
+        })),
+        distribution: distRes.rows.map((r: any) => ({
+          bucket: r.bucket,
+          count: parseInt(r.count) || 0
+        }))
+      };
+    }
+
     // Compute Issue Categories from MR review comments within the date range
     const issueCategories = await computeIssueCategories(dateFrom, dateTo);
 
@@ -653,6 +734,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
       // Merge request metrics
       mergeRequestMetrics: mrMetrics,
+
+      // Bug fix lead time metrics
+      bugFixLeadTime,
 
       // System health
       queueStats

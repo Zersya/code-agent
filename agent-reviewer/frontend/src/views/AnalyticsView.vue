@@ -359,6 +359,78 @@
       </BaseCard>
     </div>
 
+    <!-- Bug Fix Lead Time Metrics -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-6">Bug Fix Lead Time</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Average by Developer -->
+        <BaseCard title="Average by Developer (hours)">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.bugFixLeadTime?.avgByDeveloper?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No data available</p>
+            </div>
+            <div v-else>
+              <div v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper.slice(0, 5)" :key="dev.username" class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 bg-indigo-500 rounded-full"></div>
+                  <span class="text-sm font-medium text-gray-900">@{{ dev.username }}</span>
+                </div>
+                <div class="text-sm text-gray-700">
+                  <span class="font-semibold">{{ dev.avg_lead_time_hours.toFixed(2) }}</span>
+                  <span class="ml-2 text-gray-500">({{ dev.fixes }} fixes)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Trend (daily average) -->
+        <BaseCard title="Trend (Daily Avg Hours)">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.bugFixLeadTime?.trend?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No trend data</p>
+            </div>
+            <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+              <div v-for="pt in analyticsStore.analytics.bugFixLeadTime.trend.slice(-12)" :key="pt.date" class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">{{ pt.date }}</span>
+                <span class="font-semibold text-gray-900">{{ pt.value.toFixed(2) }}h</span>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Distribution -->
+        <BaseCard title="Distribution">
+          <div class="space-y-3">
+            <div v-if="analyticsStore.analytics.bugFixLeadTime?.distribution?.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No distribution data</p>
+            </div>
+            <div v-else>
+              <div v-for="b in analyticsStore.analytics.bugFixLeadTime.distribution" :key="b.bucket" class="space-y-1">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-700">{{ b.bucket }}</span>
+                  <span class="text-gray-900 font-medium">{{ b.count }}</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                  <div class="bg-indigo-600 h-2 rounded-full" :style="{ width: Math.min(100, (b.count / (maxDistribution || 1)) * 100) + '%' }"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+    </div>
+
+
     <!-- Embedding System Metrics -->
     <div class="mb-8">
       <h2 class="text-xl font-bold text-gray-900 mb-6">Embedding System Analytics</h2>
@@ -1209,6 +1281,11 @@ import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
 const selectedDateRange = ref('30')
+const maxDistribution = computed(() => {
+  const items = analyticsStore.analytics?.bugFixLeadTime?.distribution || []
+  return items.reduce((m, it) => Math.max(m, it.count || 0), 0)
+})
+
 // Derive completion-rate month from the top-level date filter (use end date)
 const currentCompletionMonth = computed(() => {
   const toStr = selectedDateRange.value === 'custom' ? customDateRange.to : format(new Date(), 'yyyy-MM-dd')

@@ -98,6 +98,8 @@ export interface NotionPageContent {
   properties: Record<string, any>;
   blocks: NotionBlock[];
   lastEditedTime: string;
+  createdTime?: string;
+
   url: string;
 }
 
