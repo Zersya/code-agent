@@ -487,6 +487,34 @@ export class CompletionRateService {
   }
 
   /**
+   * Trigger completion rate recalculation when MR is created or updated
+   */
+  async onMergeRequestCreated(
+    projectId: number,
+    mergeRequestIid: number,
+    authorUsername: string
+  ): Promise<void> {
+    try {
+      console.log(`Triggering completion rate recalculation for MR !${mergeRequestIid} creation/update`);
+
+      // Get current month/year
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      // Clear cache for the author
+      this.clearCache(authorUsername);
+
+      // Recalculate completion rate for the author for the current month
+      await this.calculateCompletionRate(authorUsername, month, year, projectId);
+
+      console.log(`Recalculated completion rate for ${authorUsername} after MR creation/update`);
+    } catch (error) {
+      console.error(`Error recalculating completion rate after MR creation/update:`, error);
+    }
+  }
+
+  /**
    * Get completion rate statistics summary
    */
   async getCompletionRateStats(

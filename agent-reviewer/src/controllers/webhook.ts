@@ -498,6 +498,13 @@ async function processMergeRequestEvent(event: GitLabMergeRequestEvent) {
           event.user?.username
         );
         console.log(`Processed task-MR mappings for MR !${mergeRequestIid}`);
+
+        // Trigger completion rate recalculation on MR creation/update
+        await completionRateService.onMergeRequestCreated(
+          projectId,
+          mergeRequestIid,
+          event.user?.username
+        );
       }
     } catch (taskMappingError) {
       console.error(`Error processing task mappings for MR !${mergeRequestIid}:`, taskMappingError);
