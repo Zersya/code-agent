@@ -3,7 +3,7 @@ import { dbService } from '../services/database.js';
 import { queueService } from '../services/queue.js';
 import { performanceService } from '../services/performance.js';
 import { completionRateService } from '../services/completion-rate.js';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { gitlabService } from '../services/gitlab.js';
 
 /**
@@ -488,8 +488,12 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
   try {
     const { from, to } = req.query;
 
-    const dateFrom = from ? new Date(from as string) : subDays(new Date(), 30);
-    const dateTo = to ? new Date(to as string) : new Date();
+    let dateFrom = from ? new Date(from as string) : subDays(new Date(), 30);
+    let dateTo = to ? new Date(to as string) : new Date();
+    // Normalize to full-day bounds to include the entire day range
+    dateFrom = startOfDay(dateFrom);
+    dateTo = endOfDay(dateTo);
+
 
     // Get basic statistics
     const totalReviewsQuery = `

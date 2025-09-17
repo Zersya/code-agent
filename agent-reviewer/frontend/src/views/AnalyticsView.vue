@@ -1105,7 +1105,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { format, subDays, startOfWeek, addDays, getMonth } from 'date-fns'
+import { format, subDays, startOfWeek, addDays, getMonth, startOfDay, endOfDay } from 'date-fns'
 import { useAnalyticsStore } from '@/stores/analytics'
 import type { CompletionRateResponse } from '@/types/performance'
 import BaseModal from '@/components/BaseModal.vue'
@@ -1168,11 +1168,24 @@ const devTaskColumns: TableColumn[] = [
 
 // Active date range derived from top-level filter
 const activeDateRange = computed(() => {
+  const now = new Date()
   if (selectedDateRange.value === 'custom') {
-    return { from: new Date(customDateRange.from), to: new Date(customDateRange.to) }
+    const from = startOfDay(new Date(customDateRange.from))
+    const to = endOfDay(new Date(customDateRange.to))
+    return { from, to }
+  }
+  if (selectedDateRange.value === 'today') {
+    return { from: startOfDay(now), to: endOfDay(now) }
+  }
+  if (selectedDateRange.value === 'yesterday') {
+    const y = subDays(now, 1)
+    return { from: startOfDay(y), to: endOfDay(y) }
+  }
+  if (selectedDateRange.value === 'this_week') {
+    return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfDay(now) }
   }
   const days = parseInt(selectedDateRange.value || '30')
-  return { from: subDays(new Date(), days), to: new Date() }
+  return { from: subDays(now, isNaN(days) ? 30 : days), to: endOfDay(now) }
 })
 
 function parseMaybeDate(v?: string | Date): Date | undefined {
@@ -1280,7 +1293,7 @@ import BaseInput from '@/components/BaseInput.vue'
 import BaseAlert from '@/components/BaseAlert.vue'
 
 const analyticsStore = useAnalyticsStore()
-const selectedDateRange = ref('30')
+const selectedDateRange = ref('this_week')
 const maxDistribution = computed(() => {
   const items = analyticsStore.analytics?.bugFixLeadTime?.distribution || []
   return items.reduce((m, it) => Math.max(m, it.count || 0), 0)
