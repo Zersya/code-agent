@@ -1117,7 +1117,7 @@
       class="mt-6"
       @dismiss="analyticsStore.clearError"
     />
-
+</div>
 </template>
 
 <script setup lang="ts">
