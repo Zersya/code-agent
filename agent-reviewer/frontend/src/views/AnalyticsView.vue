@@ -1299,7 +1299,7 @@ const bugFixColumns: { key: string; label: string; sortable?: boolean; type?: 't
   { key: 'issue_type', label: 'Type', type: 'text' },
   { key: 'mr_title', label: 'Merge Request', type: 'text' },
   { key: 'project_name', label: 'Project', type: 'text' },
-  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
+  { key: 'notion_created_at', label: 'Estimation Start', type: 'date' },
   { key: 'merged_at', label: 'MR Merged', type: 'date' },
   { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
 ]
@@ -1328,7 +1328,7 @@ const featureColumns: { key: string; label: string; sortable?: boolean; type?: '
   { key: 'issue_type', label: 'Type', type: 'text' },
   { key: 'mr_title', label: 'Merge Request', type: 'text' },
   { key: 'project_name', label: 'Project', type: 'text' },
-  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
+  { key: 'notion_created_at', label: 'Estimation Start', type: 'date' },
   { key: 'merged_at', label: 'MR Merged', type: 'date' },
   { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
 ]
@@ -1388,22 +1388,22 @@ const maxFeatureDistribution = computed(() => {
   return Math.max(...dist.map(x => x.count), 1)
 })
 
-const getActiveAnalyticsDateRange = () => {
-  if (selectedDateRange.value === 'custom') {
-    return { from: customDateRange.from, to: customDateRange.to }
-  }
-  const now = new Date()
-  const days = selectedDateRange.value === '7d' ? 7 : selectedDateRange.value === '14d' ? 14 : 30
-  return { from: format(subDays(now, days), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
-}
+
 
 const openBugFixLeadTimesForUser = async (username: string) => {
   try {
     bugFixLoading.value = true
     showBugFixModal.value = true
     bugFixModalTitle.value = `Bug Fix Lead Times - ${username}`
-    const { from, to } = getActiveAnalyticsDateRange()
-    const resp = await analyticsApi.getBugFixLeadTimeDetails({ username, from, to })
+    const { from, to } = activeDateRange.value
+    const params: any = {
+      username,
+      from: format(from, 'yyyy-MM-dd'),
+      to: format(to, 'yyyy-MM-dd')
+    }
+    // Note: projectId filter could be added here if implemented in the future
+    // if (selectedProjectId.value) params.projectId = selectedProjectId.value
+    const resp = await analyticsApi.getBugFixLeadTimeDetails(params)
     if (resp.success) {
       bugFixRows.value = resp.data || []
     } else {
@@ -1423,8 +1423,15 @@ const openFeatureCompletionLeadTimesForUser = async (username: string) => {
     featureLoading.value = true
     showFeatureModal.value = true
     featureModalTitle.value = `Feature Completion Lead Times - ${username}`
-    const { from, to } = getActiveAnalyticsDateRange()
-    const resp = await analyticsApi.getFeatureCompletionLeadTimeDetails({ username, from, to })
+    const { from, to } = activeDateRange.value
+    const params: any = {
+      username,
+      from: format(from, 'yyyy-MM-dd'),
+      to: format(to, 'yyyy-MM-dd')
+    }
+    // Note: projectId filter could be added here if implemented in the future
+    // if (selectedProjectId.value) params.projectId = selectedProjectId.value
+    const resp = await analyticsApi.getFeatureCompletionLeadTimeDetails(params)
     if (resp.success) {
       featureRows.value = resp.data || []
     } else {
