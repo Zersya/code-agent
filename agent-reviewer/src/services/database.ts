@@ -2691,6 +2691,7 @@ class DatabaseService {
   /**
    * Record bug fix lead times for a merged MR by using task-MR mappings and notion_tasks
    * Only records when task_type is 'issue' or 'bug' (case-insensitive) and merged_at is present
+   * Uses estimation_start as the start time, falls back to notion_created_at, then created_at
    */
   async recordBugFixLeadTimesForMR(projectId: number, mergeRequestIid: number, mergeRequestId: number): Promise<void> {
     const query = `
@@ -2698,7 +2699,7 @@ class DatabaseService {
         SELECT t.id AS notion_task_id,
                t.notion_page_id,
                LOWER(COALESCE(t.task_type, '')) AS task_type,
-               COALESCE(t.notion_created_at, t.created_at) AS notion_created_at
+               COALESCE(t.estimation_start, t.notion_created_at, t.created_at) AS start_time
         FROM task_mr_mappings m
         JOIN notion_tasks t ON t.id = m.notion_task_id
         WHERE m.project_id = $1 AND m.merge_request_iid = $2
@@ -2718,10 +2719,10 @@ class DatabaseService {
       SELECT $1, $2, $3,
              mr.author_id, mr.author_username,
              m.notion_task_id, m.notion_page_id, m.task_type,
-             m.notion_created_at, mr.merged_at,
-             ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.notion_created_at)) / 3600.0, 2)
+             m.start_time, mr.merged_at,
+             ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.start_time)) / 3600.0, 2)
       FROM mapping m, mr
-      WHERE m.task_type IN ('issue', 'bug')
+      WHERE m.task_type IN ('issue', 'bug') AND m.start_time IS NOT NULL
       ON CONFLICT (project_id, merge_request_iid, notion_task_id) DO NOTHING
     `;
 
@@ -2731,6 +2732,7 @@ class DatabaseService {
   /**
    * Record feature completion lead times for a merged MR by using task-MR mappings and notion_tasks
    * Only records when task_type is 'feature', 'enhancement', 'story', 'new feature', or 'improvement' (case-insensitive) and merged_at is present
+   * Uses estimation_start as the start time, falls back to notion_created_at, then created_at
    */
   async recordFeatureCompletionLeadTimesForMR(projectId: number, mergeRequestIid: number, mergeRequestId: number): Promise<void> {
     const query = `
@@ -2738,7 +2740,7 @@ class DatabaseService {
         SELECT t.id AS notion_task_id,
                t.notion_page_id,
                LOWER(COALESCE(t.task_type, '')) AS task_type,
-               COALESCE(t.notion_created_at, t.created_at) AS notion_created_at
+               COALESCE(t.estimation_start, t.notion_created_at, t.created_at) AS start_time
         FROM task_mr_mappings m
         JOIN notion_tasks t ON t.id = m.notion_task_id
         WHERE m.project_id = $1 AND m.merge_request_iid = $2
@@ -2758,10 +2760,10 @@ class DatabaseService {
       SELECT $1, $2, $3,
              mr.author_id, mr.author_username,
              m.notion_task_id, m.notion_page_id, m.task_type,
-             m.notion_created_at, mr.merged_at,
-             ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.notion_created_at)) / 3600.0, 2)
+             m.start_time, mr.merged_at,
+             ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.start_time)) / 3600.0, 2)
       FROM mapping m, mr
-      WHERE m.task_type IN ('feature', 'enhancement', 'story', 'new feature', 'improvement')
+      WHERE m.task_type IN ('feature', 'enhancement', 'story', 'new feature', 'improvement') AND m.start_time IS NOT NULL
       ON CONFLICT (project_id, merge_request_iid, notion_task_id) DO NOTHING
     `;
 
