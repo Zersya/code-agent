@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Comprehensive backfill script for Lead Time metrics using estimation_start
  *
@@ -18,8 +18,8 @@
  *  --clear-existing    Clear existing lead time data before backfill
  */
 
-import { dbService } from '../services/database.js'
-import { taskMRMappingService } from '../services/task-mr-mapping.js'
+import { dbService } from '../services/database.js';
+import { taskMRMappingService } from '../services/task-mr-mapping.js';
 
 interface BackfillOptions {
   projectId?: number
@@ -258,7 +258,7 @@ async function main() {
         break
       case '--help':
         console.log(`
-Usage: bun run src/scripts/backfill-lead-times-with-estimation-start.ts [options]
+Usage: npm run backfill-lead-times-with-estimation-start [-- options]
 
 Options:
   --project-id <id>     Process only specific project
@@ -271,13 +271,13 @@ Options:
 
 Examples:
   # Preview with clearing existing data
-  bun run src/scripts/backfill-lead-times-with-estimation-start.ts --dry-run --verbose --clear-existing
+  npm run backfill-lead-times-with-estimation-start -- --dry-run --verbose --clear-existing
 
   # Full backfill with clearing existing data
-  bun run src/scripts/backfill-lead-times-with-estimation-start.ts --verbose --clear-existing
+  npm run backfill-lead-times-with-estimation-start -- --verbose --clear-existing
 
   # Backfill specific project
-  bun run src/scripts/backfill-lead-times-with-estimation-start.ts --project-id 123 --verbose
+  npm run backfill-lead-times-with-estimation-start -- --project-id 123 --verbose
         `)
         return
     }

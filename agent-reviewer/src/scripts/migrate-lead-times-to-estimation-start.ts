@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Migration script to update existing lead time records to use estimation_start instead of notion_created_at
  *
@@ -14,7 +14,7 @@
  *  --force             Update all records even if estimation_start is the same
  */
 
-import { dbService } from '../services/database.js'
+import { dbService } from '../services/database.js';
 
 interface MigrationOptions {
   dryRun?: boolean
@@ -205,7 +205,7 @@ async function main() {
         break
       case '--help':
         console.log(`
-Usage: bun run src/scripts/migrate-lead-times-to-estimation-start.ts [options]
+Usage: npm run migrate-lead-times-to-estimation-start [-- options]
 
 Options:
   --dry-run             Show what would be updated without making changes
@@ -215,13 +215,13 @@ Options:
 
 Examples:
   # Preview changes
-  bun run src/scripts/migrate-lead-times-to-estimation-start.ts --dry-run --verbose
+  npm run migrate-lead-times-to-estimation-start -- --dry-run --verbose
 
   # Run migration
-  bun run src/scripts/migrate-lead-times-to-estimation-start.ts --verbose
+  npm run migrate-lead-times-to-estimation-start -- --verbose
 
   # Force update all records
-  bun run src/scripts/migrate-lead-times-to-estimation-start.ts --force --verbose
+  npm run migrate-lead-times-to-estimation-start -- --force --verbose
         `)
         return
     }
