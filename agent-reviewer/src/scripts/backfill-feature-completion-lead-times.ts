@@ -59,98 +59,101 @@ class FeatureCompletionLeadTimeBackfillService {
 
       for (const mr of mrs) {
         try {
-          processed++
-          if (options.verbose) console.log(`\n[${processed}/${mrs.length}] Processing MR !${mr.merge_request_iid} (Project ${mr.project_id})`)
+          if (options.verbose) {
+            console.log(`\n🧩 MR !${mr.merge_request_iid} (project ${mr.project_id})`)
+          }
 
-          // Skip if already has lead time records
-          if (!options.dryRun && await this.hasLeadTimesForMR(mr.project_id, mr.merge_request_iid)) {
+          // Skip if feature_completion_lead_times already has records for this MR
+          const alreadyHasLeadTimes = await this.hasLeadTimesForMR(mr.project_id, mr.merge_request_iid)
+          if (alreadyHasLeadTimes) {
             skippedAlreadyRecorded++
-            if (options.verbose) console.log(`  ⏭️  Already has feature completion lead time records`)
+            if (options.verbose) console.log('  ↪︎ Skipping: lead time records already exist')
             continue
           }
 
           if (options.dryRun) {
-            // Count Notion URLs for dry run
+            // Count Notion URLs that would be processed
             const { notionService } = await import('../services/notion.js')
-            const urlResult = notionService.extractNotionUrls(mr.description || '')
-            notionUrlCount += urlResult.urls.length
-            if (options.verbose && urlResult.urls.length > 0) {
-              console.log(`  🔗 Found ${urlResult.urls.length} Notion URLs`)
-            }
-            continue
+            const urls = mr.description ? notionService.extractNotionUrls(mr.description) : { urls: [], totalFound: 0 }
+            notionUrlCount += urls.urls.length
+            if (options.verbose) console.log(`  � Would process ${urls.urls.length} Notion URL(s)`)
+          } else {
+            // 1) Ensure mappings and task storage exist
+            const mappings = await taskMRMappingService.processMergeRequestForTaskMapping(
+              mr.project_id,
+              mr.merge_request_iid,
+              mr.merge_request_id,
+              mr.description || '',
+            )
+            mappingsCreated += mappings.length
+            if (options.verbose) console.log(`  ✓ Mappings created: ${mappings.length}`)
+
+            // 2) Insert feature completion lead time rows (only for feature/enhancement/story types inside dbService)
+            const before = await this.countLeadTimesForMR(mr.project_id, mr.merge_request_iid)
+            await dbService.recordFeatureCompletionLeadTimesForMR(mr.project_id, mr.merge_request_iid, mr.merge_request_id)
+            const after = await this.countLeadTimesForMR(mr.project_id, mr.merge_request_iid)
+            const inserted = Math.max(0, after - before)
+            leadTimesInserted += inserted
+            if (options.verbose) console.log(`  ✓ Lead time records inserted: ${inserted}`)
+
+            // Small delay to be polite to Notion API
+            await new Promise(res => setTimeout(res, 100))
           }
 
-          // 1) Process task-MR mappings (extracts Notion tasks, creates mappings)
-          const mappings = await taskMRMappingService.processMergeRequestForTaskMapping(
-            mr.project_id,
-            mr.merge_request_iid,
-            mr.merge_request_id,
-            mr.description || '',
-            mr.author_username || 'unknown'
-          )
-          mappingsCreated += mappings.length
-          if (options.verbose) console.log(`  ✓ Mappings created: ${mappings.length}`)
-
-          // 2) Insert feature completion lead time rows (only for feature/enhancement/story types inside dbService)
-          const before = await this.countLeadTimesForMR(mr.project_id, mr.merge_request_iid)
-          await dbService.recordFeatureCompletionLeadTimesForMR(mr.project_id, mr.merge_request_iid, mr.merge_request_id)
-          const after = await this.countLeadTimesForMR(mr.project_id, mr.merge_request_iid)
-          const inserted = Math.max(0, after - before)
-          leadTimesInserted += inserted
-          if (options.verbose) console.log(`  ✓ Lead time records inserted: ${inserted}`)
-
-          // Small delay to be polite to Notion API
-          await new Promise(res => setTimeout(res, 100))
-
-        } catch (error) {
+          processed++
+        } catch (err) {
           errors++
-          console.error(`❌ Error processing MR !${mr.merge_request_iid}:`, error)
+          console.error(`❌ Error on MR !${mr.merge_request_iid}:`, err)
         }
       }
 
-      // Summary
-      console.log('\n📈 Feature Completion Lead Time Backfill Summary:')
-      console.log(`   Processed: ${processed} MRs`)
+      console.log('\n📈 Backfill Summary:')
+      console.log(`  • Processed: ${processed} MRs`)
+      console.log(`  • Skipped (already recorded): ${skippedAlreadyRecorded}`)
       if (options.dryRun) {
-        console.log(`   Notion URLs found: ${notionUrlCount}`)
-        console.log(`   (Run without --dry-run to process)`)
+        console.log(`  • Notion URLs that would be processed: ${notionUrlCount}`)
       } else {
-        console.log(`   Skipped (already recorded): ${skippedAlreadyRecorded}`)
-        console.log(`   Task-MR mappings created: ${mappingsCreated}`)
-        console.log(`   Feature completion lead time records inserted: ${leadTimesInserted}`)
-        console.log(`   Errors: ${errors}`)
+        console.log(`  • Task-MR mappings created: ${mappingsCreated}`)
+        console.log(`  • Lead time records inserted: ${leadTimesInserted}`)
       }
+      console.log(`  • Errors: ${errors}`)
+      console.log('✅ Backfill complete')
 
-    } catch (error) {
-      console.error('💥 Backfill failed:', error)
-      process.exit(1)
+    } catch (e) {
+      console.error('💥 Backfill failed:', e)
+      throw e
     }
   }
 
   private async getEligibleMergeRequests(options: BackfillOptions): Promise<MergeRequestRow[]> {
     let query = `
-      SELECT project_id, merge_request_iid, merge_request_id, description, author_username, merged_at
+      SELECT
+        project_id,
+        merge_request_iid,
+        merge_request_id,
+        description,
+        author_username,
+        merged_at
       FROM merge_request_tracking
-      WHERE state = 'merged'
-        AND merged_at IS NOT NULL
-        AND (description LIKE '%notion.so%' OR description LIKE '%notion.site%')
+      WHERE merged_at IS NOT NULL
+        AND (description IS NOT NULL AND description != '' AND description ILIKE '%notion%')
     `
-
     const params: any[] = []
+    let idx = 1
 
     if (options.projectId) {
-      query += ` AND project_id = $${params.length + 1}`
+      query += ` AND project_id = $${idx++}`
       params.push(options.projectId)
     }
 
     if (options.dateFrom) {
-      query += ` AND merged_at >= $${params.length + 1}`
-      params.push(options.dateFrom.toISOString())
+      query += ` AND merged_at >= $${idx++}`
+      params.push(options.dateFrom)
     }
 
     if (options.dateTo) {
-      query += ` AND merged_at <= $${params.length + 1}`
-      params.push(options.dateTo.toISOString())
+      query += ` AND merged_at <= $${idx++}`
+      params.push(options.dateTo)
     }
 
     query += ' ORDER BY merged_at DESC'
@@ -176,14 +179,12 @@ class FeatureCompletionLeadTimeBackfillService {
   }
 }
 
-// CLI parsing
-function parseArgs(): BackfillOptions {
+async function main() {
   const args = process.argv.slice(2)
   const options: BackfillOptions = {}
 
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]
-    switch (arg) {
+    switch (args[i]) {
       case '--project-id':
         options.projectId = parseInt(args[++i])
         break
@@ -201,42 +202,31 @@ function parseArgs(): BackfillOptions {
         break
       case '--help':
         console.log(`
-Feature Completion Lead Time Backfill Script
-
 Usage: bun run src/scripts/backfill-feature-completion-lead-times.ts [options]
 
 Options:
-  --project-id <id>   Limit to a single project
-  --date-from <date>  Start date (YYYY-MM-DD) for MR merged_at
-  --date-to <date>    End date (YYYY-MM-DD) for MR merged_at
-  --dry-run           Preview actions without writing
-  --verbose           More detailed logging
-  --help              Show this help message
+  --project-id <id>     Process only specific project
+  --date-from <date>    Process merged MRs from this date (YYYY-MM-DD)
+  --date-to <date>      Process merged MRs until this date (YYYY-MM-DD)
+  --dry-run             Show what would be processed without making changes
+  --verbose             Show detailed progress information
+  --help                Show this help message
 
 Examples:
-  # Dry run preview
   bun run src/scripts/backfill-feature-completion-lead-times.ts --dry-run --verbose
-
-  # Limit to a project
   bun run src/scripts/backfill-feature-completion-lead-times.ts --project-id 123
-
-  # Limit by merge window
   bun run src/scripts/backfill-feature-completion-lead-times.ts --date-from 2024-01-01 --date-to 2024-12-31
-
-  # Full run
-  bun run src/scripts/backfill-feature-completion-lead-times.ts --verbose
         `)
-        process.exit(0)
-        break
+        return
     }
   }
 
-  return options
-}
-
-// Main execution
-if (import.meta.main) {
-  const options = parseArgs()
   const service = new FeatureCompletionLeadTimeBackfillService()
   await service.run(options)
 }
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(console.error)
+}
+
+export { FeatureCompletionLeadTimeBackfillService }
