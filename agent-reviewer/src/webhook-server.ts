@@ -33,7 +33,8 @@ import {
   getCompletionRateTrends,
   getProjectCompletionRates,
   getCompletionRateStats,
-  getBugFixLeadTimeDetails
+  getBugFixLeadTimeDetails,
+  getFeatureCompletionLeadTimeDetails
 } from './controllers/admin-analytics.js';
 import {
   getWhatsAppConfigurations,
@@ -181,6 +182,8 @@ app.get('/api/analytics/merge-requests', adminAuth, getMRQualityAnalytics);
 app.get('/api/analytics/issues', adminAuth, getIssueTrackingAnalytics);
   // Bug Fix Lead Time details per developer
   app.get('/api/analytics/bug-fix-lead-times/details', adminAuth, getBugFixLeadTimeDetails);
+  // Feature Completion Lead Time details per developer
+  app.get('/api/analytics/feature-completion-lead-times/details', adminAuth, getFeatureCompletionLeadTimeDetails);
 
 
 // Feature Completion Rate Analytics endpoints (register specific routes BEFORE the generic :developerId route)

@@ -170,6 +170,9 @@ export const analyticsApi = {
 
   getBugFixLeadTimeDetails: (params: { username: string; from: string; to: string; projectId?: number; limit?: number }): Promise<ApiResponse<any[]>> =>
     apiClient.get<any[]>('/analytics/bug-fix-lead-times/details', params),
+
+  getFeatureCompletionLeadTimeDetails: (params: { username: string; from: string; to: string; projectId?: number; limit?: number }): Promise<ApiResponse<any[]>> =>
+    apiClient.get<any[]>('/analytics/feature-completion-lead-times/details', params),
 }
 
 // Merge Request API

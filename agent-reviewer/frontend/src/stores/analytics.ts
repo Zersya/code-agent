@@ -100,6 +100,13 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       distribution: []
     },
 
+    // Feature Completion Lead Time metrics
+    featureCompletionLeadTime: {
+      avgByDeveloper: [],
+      trend: [],
+      distribution: []
+    },
+
     // Queue statistics
     queueStats: {
       total: 0,
@@ -138,7 +145,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         analytics.value = {
           ...analytics.value,
           ...response.data,
-          bugFixLeadTime: (response.data as any).bugFixLeadTime ?? analytics.value.bugFixLeadTime
+          bugFixLeadTime: (response.data as any).bugFixLeadTime ?? analytics.value.bugFixLeadTime,
+          featureCompletionLeadTime: (response.data as any).featureCompletionLeadTime ?? analytics.value.featureCompletionLeadTime
         } as any
       } else {
         error.value = response.message || 'Failed to fetch analytics'

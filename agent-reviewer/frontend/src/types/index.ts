@@ -241,6 +241,23 @@ export interface AnalyticsData {
     }>
   }
 
+  // Feature completion lead time metrics
+  featureCompletionLeadTime: {
+    avgByDeveloper: Array<{
+      username: string
+      avg_lead_time_hours: number
+      features: number
+    }>
+    trend: Array<{
+      date: string
+      value: number
+    }>
+    distribution: Array<{
+      bucket: string
+      count: number
+    }>
+  }
+
 
   // Queue statistics
   queueStats: QueueStats

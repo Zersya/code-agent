@@ -361,12 +361,38 @@
 
     <!-- Bug Fix Lead Time Metrics -->
     <div class="mb-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-6">Bug Fix Lead Time</h2>
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Bug Fix Lead Time</h2>
+        <div class="flex bg-gray-100 rounded-lg p-1">
+          <button
+            @click="bugFixTimeUnit = 'hours'"
+            :class="[
+              'px-3 py-1 text-sm font-medium rounded-md transition-colors',
+              bugFixTimeUnit === 'hours'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            ]"
+          >
+            Hours
+          </button>
+          <button
+            @click="bugFixTimeUnit = 'days'"
+            :class="[
+              'px-3 py-1 text-sm font-medium rounded-md transition-colors',
+              bugFixTimeUnit === 'days'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            ]"
+          >
+            Days
+          </button>
+        </div>
+      </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Average by Developer -->
-        <BaseCard title="Average by Developer (hours)">
+        <BaseCard :title="`Average by Developer (${bugFixTimeUnit})`">
           <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.bugFixLeadTime?.avgByDeveloper?.length === 0" class="text-center text-gray-500 py-8">
+            <div v-if="bugFixLeadTimeDisplay.avgByDeveloper.length === 0" class="text-center text-gray-500 py-8">
               <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
@@ -374,7 +400,7 @@
             </div>
             <div v-else>
               <div
-                v-for="dev in analyticsStore.analytics.bugFixLeadTime.avgByDeveloper"
+                v-for="dev in bugFixLeadTimeDisplay.avgByDeveloper"
                 :key="dev.username"
                 class="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
                 @click="openBugFixLeadTimesForUser(dev.username)"
@@ -384,7 +410,7 @@
                   <span class="text-sm font-medium text-gray-900">@{{ dev.username }}</span>
                 </div>
                 <div class="text-sm text-gray-700">
-                  <span class="font-semibold">{{ dev.avg_lead_time_hours.toFixed(2) }}</span>
+                  <span class="font-semibold">{{ dev.displayValue }}</span>{{ bugFixTimeUnit === 'hours' ? 'h' : 'd' }}
                   <span class="ml-2 text-gray-500">({{ dev.fixes }} fixes)</span>
                 </div>
               </div>
@@ -393,18 +419,18 @@
         </BaseCard>
 
         <!-- Trend (daily average) -->
-        <BaseCard title="Trend (Daily Avg Hours)">
+        <BaseCard :title="`Trend (Daily Avg ${bugFixTimeUnit === 'hours' ? 'Hours' : 'Days'})`">
           <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.bugFixLeadTime?.trend?.length === 0" class="text-center text-gray-500 py-8">
+            <div v-if="bugFixLeadTimeDisplay.trend.length === 0" class="text-center text-gray-500 py-8">
               <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <p>No trend data</p>
             </div>
             <div v-else class="space-y-2 max-h-64 overflow-y-auto">
-              <div v-for="pt in analyticsStore.analytics.bugFixLeadTime.trend.slice(-12)" :key="pt.date" class="flex items-center justify-between text-sm">
+              <div v-for="pt in bugFixLeadTimeDisplay.trend.slice(-12)" :key="pt.date" class="flex items-center justify-between text-sm">
                 <span class="text-gray-600">{{ pt.date }}</span>
-                <span class="font-semibold text-gray-900">{{ pt.value.toFixed(2) }}h</span>
+                <span class="font-semibold text-gray-900">{{ pt.displayValue }}{{ bugFixTimeUnit === 'hours' ? 'h' : 'd' }}</span>
               </div>
             </div>
           </div>
@@ -413,20 +439,122 @@
         <!-- Distribution -->
         <BaseCard title="Distribution">
           <div class="space-y-3">
-            <div v-if="analyticsStore.analytics.bugFixLeadTime?.distribution?.length === 0" class="text-center text-gray-500 py-8">
+            <div v-if="bugFixLeadTimeDisplay.distribution.length === 0" class="text-center text-gray-500 py-8">
               <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <p>No distribution data</p>
             </div>
             <div v-else>
-              <div v-for="b in analyticsStore.analytics.bugFixLeadTime.distribution" :key="b.bucket" class="space-y-1">
+              <div v-for="b in bugFixLeadTimeDisplay.distribution" :key="b.bucket" class="space-y-1">
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-gray-700">{{ b.bucket }}</span>
                   <span class="text-gray-900 font-medium">{{ b.count }}</span>
                 </div>
                 <div class="w-full bg-gray-100 rounded-full h-2">
                   <div class="bg-indigo-600 h-2 rounded-full" :style="{ width: Math.min(100, (b.count / (maxDistribution || 1)) * 100) + '%' }"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+    </div>
+
+    <!-- Feature Completion Lead Time Metrics -->
+    <div class="mb-8">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Feature Completion Lead Time</h2>
+        <div class="flex bg-gray-100 rounded-lg p-1">
+          <button
+            @click="featureTimeUnit = 'hours'"
+            :class="[
+              'px-3 py-1 text-sm font-medium rounded-md transition-colors',
+              featureTimeUnit === 'hours'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            ]"
+          >
+            Hours
+          </button>
+          <button
+            @click="featureTimeUnit = 'days'"
+            :class="[
+              'px-3 py-1 text-sm font-medium rounded-md transition-colors',
+              featureTimeUnit === 'days'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            ]"
+          >
+            Days
+          </button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Average by Developer -->
+        <BaseCard :title="`Average by Developer (${featureTimeUnit})`">
+          <div class="space-y-3">
+            <div v-if="featureCompletionLeadTimeDisplay.avgByDeveloper.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No data available</p>
+            </div>
+            <div v-else>
+              <div
+                v-for="dev in featureCompletionLeadTimeDisplay.avgByDeveloper"
+                :key="dev.username"
+                class="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                @click="openFeatureCompletionLeadTimesForUser(dev.username)"
+              >
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span class="text-sm font-medium text-gray-900">@{{ dev.username }}</span>
+                </div>
+                <div class="text-sm text-gray-700">
+                  <span class="font-semibold">{{ dev.displayValue }}</span>{{ featureTimeUnit === 'hours' ? 'h' : 'd' }}
+                  <span class="ml-2 text-gray-500">({{ dev.features }} features)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Trend (daily average) -->
+        <BaseCard :title="`Trend (Daily Avg ${featureTimeUnit === 'hours' ? 'Hours' : 'Days'})`">
+          <div class="space-y-3">
+            <div v-if="featureCompletionLeadTimeDisplay.trend.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No trend data</p>
+            </div>
+            <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+              <div v-for="pt in featureCompletionLeadTimeDisplay.trend.slice(-12)" :key="pt.date" class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">{{ pt.date }}</span>
+                <span class="font-semibold text-gray-900">{{ pt.displayValue }}{{ featureTimeUnit === 'hours' ? 'h' : 'd' }}</span>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        <!-- Distribution -->
+        <BaseCard title="Distribution">
+          <div class="space-y-3">
+            <div v-if="featureCompletionLeadTimeDisplay.distribution.length === 0" class="text-center text-gray-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No distribution data</p>
+            </div>
+            <div v-else>
+              <div v-for="b in featureCompletionLeadTimeDisplay.distribution" :key="b.bucket" class="space-y-1">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-700">{{ b.bucket }}</span>
+                  <span class="text-gray-900 font-medium">{{ b.count }}</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                  <div class="bg-green-600 h-2 rounded-full" :style="{ width: Math.min(100, (b.count / (maxFeatureDistribution || 1)) * 100) + '%' }"></div>
                 </div>
               </div>
             </div>
@@ -613,6 +741,20 @@
           >
             <template #cell-mr_title="{ item, value }">
               <a :href="item.mr_web_url" class="text-indigo-600 hover:text-indigo-800" target="_blank" rel="noopener noreferrer">{{ value }}</a>
+            </template>
+          </BaseTable>
+        </BaseModal>
+
+        <!-- Feature Completion Lead Time Details Modal -->
+        <BaseModal :show="showFeatureModal" :title="featureModalTitle" size="xl" @close="showFeatureModal = false">
+          <BaseTable
+            :columns="featureColumns"
+            :data="featureRows"
+            :loading="featureLoading"
+            empty-message="No feature completion records found for this period"
+          >
+            <template #cell-mr_title="{ item, value }">
+              <a :href="item.mr_web_url" class="text-green-600 hover:text-green-800" target="_blank" rel="noopener noreferrer">{{ value }}</a>
             </template>
           </BaseTable>
         </BaseModal>
@@ -1130,6 +1272,10 @@ import BaseTable from '@/components/BaseTable.vue'
 
 import { analyticsApi } from '@/services/api'
 
+// === Time unit toggles ===
+const bugFixTimeUnit = ref<'hours' | 'days'>('hours')
+const featureTimeUnit = ref<'hours' | 'days'>('hours')
+
 // === Bug Fix Lead Time modal state ===
 const showBugFixModal = ref(false)
 const bugFixLoading = ref(false)
@@ -1159,6 +1305,89 @@ const bugFixColumns: { key: string; label: string; sortable?: boolean; type?: 't
 ]
 const bugFixRows = ref<BugFixLeadTimeRecord[]>([])
 
+// === Feature Completion Lead Time modal state ===
+const showFeatureModal = ref(false)
+const featureLoading = ref(false)
+const featureModalTitle = ref('Feature Completion Lead Times')
+interface FeatureCompletionLeadTimeRecord {
+  project_id: number
+  project_name: string
+  merge_request_iid: number
+  merge_request_id: number
+  mr_title: string
+  mr_web_url: string
+  notion_task_id?: number
+  task_title: string
+  issue_type?: string
+  notion_created_at?: string | Date
+  merged_at?: string | Date
+  lead_time_hours?: number
+}
+const featureColumns: { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }[] = [
+  { key: 'task_title', label: 'Task', type: 'text' },
+  { key: 'issue_type', label: 'Type', type: 'text' },
+  { key: 'mr_title', label: 'Merge Request', type: 'text' },
+  { key: 'project_name', label: 'Project', type: 'text' },
+  { key: 'notion_created_at', label: 'Task Created', type: 'date' },
+  { key: 'merged_at', label: 'MR Merged', type: 'date' },
+  { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
+]
+const featureRows = ref<FeatureCompletionLeadTimeRecord[]>([])
+
+// === Computed properties for time unit conversion ===
+const bugFixLeadTimeDisplay = computed(() => {
+  const data = analyticsStore.analytics.bugFixLeadTime
+  if (!data) return { avgByDeveloper: [], trend: [], distribution: [] }
+
+  const convertValue = (hours: number) => {
+    if (bugFixTimeUnit.value === 'days') {
+      return (hours / 24).toFixed(1)
+    }
+    return hours.toFixed(2)
+  }
+
+  return {
+    avgByDeveloper: data.avgByDeveloper.map(dev => ({
+      ...dev,
+      displayValue: convertValue(dev.avg_lead_time_hours)
+    })),
+    trend: data.trend.map(point => ({
+      ...point,
+      displayValue: convertValue(point.value)
+    })),
+    distribution: data.distribution
+  }
+})
+
+const featureCompletionLeadTimeDisplay = computed(() => {
+  const data = analyticsStore.analytics.featureCompletionLeadTime
+  if (!data) return { avgByDeveloper: [], trend: [], distribution: [] }
+
+  const convertValue = (hours: number) => {
+    if (featureTimeUnit.value === 'days') {
+      return (hours / 24).toFixed(1)
+    }
+    return hours.toFixed(2)
+  }
+
+  return {
+    avgByDeveloper: data.avgByDeveloper.map(dev => ({
+      ...dev,
+      displayValue: convertValue(dev.avg_lead_time_hours)
+    })),
+    trend: data.trend.map(point => ({
+      ...point,
+      displayValue: convertValue(point.value)
+    })),
+    distribution: data.distribution
+  }
+})
+
+const maxFeatureDistribution = computed(() => {
+  const dist = analyticsStore.analytics.featureCompletionLeadTime?.distribution || []
+  return Math.max(...dist.map(x => x.count), 1)
+})
+
 const getActiveAnalyticsDateRange = () => {
   if (selectedDateRange.value === 'custom') {
     return { from: customDateRange.from, to: customDateRange.to }
@@ -1186,6 +1415,27 @@ const openBugFixLeadTimesForUser = async (username: string) => {
     bugFixRows.value = []
   } finally {
     bugFixLoading.value = false
+  }
+}
+
+const openFeatureCompletionLeadTimesForUser = async (username: string) => {
+  try {
+    featureLoading.value = true
+    showFeatureModal.value = true
+    featureModalTitle.value = `Feature Completion Lead Times - ${username}`
+    const { from, to } = getActiveAnalyticsDateRange()
+    const resp = await analyticsApi.getFeatureCompletionLeadTimeDetails({ username, from, to })
+    if (resp.success) {
+      featureRows.value = resp.data || []
+    } else {
+      featureRows.value = []
+      console.error('Failed to load feature completion details:', resp.error)
+    }
+  } catch (e) {
+    console.error('Error loading feature completion details:', e)
+    featureRows.value = []
+  } finally {
+    featureLoading.value = false
   }
 }
 

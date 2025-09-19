@@ -625,6 +625,19 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
       distribution: [] as Array<{ bucket: string; count: number }>
     };
 
+    // Feature completion lead time metrics (Notion feature created -> MR merged)
+    // Ensure table exists check
+    const fcltTableExistsRes = await dbService.query(`
+      SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feature_completion_lead_times')
+    `);
+    const fcltExists = fcltTableExistsRes.rows[0]?.exists === true;
+
+    let featureCompletionLeadTime = {
+      avgByDeveloper: [] as Array<{ username: string; avg_lead_time_hours: number; features: number }>,
+      trend: [] as Array<{ date: string; value: number }>,
+      distribution: [] as Array<{ bucket: string; count: number }>
+    };
+
     if (bfltExists) {
       // Average lead time by developer
       const avgByDevQuery = `
@@ -693,6 +706,68 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
       };
     }
 
+    // Feature completion lead time queries
+    if (fcltExists) {
+      const fcltAvgByDevRes = await dbService.query(`
+        SELECT author_username as username,
+               ROUND(AVG(lead_time_hours), 2) as avg_lead_time_hours,
+               COUNT(*) as features
+        FROM feature_completion_lead_times
+        WHERE merged_at BETWEEN $1 AND $2
+        GROUP BY author_username
+        ORDER BY avg_lead_time_hours ASC
+        LIMIT 10
+      `, [startOfDay(dateFrom), endOfDay(dateTo)]);
+
+      const fcltTrendRes = await dbService.query(`
+        SELECT DATE(merged_at) as date,
+               ROUND(AVG(lead_time_hours), 2) as value
+        FROM feature_completion_lead_times
+        WHERE merged_at BETWEEN $1 AND $2
+        GROUP BY DATE(merged_at)
+        ORDER BY date ASC
+      `, [startOfDay(dateFrom), endOfDay(dateTo)]);
+
+      const fcltDistRes = await dbService.query(`
+        SELECT
+          CASE
+            WHEN lead_time_hours <= 8 THEN '≤ 8h'
+            WHEN lead_time_hours <= 24 THEN '8-24h'
+            WHEN lead_time_hours <= 72 THEN '1-3 days'
+            WHEN lead_time_hours <= 168 THEN '3-7 days'
+            ELSE '> 1 week'
+          END as bucket,
+          COUNT(*) as count
+        FROM feature_completion_lead_times
+        WHERE merged_at BETWEEN $1 AND $2
+        GROUP BY
+          CASE
+            WHEN lead_time_hours <= 8 THEN '≤ 8h'
+            WHEN lead_time_hours <= 24 THEN '8-24h'
+            WHEN lead_time_hours <= 72 THEN '1-3 days'
+            WHEN lead_time_hours <= 168 THEN '3-7 days'
+            ELSE '> 1 week'
+          END
+        ORDER BY MIN(lead_time_hours)
+      `, [startOfDay(dateFrom), endOfDay(dateTo)]);
+
+      featureCompletionLeadTime = {
+        avgByDeveloper: fcltAvgByDevRes.rows.map((r: any) => ({
+          username: r.username,
+          avg_lead_time_hours: parseFloat(r.avg_lead_time_hours) || 0,
+          features: parseInt(r.features) || 0
+        })),
+        trend: fcltTrendRes.rows.map((r: any) => ({
+          date: format(new Date(r.date), 'yyyy-MM-dd'),
+          value: parseFloat(r.value) || 0
+        })),
+        distribution: fcltDistRes.rows.map((r: any) => ({
+          bucket: r.bucket,
+          count: parseInt(r.count) || 0
+        }))
+      };
+    }
+
     // Compute Issue Categories from MR review comments within the date range
     const issueCategories = await computeIssueCategories(dateFrom, dateTo);
 
@@ -741,6 +816,9 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
 
       // Bug fix lead time metrics
       bugFixLeadTime,
+
+      // Feature completion lead time metrics
+      featureCompletionLeadTime,
 
       // System health
       queueStats
@@ -1458,6 +1536,77 @@ export async function getBugFixLeadTimeDetails(req: Request, res: Response) {
   } catch (error) {
     console.error('Error fetching bug fix lead time details:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch bug fix lead time details' });
+    return;
+  }
+}
+
+/**
+ * Get detailed Feature Completion Lead Time records for a specific developer
+ * Applies date range filter and optional project filter
+ */
+export async function getFeatureCompletionLeadTimeDetails(req: Request, res: Response) {
+  try {
+    const username = (req.query.username as string || '').trim();
+    const dateFrom = req.query.from ? new Date(req.query.from as string) : subDays(new Date(), 30);
+    const dateTo = req.query.to ? new Date(req.query.to as string) : new Date();
+    const projectId = req.query.projectId ? parseInt(req.query.projectId as string) : undefined;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit as string), 500) : 200;
+
+    if (!username) {
+      res.status(400).json({ success: false, error: 'username is required' });
+      return;
+    }
+
+    // Ensure table exists to avoid errors on fresh setups
+    const tableExists = await dbService.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables WHERE table_name = 'feature_completion_lead_times'
+      ) as exists
+    `);
+    if (!tableExists.rows[0]?.exists) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const params: any[] = [username, startOfDay(dateFrom), endOfDay(dateTo)];
+    let filterProject = '';
+    if (projectId && !Number.isNaN(projectId)) {
+      filterProject = ' AND fclt.project_id = $4 ';
+      params.push(projectId);
+    }
+
+    const query = `
+      SELECT
+        fclt.project_id,
+        COALESCE(p.name, 'Unknown Project') as project_name,
+        fclt.merge_request_iid,
+        fclt.merge_request_id,
+        mrt.title as mr_title,
+        mrt.web_url as mr_web_url,
+        fclt.notion_task_id,
+        COALESCE(nt.title, nt.notion_page_id) as task_title,
+        fclt.issue_type,
+        fclt.notion_created_at,
+        fclt.merged_at,
+        fclt.lead_time_hours
+      FROM feature_completion_lead_times fclt
+      LEFT JOIN notion_tasks nt ON nt.id = fclt.notion_task_id
+      LEFT JOIN merge_request_tracking mrt ON mrt.project_id = fclt.project_id AND mrt.merge_request_iid = fclt.merge_request_iid
+      LEFT JOIN projects p ON p.project_id = fclt.project_id
+      WHERE fclt.author_username = $1
+        AND fclt.merged_at BETWEEN $2 AND $3
+        ${filterProject}
+      ORDER BY fclt.merged_at DESC
+      LIMIT ${limit}
+    `;
+
+    const result = await dbService.query(query, params);
+
+    res.json({ success: true, data: result.rows });
+    return;
+  } catch (error) {
+    console.error('Error fetching feature completion lead time details:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch feature completion lead time details' });
     return;
   }
 }
