@@ -43,7 +43,7 @@
                   <button
                     v-if="showCloseButton"
                     @click="$emit('close')"
-                    class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                    class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   >
                     <span class="sr-only">Close</span>
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,7 +54,7 @@
               </div>
 
               <!-- Body -->
-              <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pt-0">
                 <slot />
               </div>
 
@@ -76,7 +76,7 @@ import { computed, watch } from 'vue'
 interface Props {
   show?: boolean
   title?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
   closeOnBackdrop?: boolean
   showCloseButton?: boolean
 }
@@ -96,7 +96,9 @@ const sizeClasses = computed(() => {
     sm: 'sm:max-w-sm sm:w-full',
     md: 'sm:max-w-lg sm:w-full',
     lg: 'sm:max-w-2xl sm:w-full',
-    xl: 'sm:max-w-4xl sm:w-full'
+    xl: 'sm:max-w-4xl sm:w-full',
+    '2xl': 'sm:max-w-6xl sm:w-full',
+    full: 'sm:max-w-7xl sm:w-full'
   }
   return sizes[props.size]
 })

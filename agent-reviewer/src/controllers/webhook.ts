@@ -609,6 +609,22 @@ async function processMergeCompletionEvent(event: GitLabMergeRequestEvent) {
         console.error(`Error updating task completion for MR !${mergeRequestIid}:`, taskError);
       }
 
+      // Record bug fix lead time metrics based on Notion issue creation to MR merged
+      try {
+        await dbService.recordBugFixLeadTimesForMR(projectId, mergeRequestIid, event.object_attributes.id);
+        console.log(`Recorded bug fix lead time for project ${projectId}, MR !${mergeRequestIid}`);
+      } catch (leadTimeErr) {
+        console.error(`Error recording bug fix lead time for MR !${mergeRequestIid}:`, leadTimeErr);
+      }
+
+      // Record feature completion lead time metrics based on Notion feature creation to MR merged
+      try {
+        await dbService.recordFeatureCompletionLeadTimesForMR(projectId, mergeRequestIid, event.object_attributes.id);
+        console.log(`Recorded feature completion lead time for project ${projectId}, MR !${mergeRequestIid}`);
+      } catch (featureLeadTimeErr) {
+        console.error(`Error recording feature completion lead time for MR !${mergeRequestIid}:`, featureLeadTimeErr);
+      }
+
       // Trigger completion rate recalculation
       try {
         await completionRateService.onMergeRequestMerged(
@@ -727,6 +743,22 @@ async function processRepopoMergeCompletionEvent(event: RepopoWebhookEvent) {
       } catch (taskMappingError) {
         console.error(`Error processing task mappings on Repopo merge for MR !${mergeRequestIid}:`, taskMappingError);
       }
+      // Record bug fix lead time metrics for Repopo MR
+      try {
+        await dbService.recordBugFixLeadTimesForMR(projectId, mergeRequestIid, event.object_attributes.id);
+        console.log(`Recorded bug fix lead time for Repopo project ${projectId}, MR !${mergeRequestIid}`);
+      } catch (leadTimeErr) {
+        console.error(`Error recording bug fix lead time for Repopo MR !${mergeRequestIid}:`, leadTimeErr);
+      }
+
+      // Record feature completion lead time metrics for Repopo MR
+      try {
+        await dbService.recordFeatureCompletionLeadTimesForMR(projectId, mergeRequestIid, event.object_attributes.id);
+        console.log(`Recorded feature completion lead time for Repopo project ${projectId}, MR !${mergeRequestIid}`);
+      } catch (featureLeadTimeErr) {
+        console.error(`Error recording feature completion lead time for Repopo MR !${mergeRequestIid}:`, featureLeadTimeErr);
+      }
+
 
       // Update task completion status for associated Notion tasks (Repopo)
       try {

@@ -25,7 +25,7 @@
     </div>
 
     <!-- Error Alert -->
-    <BaseAlert v-if="mrStore.error" type="danger" @dismiss="mrStore.clearError">
+    <BaseAlert v-if="mrStore.error" type="error" @dismiss="mrStore.clearError">
       {{ mrStore.error }}
     </BaseAlert>
 

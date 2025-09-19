@@ -1,7 +1,7 @@
 <template>
   <BaseCard title="Embedding Queue Status">
     <div v-if="isLoading" class="flex justify-center py-8">
-      <div class="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
+      <div class="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
     </div>
 
     <div v-else-if="queueData" class="space-y-6">
@@ -99,7 +99,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"

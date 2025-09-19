@@ -25,7 +25,7 @@
       <div>
         <select
           v-model="frameworkFilter"
-          class="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">All Frameworks</option>
           <option value="nuxt">Nuxt.js</option>
@@ -42,7 +42,7 @@
       <div>
         <select
           v-model="statusFilter"
-          class="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
@@ -53,7 +53,7 @@
 
     <!-- Loading State -->
     <div v-if="isLoading" class="flex justify-center py-8">
-      <div class="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
+      <div class="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
     </div>
 
     <!-- Empty State -->
@@ -121,7 +121,7 @@
                 :href="source.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-primary-600 hover:text-primary-800 underline text-sm break-all"
+                class="text-blue-600 hover:text-blue-800 underline text-sm break-all"
               >
                 {{ source.url }}
               </a>
@@ -130,7 +130,7 @@
             <!-- Error Message -->
             <BaseAlert
               v-if="source.fetchError"
-              type="danger"
+              type="error"
               :message="source.fetchError"
               class="mt-3"
             />
@@ -154,7 +154,7 @@
             </BaseButton>
             <BaseButton
               size="sm"
-              variant="danger"
+              variant="error"
               @click="$emit('delete', source.id)"
             >
               Delete
@@ -177,7 +177,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       class="mt-4"
       @dismiss="$emit('error-dismissed')"

@@ -33,7 +33,7 @@
           <div :class="statusClasses" class="px-3 py-1 rounded-full text-sm font-medium">
             {{ statusText }}
           </div>
-          <div v-if="isProcessing" class="animate-spin h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full"></div>
+          <div v-if="isProcessing" class="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
         </div>
       </div>
 
@@ -46,7 +46,7 @@
           :href="status.repositoryUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-primary-600 hover:text-primary-800 underline break-all"
+          class="text-blue-600 hover:text-blue-800 underline break-all"
         >
           {{ status.repositoryUrl }}
         </a>
@@ -103,7 +103,7 @@
       <!-- Error Message -->
       <BaseAlert
         v-if="status?.error"
-        type="danger"
+        type="error"
         :message="status.error"
         class="mt-4"
       />
@@ -129,7 +129,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"

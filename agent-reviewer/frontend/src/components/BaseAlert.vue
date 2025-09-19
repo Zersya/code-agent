@@ -32,7 +32,7 @@ import { computed, h } from 'vue'
 
 interface Props {
   show?: boolean
-  type?: 'success' | 'warning' | 'danger' | 'info'
+  type?: 'success' | 'warning' | 'error' | 'info'
   title?: string
   message?: string
   dismissible?: boolean
@@ -51,30 +51,30 @@ defineEmits<{
 const alertClasses = computed(() => {
   const baseClasses = 'rounded-md p-4'
   const typeClasses = {
-    success: 'bg-success-50',
-    warning: 'bg-warning-50',
-    danger: 'bg-danger-50',
-    info: 'bg-primary-50'
+    success: 'bg-green-50',
+    warning: 'bg-yellow-50',
+    error: 'bg-red-50',
+    info: 'bg-blue-50'
   }
   return `${baseClasses} ${typeClasses[props.type]}`
 })
 
 const iconClasses = computed(() => {
   const typeClasses = {
-    success: 'text-success-400',
-    warning: 'text-warning-400',
-    danger: 'text-danger-400',
-    info: 'text-primary-400'
+    success: 'text-green-400',
+    warning: 'text-yellow-400',
+    error: 'text-red-400',
+    info: 'text-blue-400'
   }
   return `h-5 w-5 ${typeClasses[props.type]}`
 })
 
 const titleClasses = computed(() => {
   const typeClasses = {
-    success: 'text-success-800',
-    warning: 'text-warning-800',
-    danger: 'text-danger-800',
-    info: 'text-primary-800'
+    success: 'text-green-800',
+    warning: 'text-yellow-800',
+    error: 'text-red-800',
+    info: 'text-blue-800'
   }
   return `text-sm font-medium ${typeClasses[props.type]}`
 })
@@ -82,10 +82,10 @@ const titleClasses = computed(() => {
 const messageClasses = computed(() => {
   const baseClasses = 'text-sm'
   const typeClasses = {
-    success: 'text-success-700',
-    warning: 'text-warning-700',
-    danger: 'text-danger-700',
-    info: 'text-primary-700'
+    success: 'text-green-700',
+    warning: 'text-yellow-700',
+    error: 'text-red-700',
+    info: 'text-blue-700'
   }
   const marginClass = props.title ? 'mt-2' : ''
   return `${baseClasses} ${typeClasses[props.type]} ${marginClass}`
@@ -93,10 +93,10 @@ const messageClasses = computed(() => {
 
 const dismissButtonClasses = computed(() => {
   const typeClasses = {
-    success: 'text-success-500 hover:bg-success-100 focus:ring-success-600',
-    warning: 'text-warning-500 hover:bg-warning-100 focus:ring-warning-600',
-    danger: 'text-danger-500 hover:bg-danger-100 focus:ring-danger-600',
-    info: 'text-primary-500 hover:bg-primary-100 focus:ring-primary-600'
+    success: 'text-green-500 hover:bg-green-100 focus:ring-green-600',
+    warning: 'text-yellow-500 hover:bg-yellow-100 focus:ring-yellow-600',
+    error: 'text-red-500 hover:bg-red-100 focus:ring-red-600',
+    info: 'text-blue-500 hover:bg-blue-100 focus:ring-blue-600'
   }
   return `inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${typeClasses[props.type]}`
 })
@@ -123,7 +123,7 @@ const iconComponent = computed(() => {
         'clip-rule': 'evenodd'
       })
     ]),
-    danger: () => h('svg', {
+    error: () => h('svg', {
       fill: 'currentColor',
       viewBox: '0 0 20 20'
     }, [

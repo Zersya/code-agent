@@ -54,7 +54,7 @@
             Cancel
           </BaseButton>
           <BaseButton
-            variant="danger"
+            variant="error"
             @click="confirmDelete"
             :loading="isDeleting"
           >
@@ -105,7 +105,7 @@
 
     <BaseAlert
       v-if="globalErrorMessage"
-      type="danger"
+      type="error"
       :message="globalErrorMessage"
       @dismiss="globalErrorMessage = ''"
     />

@@ -154,6 +154,10 @@ export interface NotionTask {
   developer_start?: Date;
   developer_end?: Date;
   ready_to_test_at?: Date;
+  // New fields for bug fix lead time
+  task_type?: string;
+  notion_created_at?: Date;
+
   updated_at?: Date;
   // Joined fields
   project_name?: string;

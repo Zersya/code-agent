@@ -47,7 +47,7 @@
         <select
           id="framework"
           v-model="form.framework"
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           required
         >
           <option value="">Select a framework</option>
@@ -96,7 +96,7 @@
             id="isActive"
             v-model="form.isActive"
             type="checkbox"
-            class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
           />
           <label for="isActive" class="ml-2 block text-sm text-gray-900">
             Active
@@ -134,7 +134,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"

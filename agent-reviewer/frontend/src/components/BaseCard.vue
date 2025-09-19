@@ -1,8 +1,8 @@
 <template>
   <div :class="cardClasses">
-    <div v-if="$slots.header || title" class="px-6 py-4 border-b border-gray-200">
+    <div v-if="$slots.header || title" class="px-6 py-4 border-b border-gray-200 bg-white">
       <slot name="header">
-        <h3 v-if="title" class="text-lg font-medium text-gray-900">{{ title }}</h3>
+        <h3 v-if="title" class="text-lg font-medium leading-6 text-gray-900">{{ title }}</h3>
       </slot>
     </div>
     <div :class="bodyClasses">
@@ -21,15 +21,17 @@ interface Props {
   title?: string
   padding?: boolean
   shadow?: 'none' | 'sm' | 'md' | 'lg'
+  rounded?: 'none' | 'sm' | 'md' | 'lg'
 }
 
 const props = withDefaults(defineProps<Props>(), {
   padding: true,
-  shadow: 'sm'
+  shadow: 'sm',
+  rounded: 'md'
 })
 
 const cardClasses = computed(() => {
-  const baseClasses = 'bg-white rounded-lg border border-gray-200'
+  const baseClasses = 'bg-white border border-gray-200 overflow-hidden'
   
   const shadowClasses = {
     none: '',
@@ -38,7 +40,18 @@ const cardClasses = computed(() => {
     lg: 'shadow-lg'
   }
   
-  return [baseClasses, shadowClasses[props.shadow]].filter(Boolean).join(' ')
+  const roundedClasses = {
+    none: 'rounded-none',
+    sm: 'rounded-sm',
+    md: 'rounded-md',
+    lg: 'rounded-lg'
+  }
+  
+  return [
+    baseClasses,
+    shadowClasses[props.shadow],
+    roundedClasses[props.rounded]
+  ].filter(Boolean).join(' ')
 })
 
 const bodyClasses = computed(() => {
