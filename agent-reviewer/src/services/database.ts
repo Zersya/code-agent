@@ -2730,7 +2730,7 @@ class DatabaseService {
 
   /**
    * Record feature completion lead times for a merged MR by using task-MR mappings and notion_tasks
-   * Only records when task_type is 'feature', 'enhancement', or 'story' (case-insensitive) and merged_at is present
+   * Only records when task_type is 'feature', 'enhancement', 'story', 'new feature', or 'improvement' (case-insensitive) and merged_at is present
    */
   async recordFeatureCompletionLeadTimesForMR(projectId: number, mergeRequestIid: number, mergeRequestId: number): Promise<void> {
     const query = `
@@ -2761,7 +2761,7 @@ class DatabaseService {
              m.notion_created_at, mr.merged_at,
              ROUND(EXTRACT(EPOCH FROM (mr.merged_at - m.notion_created_at)) / 3600.0, 2)
       FROM mapping m, mr
-      WHERE m.task_type IN ('feature', 'enhancement', 'story')
+      WHERE m.task_type IN ('feature', 'enhancement', 'story', 'new feature', 'improvement')
       ON CONFLICT (project_id, merge_request_iid, notion_task_id) DO NOTHING
     `;
 
