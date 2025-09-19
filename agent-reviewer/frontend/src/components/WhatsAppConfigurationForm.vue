@@ -48,7 +48,7 @@
               type="checkbox"
               :value="type.value"
               v-model="form.notificationTypes"
-              class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <span class="ml-2 text-sm text-gray-700">{{ type.label }}</span>
           </label>
@@ -63,7 +63,7 @@
           <input
             type="checkbox"
             v-model="form.isActive"
-            class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
           />
           <span class="ml-2 text-sm text-gray-700">Enable notifications</span>
         </label>
@@ -107,7 +107,7 @@
     <!-- Test Message Result -->
     <BaseAlert
       v-if="testResult"
-      :type="testResult.success ? 'success' : 'danger'"
+      :type="testResult.success ? 'success' : 'error'"
       :message="testResult.message"
       class="mt-4"
       @dismiss="testResult = null"

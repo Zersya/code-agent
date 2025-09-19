@@ -9,19 +9,19 @@
 
     <!-- Loading state -->
     <div v-if="analyticsStore.isLoading || statusStore.isLoading" class="flex justify-center items-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>
     <!-- Error state -->
-    <div v-else-if="analyticsStore.error || statusStore.error" class="rounded-md bg-danger-50 p-4 mb-6">
+    <div v-else-if="analyticsStore.error || statusStore.error" class="rounded-md bg-red-50 p-4 mb-6">
       <div class="flex">
         <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-danger-400" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
           </svg>
         </div>
         <div class="ml-3">
-          <h3 class="text-sm font-medium text-danger-800">Error loading dashboard data</h3>
-          <div class="mt-2 text-sm text-danger-700">
+          <h3 class="text-sm font-medium text-red-800">Error loading dashboard data</h3>
+          <div class="mt-2 text-sm text-red-700">
             {{ analyticsStore.error || statusStore.error }}
           </div>
         </div>
@@ -35,8 +35,8 @@
         <div class="card p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -53,8 +53,8 @@
         <div class="card p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-success-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
               </div>
@@ -71,8 +71,8 @@
         <div class="card p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -117,7 +117,7 @@
                 <span class="text-sm font-medium text-gray-900 capitalize">{{ service.replace(/([A-Z])/g, ' $1').trim() }}</span>
                 <span :class="[
                   'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                  status === 'healthy' ? 'bg-success-100 text-success-800' : 'bg-danger-100 text-danger-800'
+                  status === 'healthy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 ]">
                   {{ status }}
                 </span>
@@ -171,7 +171,7 @@
             <div class="mt-4">
               <router-link
                 to="/repository-embedding"
-                class="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
               >
                 Manage Repository Embeddings →
               </router-link>
@@ -202,7 +202,7 @@
             <div class="mt-4">
               <router-link
                 to="/documentation"
-                class="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
               >
                 Manage Documentation Sources →
               </router-link>

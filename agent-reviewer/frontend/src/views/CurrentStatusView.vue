@@ -23,12 +23,12 @@
           <div class="flex-shrink-0">
             <div :class="[
               'w-8 h-8 rounded-lg flex items-center justify-center',
-              status === 'healthy' ? 'bg-success-100' : 'bg-danger-100'
+              status === 'healthy' ? 'bg-green-100' : 'bg-red-100'
             ]">
-              <svg v-if="status === 'healthy'" class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-if="status === 'healthy'" class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
-              <svg v-else class="w-5 h-5 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-else class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
@@ -39,7 +39,7 @@
             </h3>
             <p :class="[
               'text-sm font-medium',
-              status === 'healthy' ? 'text-success-600' : 'text-danger-600'
+              status === 'healthy' ? 'text-green-600' : 'text-red-600'
             ]">
               {{ status }}
             </p>
@@ -58,23 +58,23 @@
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium text-gray-600">Pending</span>
-            <span class="text-lg font-semibold text-warning-600">{{ statusStore.queueStats.pending }}</span>
+            <span class="text-lg font-semibold text-yellow-600">{{ statusStore.queueStats.pending }}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium text-gray-600">Processing</span>
-            <span class="text-lg font-semibold text-primary-600">{{ statusStore.queueStats.processing }}</span>
+            <span class="text-lg font-semibold text-blue-600">{{ statusStore.queueStats.processing }}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium text-gray-600">Completed</span>
-            <span class="text-lg font-semibold text-success-600">{{ statusStore.queueStats.completed }}</span>
+            <span class="text-lg font-semibold text-green-600">{{ statusStore.queueStats.completed }}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium text-gray-600">Failed</span>
-            <span class="text-lg font-semibold text-danger-600">{{ statusStore.queueStats.failed }}</span>
+            <span class="text-lg font-semibold text-red-600">{{ statusStore.queueStats.failed }}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm font-medium text-gray-600">Retrying</span>
-            <span class="text-lg font-semibold text-warning-600">{{ statusStore.queueStats.retrying }}</span>
+            <span class="text-lg font-semibold text-yellow-600">{{ statusStore.queueStats.retrying }}</span>
           </div>
         </div>
       </BaseCard>
@@ -85,20 +85,20 @@
           <div class="relative pt-1">
             <div class="flex mb-2 items-center justify-between">
               <div>
-                <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-success-600 bg-success-200">
+                <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-green-600 bg-green-200">
                   Success Rate
                 </span>
               </div>
               <div class="text-right">
-                <span class="text-xs font-semibold inline-block text-success-600">
+                <span class="text-xs font-semibold inline-block text-green-600">
                   {{ successRate }}%
                 </span>
               </div>
             </div>
-            <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-success-200">
+            <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-green-200">
               <div 
                 :style="{ width: successRate + '%' }" 
-                class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-success-500"
+                class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
               ></div>
             </div>
           </div>
@@ -121,7 +121,7 @@
         empty-message="No recent jobs found"
       >
         <template #cell-repositoryUrl="{ value }">
-          <a :href="value" target="_blank" class="text-primary-600 hover:text-primary-800 text-sm truncate max-w-xs block">
+          <a :href="value" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm truncate max-w-xs block">
             {{ formatRepositoryUrl(value) }}
           </a>
         </template>
@@ -138,8 +138,8 @@
         <template #cell-priority="{ value }">
           <span :class="[
             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-            value <= 3 ? 'bg-danger-100 text-danger-800' :
-            value <= 5 ? 'bg-warning-100 text-warning-800' :
+            value <= 3 ? 'bg-red-100 text-red-800' :
+            value <= 5 ? 'bg-yellow-100 text-yellow-800' :
             'bg-gray-100 text-gray-800'
           ]">
             {{ getPriorityLabel(value) }}
@@ -149,14 +149,14 @@
         <template #cell-attempts="{ value, item }">
           <span :class="[
             'text-sm',
-            value >= item.maxAttempts ? 'text-danger-600 font-medium' : 'text-gray-600'
+            value >= item.maxAttempts ? 'text-red-600 font-medium' : 'text-gray-600'
           ]">
             {{ value }}/{{ item.maxAttempts }}
           </span>
         </template>
 
         <template #cell-isReembedding="{ value }">
-          <span v-if="value" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+          <span v-if="value" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             Re-embedding
           </span>
           <span v-else class="text-gray-400 text-xs">Initial</span>
@@ -186,7 +186,7 @@
               :loading="retryingJobs.has(item.processingId)"
               size="xs"
               variant="secondary"
-              class="text-primary-600 border-primary-300 hover:bg-primary-50"
+              class="text-blue-600 border-blue-300 hover:bg-blue-50"
             >
               <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -245,7 +245,7 @@
     <!-- Error Alert -->
     <BaseAlert
       v-if="statusStore.error"
-      type="danger"
+      type="error"
       :show="!!statusStore.error"
       title="Error"
       :message="statusStore.error"
@@ -282,7 +282,7 @@
             Cancel
           </BaseButton>
           <BaseButton
-            variant="danger"
+            variant="error"
             @click="handleDelete"
             :loading="!!jobToDelete && deletingJobs.has(jobToDelete)"
           >
@@ -349,15 +349,15 @@ const formatRepositoryUrl = (url: string) => {
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'completed':
-      return 'bg-success-100 text-success-800'
+      return 'bg-green-100 text-green-800'
     case 'processing':
-      return 'bg-primary-100 text-primary-800'
+      return 'bg-blue-100 text-blue-800'
     case 'pending':
-      return 'bg-warning-100 text-warning-800'
+      return 'bg-yellow-100 text-yellow-800'
     case 'failed':
-      return 'bg-danger-100 text-danger-800'
+      return 'bg-red-100 text-red-800'
     case 'retrying':
-      return 'bg-warning-100 text-warning-800'
+      return 'bg-yellow-100 text-yellow-800'
     default:
       return 'bg-gray-100 text-gray-800'
   }

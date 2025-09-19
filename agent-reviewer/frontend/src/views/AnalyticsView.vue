@@ -59,8 +59,8 @@
       <BaseCard>
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -75,8 +75,8 @@
       <BaseCard>
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-success-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
@@ -91,8 +91,8 @@
       <BaseCard>
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -107,8 +107,8 @@
       <BaseCard>
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-danger-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
@@ -212,7 +212,7 @@
                 <p class="text-xs text-gray-500">{{ project.approvalRate?.toFixed(1) }}% approval rate</p>
               </div>
               <div class="ml-4 flex-shrink-0">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {{ project.reviewCount }} reviews
                 </span>
               </div>
@@ -226,7 +226,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <BaseCard title="Review Frequency">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay?.toFixed(1) || '0' }}</p>
+          <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.reviewFrequency?.avgReviewsPerDay?.toFixed(1) || '0' }}</p>
           <p class="text-sm text-gray-600">Reviews per day</p>
           <p class="text-xs text-gray-500 mt-1">{{ analyticsStore.analytics.reviewFrequency?.activeDays || 0 }} active days</p>
         </div>
@@ -234,21 +234,21 @@
 
       <BaseCard title="Today">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsToday }}</p>
+          <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.reviewsToday }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
         </div>
       </BaseCard>
 
       <BaseCard title="This Week">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisWeek }}</p>
+          <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.reviewsThisWeek }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
         </div>
       </BaseCard>
 
       <BaseCard title="This Month">
         <div class="text-center">
-          <p class="text-2xl font-bold text-primary-600">{{ analyticsStore.analytics.reviewsThisMonth }}</p>
+          <p class="text-2xl font-bold text-blue-600">{{ analyticsStore.analytics.reviewsThisMonth }}</p>
           <p class="text-sm text-gray-600">Reviews completed</p>
         </div>
       </BaseCard>
@@ -268,7 +268,7 @@
             <div v-for="project in analyticsStore.analytics.projectActivity?.slice(0, 5)" :key="project.projectName" class="border-b border-gray-200 pb-3 last:border-b-0">
               <div class="flex items-center justify-between mb-2">
                 <h4 class="text-sm font-medium text-gray-900 truncate">{{ project.projectName || 'Unknown Project' }}</h4>
-                <span class="text-sm font-semibold text-primary-600">{{ project.reviewCount }} reviews</span>
+                <span class="text-sm font-semibold text-blue-600">{{ project.reviewCount }} reviews</span>
               </div>
               <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
                 <div>
@@ -1251,7 +1251,7 @@
     <!-- Error Alerts -->
     <BaseAlert
       v-if="analyticsStore.error"
-      type="danger"
+      type="error"
       :show="!!analyticsStore.error"
       title="Analytics Error"
       :message="analyticsStore.error"

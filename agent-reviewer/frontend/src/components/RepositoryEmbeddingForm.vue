@@ -42,7 +42,7 @@
             <select
               v-model="selectedExistingProject"
               @change="onExistingProjectSelect"
-              class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               <option value="">Select an existing project...</option>
               <option
@@ -64,7 +64,7 @@
         <select
           id="priority"
           v-model="form.priority"
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="normal">Normal</option>
           <option value="high">High</option>
@@ -102,7 +102,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       class="mt-4"
       @dismiss="errorMessage = ''"

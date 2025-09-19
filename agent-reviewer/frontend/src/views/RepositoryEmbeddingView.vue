@@ -44,7 +44,7 @@
             :key="job.processingId"
             class="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-gray-300 transition-colors"
             @click="selectJob(job.processingId)"
-            :class="{ 'ring-2 ring-primary-500 border-primary-500': currentProcessingId === job.processingId }"
+            :class="{ 'ring-2 ring-blue-500 border-blue-500': currentProcessingId === job.processingId }"
           >
             <div class="flex items-center justify-between">
               <div class="flex-1 min-w-0">
@@ -107,7 +107,7 @@
 
     <BaseAlert
       v-if="errorMessage"
-      type="danger"
+      type="error"
       :message="errorMessage"
       @dismiss="errorMessage = ''"
     />

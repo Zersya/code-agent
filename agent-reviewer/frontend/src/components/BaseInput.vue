@@ -2,9 +2,9 @@
   <div class="space-y-1">
     <label v-if="label" :for="id" class="block text-sm font-medium text-gray-700">
       {{ label }}
-      <span v-if="required" class="text-danger-500">*</span>
+      <span v-if="required" class="text-red-500">*</span>
     </label>
-    <div class="relative">
+    <div class="relative rounded-md shadow-sm">
       <input
         :id="id"
         :type="type"
@@ -17,12 +17,12 @@
         @blur="$emit('blur')"
         @focus="$emit('focus')"
       />
-      <div v-if="$slots.suffix" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+      <div v-if="$slots.suffix" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
         <slot name="suffix" />
       </div>
     </div>
-    <p v-if="error" class="text-sm text-danger-600">{{ error }}</p>
-    <p v-else-if="hint" class="text-sm text-gray-500">{{ hint }}</p>
+    <p v-if="error" class="mt-1 text-sm text-red-600">{{ error }}</p>
+    <p v-else-if="hint" class="mt-1 text-sm text-gray-500">{{ hint }}</p>
   </div>
 </template>
 
@@ -55,16 +55,20 @@ defineEmits<{
 }>()
 
 const inputClasses = computed(() => {
-  const baseClasses = 'block w-full rounded-lg border px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 transition-colors'
+  const baseClasses = 'block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm'
   
-  const stateClasses = props.error
-    ? 'border-danger-300 focus:border-danger-500 focus:ring-danger-500'
-    : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
+  const errorClasses = props.error
+    ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500'
+    : ''
   
   const disabledClasses = props.disabled
     ? 'bg-gray-50 text-gray-500 cursor-not-allowed'
-    : 'bg-white'
+    : ''
   
-  return [baseClasses, stateClasses, disabledClasses].join(' ')
+  return [
+    baseClasses,
+    errorClasses,
+    disabledClasses
+  ].filter(Boolean).join(' ')
 })
 </script>

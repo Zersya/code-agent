@@ -130,7 +130,7 @@
             v-if="item.projectId"
             :href="`https://repopo.transtrack.id/project/${item.projectId}/-/merge_requests/${value}`"
             target="_blank"
-            class="text-primary-600 hover:text-primary-800 font-medium"
+            class="text-blue-600 hover:text-blue-800 font-medium"
           >
             !{{ value }}
           </a>
@@ -140,9 +140,9 @@
         <template #cell-status="{ value }">
           <span :class="[
             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-            value === 'approved' ? 'bg-success-100 text-success-800' :
-            value === 'rejected' ? 'bg-danger-100 text-danger-800' :
-            'bg-warning-100 text-warning-800'
+            value === 'approved' ? 'bg-green-100 text-green-800' :
+            value === 'rejected' ? 'bg-red-100 text-red-800' :
+            'bg-yellow-100 text-yellow-800'
           ]">
             {{ value }}
           </span>
@@ -151,7 +151,7 @@
         <template #cell-reviewerType="{ value }">
           <span :class="[
             'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-            value === 'auto' ? 'bg-primary-100 text-primary-800' : 'bg-gray-100 text-gray-800'
+            value === 'auto' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
           ]">
             {{ value === 'auto' ? 'Automated' : 'Manual' }}
           </span>
@@ -162,7 +162,7 @@
         </template>
 
         <template #cell-criticalIssuesCount="{ value }">
-          <span v-if="value > 0" class="text-danger-600 font-medium">{{ value }}</span>
+          <span v-if="value > 0" class="text-red-600 font-medium">{{ value }}</span>
           <span v-else class="text-gray-400">0</span>
         </template>
       </BaseTable>
@@ -181,7 +181,7 @@
     <!-- Error Alert -->
     <BaseAlert
       v-if="reviewsStore.error"
-      type="danger"
+      type="error"
       :show="!!reviewsStore.error"
       title="Error"
       :message="reviewsStore.error"
