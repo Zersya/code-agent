@@ -71,10 +71,11 @@ class FeatureCompletionLeadTimeBackfillService {
 
           if (options.dryRun) {
             // Count Notion URLs for dry run
-            const urls = taskMRMappingService.extractNotionUrls(mr.description || '')
-            notionUrlCount += urls.length
-            if (options.verbose && urls.length > 0) {
-              console.log(`  🔗 Found ${urls.length} Notion URLs`)
+            const { notionService } = await import('../services/notion.js')
+            const urlResult = notionService.extractNotionUrls(mr.description || '')
+            notionUrlCount += urlResult.urls.length
+            if (options.verbose && urlResult.urls.length > 0) {
+              console.log(`  🔗 Found ${urlResult.urls.length} Notion URLs`)
             }
             continue
           }
@@ -83,6 +84,7 @@ class FeatureCompletionLeadTimeBackfillService {
           const mappings = await taskMRMappingService.processMergeRequestForTaskMapping(
             mr.project_id,
             mr.merge_request_iid,
+            mr.merge_request_id,
             mr.description || '',
             mr.author_username || 'unknown'
           )
