@@ -3207,6 +3207,7 @@ class DatabaseService {
 
   /**
    * Get Notion tasks by assignee and date range
+   * Includes tasks that were active during the period (started, completed, or updated)
    */
   async getNotionTasksByAssignee(
     assigneeUsername: string,
@@ -3221,14 +3222,35 @@ class DatabaseService {
     const params: any[] = [assigneeUsername];
     let paramIndex = 2;
 
-    if (dateFrom) {
-      query += ` AND COALESCE(estimation_start, developer_start, created_at) >= $${paramIndex}`;
+    if (dateFrom && dateTo) {
+      // Include tasks that were active during the period:
+      // 1. Tasks that started in the period
+      // 2. Tasks that were completed in the period
+      // 3. Tasks that were updated in the period
+      // 4. Tasks that span across the period (started before and ended after)
+      query += ` AND (
+        (COALESCE(estimation_start, developer_start, created_at) BETWEEN $${paramIndex} AND $${paramIndex + 1})
+        OR (completed_at BETWEEN $${paramIndex} AND $${paramIndex + 1})
+        OR (updated_at BETWEEN $${paramIndex} AND $${paramIndex + 1})
+        OR (COALESCE(estimation_start, developer_start, created_at) <= $${paramIndex}
+            AND (completed_at IS NULL OR completed_at >= $${paramIndex + 1}))
+      )`;
+      params.push(dateFrom, dateTo);
+      paramIndex += 2;
+    } else if (dateFrom) {
+      query += ` AND (
+        COALESCE(estimation_start, developer_start, created_at) >= $${paramIndex}
+        OR completed_at >= $${paramIndex}
+        OR updated_at >= $${paramIndex}
+      )`;
       params.push(dateFrom);
       paramIndex++;
-    }
-
-    if (dateTo) {
-      query += ` AND COALESCE(estimation_start, developer_start, created_at) <= $${paramIndex}`;
+    } else if (dateTo) {
+      query += ` AND (
+        COALESCE(estimation_start, developer_start, created_at) <= $${paramIndex}
+        OR completed_at <= $${paramIndex}
+        OR updated_at <= $${paramIndex}
+      )`;
       params.push(dateTo);
       paramIndex++;
     }

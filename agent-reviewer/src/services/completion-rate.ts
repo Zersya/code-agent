@@ -160,12 +160,19 @@ export class CompletionRateService {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
 
-      // Query to get unique developers with tasks in the period
+      // Query to get unique developers with tasks that were active in the period
+      // Includes tasks that started, completed, or were updated during the month
       let query = `
         SELECT DISTINCT assignee_username
         FROM notion_tasks
         WHERE assignee_username IS NOT NULL
-          AND COALESCE(estimation_start, developer_start, created_at) BETWEEN $1 AND $2
+          AND (
+            (COALESCE(estimation_start, developer_start, created_at) BETWEEN $1 AND $2)
+            OR (completed_at BETWEEN $1 AND $2)
+            OR (updated_at BETWEEN $1 AND $2)
+            OR (COALESCE(estimation_start, developer_start, created_at) <= $1
+                AND (completed_at IS NULL OR completed_at >= $2))
+          )
       `;
       const params: any[] = [startDate, endDate];
 
