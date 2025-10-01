@@ -10,6 +10,7 @@ import DocumentationManagementView from '@/views/DocumentationManagementView.vue
 import MergeRequestsView from '@/views/MergeRequestsView.vue'
 import AutoReviewSettingsView from '@/views/AutoReviewSettingsView.vue'
 import WhatsAppSettingsView from '@/views/WhatsAppSettingsView.vue'
+import MonthlyReportsView from '@/views/MonthlyReportsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
@@ -71,6 +72,11 @@ const router = createRouter({
           path: '/whatsapp-settings',
           name: 'WhatsAppSettings',
           component: WhatsAppSettingsView
+        },
+        {
+          path: '/monthly-reports',
+          name: 'MonthlyReports',
+          component: MonthlyReportsView
         }
       ]
     },

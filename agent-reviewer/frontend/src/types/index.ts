@@ -7,6 +7,110 @@ export interface User {
 // Re-export performance types
 export * from './performance'
 
+// Monthly Report Types
+export interface ActionPoint {
+  date: string
+  action: string
+  pic: string
+  status: 'finish' | 'ongoing' | 'drop'
+}
+
+export interface Highlight {
+  description: string
+  completed: boolean
+}
+
+export interface Lowlight {
+  description: string
+  completed: boolean
+}
+
+export interface TopContributor {
+  username: string
+  mrCount: number
+}
+
+export interface MergeRequestDashboard {
+  totalMRCreated: number
+  totalMRMerged: number
+  mergeRate: number
+  topContributors: TopContributor[]
+}
+
+export interface ToolingChange {
+  description: string
+}
+
+export interface LessonLearned {
+  whatHappened: string
+  whyItMatters: string
+  nextAction: string
+}
+
+export interface QualityMetric {
+  metric: string
+  previousValue: number
+  currentValue: number
+  trend: 'up' | 'down' | 'stable'
+  unit: string
+}
+
+export interface BudgetItem {
+  item: string
+  budgeted: number
+  actual: number
+  variance: number
+}
+
+export interface MonthlyReportData {
+  month: number
+  year: number
+  actionPoints: ActionPoint[]
+  highlights: Highlight[]
+  lowlights: Lowlight[]
+  techUpdate: {
+    mergeRequestDashboard: MergeRequestDashboard
+    toolingChanges: ToolingChange[]
+  }
+  lessonsLearned: LessonLearned[]
+  productStrategy: {
+    feedbackSummary: string
+    feedbackLink?: string
+    qualityMetrics: QualityMetric[]
+  }
+  budgeting: {
+    items: BudgetItem[]
+  }
+  thankYouNote: string
+}
+
+export interface MonthlyReport {
+  id?: number
+  month: number
+  year: number
+  reportData: MonthlyReportData
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: string
+}
+
+export interface CreateMonthlyReportRequest {
+  month: number
+  year: number
+  autoGenerate?: boolean
+}
+
+export interface UpdateMonthlyReportRequest {
+  reportData: Partial<MonthlyReportData>
+}
+
+export interface MonthlyReportListParams {
+  year?: number
+  month?: number
+  page?: number
+  limit?: number
+}
+
 export interface LoginCredentials {
   secretKey: string
 }

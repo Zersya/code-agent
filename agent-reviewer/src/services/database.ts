@@ -833,6 +833,23 @@ class DatabaseService {
       await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_project ON feature_completion_rates(project_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_feature_completion_rates_date ON feature_completion_rates(year, month)');
 
+      // Monthly reports table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS monthly_reports (
+          id SERIAL PRIMARY KEY,
+          month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+          year INTEGER NOT NULL CHECK (year >= 2020),
+          report_data JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_by TEXT,
+          UNIQUE(month, year)
+        )
+      `);
+
+      await client.query('CREATE INDEX IF NOT EXISTS idx_monthly_reports_date ON monthly_reports(year, month)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_monthly_reports_created_by ON monthly_reports(created_by)');
+
       console.log('Database schema initialized');
     } catch (error) {
       console.error('Failed to initialize database schema:', error);
@@ -3429,6 +3446,94 @@ class DatabaseService {
 
     const result = await this.query(query, params);
     return result.rows;
+  }
+
+  /**
+   * Monthly Reports CRUD operations
+   */
+  async createMonthlyReport(month: number, year: number, reportData: any, createdBy?: string): Promise<any> {
+    const query = `
+      INSERT INTO monthly_reports (month, year, report_data, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      RETURNING *
+    `;
+    const result = await this.query(query, [month, year, JSON.stringify(reportData), createdBy]);
+    return result.rows[0];
+  }
+
+  async getMonthlyReport(month: number, year: number): Promise<any> {
+    const query = `
+      SELECT * FROM monthly_reports
+      WHERE month = $1 AND year = $2
+    `;
+    const result = await this.query(query, [month, year]);
+    return result.rows[0];
+  }
+
+  async getMonthlyReportById(id: number): Promise<any> {
+    const query = `
+      SELECT * FROM monthly_reports
+      WHERE id = $1
+    `;
+    const result = await this.query(query, [id]);
+    return result.rows[0];
+  }
+
+  async listMonthlyReports(filters: { year?: number; month?: number; page?: number; limit?: number }): Promise<{ reports: any[]; total: number }> {
+    let query = `
+      SELECT * FROM monthly_reports
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters.year) {
+      query += ` AND year = $${paramIndex}`;
+      params.push(filters.year);
+      paramIndex++;
+    }
+
+    if (filters.month) {
+      query += ` AND month = $${paramIndex}`;
+      params.push(filters.month);
+      paramIndex++;
+    }
+
+    // Get total count
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countResult = await this.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    // Add pagination
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+
+    query += ` ORDER BY year DESC, month DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    const result = await this.query(query, params);
+    return { reports: result.rows, total };
+  }
+
+  async updateMonthlyReport(id: number, reportData: any): Promise<any> {
+    const query = `
+      UPDATE monthly_reports
+      SET report_data = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
+    const result = await this.query(query, [JSON.stringify(reportData), id]);
+    return result.rows[0];
+  }
+
+  async deleteMonthlyReport(id: number): Promise<boolean> {
+    const query = `
+      DELETE FROM monthly_reports
+      WHERE id = $1
+    `;
+    const result = await this.query(query, [id]);
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
 
