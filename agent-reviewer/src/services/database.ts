@@ -726,6 +726,7 @@ class DatabaseService {
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS ready_to_test_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS notion_created_at TIMESTAMPTZ`);
       await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS task_type TEXT`);
+      await client.query(`ALTER TABLE notion_tasks ADD COLUMN IF NOT EXISTS points INTEGER`);
 
 
 
@@ -3166,8 +3167,8 @@ class DatabaseService {
         notion_page_id, title, status, assignee_id, assignee_username,
         assignee_name, project_id, completed_at,
         estimation_start, estimation_end, developer_start, developer_end, ready_to_test_at,
-        task_type, notion_created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        task_type, notion_created_at, points
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       ON CONFLICT (notion_page_id)
       DO UPDATE SET
         title = EXCLUDED.title,
@@ -3184,6 +3185,7 @@ class DatabaseService {
         ready_to_test_at = EXCLUDED.ready_to_test_at,
         task_type = EXCLUDED.task_type,
         notion_created_at = COALESCE(notion_tasks.notion_created_at, EXCLUDED.notion_created_at),
+        points = EXCLUDED.points,
         updated_at = NOW()
       RETURNING *
     `;
@@ -3203,7 +3205,8 @@ class DatabaseService {
       task.developer_end,
       task.ready_to_test_at,
       (task as any).task_type,
-      (task as any).notion_created_at
+      (task as any).notion_created_at,
+      (task as any).points
     ]);
 
     return result.rows[0];

@@ -153,28 +153,48 @@ export class MonthlyReportService {
   }
 
   /**
-   * Generate highlights from most time-consuming MRs (from different projects)
+   * Generate highlights from highest-point Notion tasks (from different projects)
    */
   private async generateHighlights(startDate: Date, endDate: Date): Promise<Highlight[]> {
+    // Query to get tasks with highest points that have merged MRs
     const query = `
-      WITH ranked_mrs AS (
+      WITH task_mrs AS (
         SELECT
-          mrt.title,
-          mrt.author_username,
-          mrt.description,
+          nt.id as task_id,
+          nt.title as task_title,
+          nt.points,
           p.name as project_name,
-          EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at))/3600 as merge_time_hours,
-          ROW_NUMBER() OVER (PARTITION BY p.project_id ORDER BY EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at))/3600 DESC) as rn
-        FROM merge_request_tracking mrt
+          mrt.title as mr_title,
+          mrt.description as mr_description,
+          mrt.author_username,
+          mrt.web_url as mr_url
+        FROM notion_tasks nt
+        INNER JOIN task_mr_mappings tmm ON nt.id = tmm.notion_task_id
+        INNER JOIN merge_request_tracking mrt ON tmm.project_id = mrt.project_id
+          AND tmm.merge_request_iid = mrt.merge_request_iid
         LEFT JOIN projects p ON mrt.project_id = p.project_id
         WHERE mrt.merged_at BETWEEN $1 AND $2
           AND mrt.status = 'merged'
-          AND mrt.merged_at IS NOT NULL
+          AND nt.points IS NOT NULL
+          AND nt.points > 0
+      ),
+      grouped_by_points AS (
+        SELECT
+          points,
+          json_agg(json_build_object(
+            'task_title', task_title,
+            'project_name', project_name,
+            'mr_title', mr_title,
+            'mr_description', mr_description,
+            'author_username', author_username,
+            'mr_url', mr_url
+          )) as mrs
+        FROM task_mrs
+        GROUP BY points
+        ORDER BY points DESC
+        LIMIT 5
       )
-      SELECT * FROM ranked_mrs
-      WHERE rn = 1
-      ORDER BY merge_time_hours DESC
-      LIMIT 5
+      SELECT * FROM grouped_by_points
     `;
 
     const result = await dbService.query(query, [startDate, endDate]);
@@ -183,19 +203,15 @@ export class MonthlyReportService {
       return [{ description: 'Add your highlights here', completed: false }];
     }
 
-    // Process with LLM for human-readable descriptions
+    // Process each point group with LLM
     const highlights: Highlight[] = [];
     for (const row of result.rows) {
-      const hours = Math.round(row.merge_time_hours);
-      const days = Math.floor(hours / 24);
-      const timeStr = days > 0 ? `${days}d ${hours % 24}h` : `${hours}h`;
+      const points = row.points;
+      const mrs = row.mrs;
 
-      const llmDescription = await this.generateHighlightDescription(
-        row.project_name,
-        row.title,
-        row.description || '',
-        timeStr,
-        row.author_username
+      const llmDescription = await this.generateHighlightDescriptionFromMultipleMRs(
+        points,
+        mrs
       );
 
       highlights.push({
@@ -208,31 +224,53 @@ export class MonthlyReportService {
   }
 
   /**
-   * Generate lowlights from MRs with minor issues (from different projects)
+   * Generate lowlights from lowest-point Notion tasks (from different projects)
    */
   private async generateLowlights(startDate: Date, endDate: Date): Promise<Lowlight[]> {
+    // Query to get tasks with lowest points that have merged MRs with issues
     const query = `
-      WITH ranked_mrs AS (
+      WITH task_mrs AS (
         SELECT
-          mrt.title,
-          mrt.author_username,
-          mrt.description,
+          nt.id as task_id,
+          nt.title as task_title,
+          nt.points,
           p.name as project_name,
-          mrr.critical_issues_count,
-          ROW_NUMBER() OVER (PARTITION BY p.project_id ORDER BY mrr.critical_issues_count DESC, mrt.merged_at DESC) as rn
-        FROM merge_request_tracking mrt
+          mrt.title as mr_title,
+          mrt.description as mr_description,
+          mrt.author_username,
+          mrt.web_url as mr_url,
+          mrr.critical_issues_count
+        FROM notion_tasks nt
+        INNER JOIN task_mr_mappings tmm ON nt.id = tmm.notion_task_id
+        INNER JOIN merge_request_tracking mrt ON tmm.project_id = mrt.project_id
+          AND tmm.merge_request_iid = mrt.merge_request_iid
         LEFT JOIN projects p ON mrt.project_id = p.project_id
         LEFT JOIN merge_request_reviews mrr ON mrt.project_id = mrr.project_id
           AND mrt.merge_request_iid = mrr.merge_request_iid
         WHERE mrt.merged_at BETWEEN $1 AND $2
           AND mrt.status = 'merged'
-          AND mrr.critical_issues_count > 0
-          AND mrr.critical_issues_count <= 3
+          AND nt.points IS NOT NULL
+          AND nt.points > 0
+          AND (mrr.critical_issues_count > 0 OR mrr.critical_issues_count IS NULL)
+      ),
+      grouped_by_points AS (
+        SELECT
+          points,
+          json_agg(json_build_object(
+            'task_title', task_title,
+            'project_name', project_name,
+            'mr_title', mr_title,
+            'mr_description', mr_description,
+            'author_username', author_username,
+            'mr_url', mr_url,
+            'critical_issues_count', critical_issues_count
+          )) as mrs
+        FROM task_mrs
+        GROUP BY points
+        ORDER BY points ASC
+        LIMIT 5
       )
-      SELECT * FROM ranked_mrs
-      WHERE rn = 1
-      ORDER BY critical_issues_count DESC
-      LIMIT 5
+      SELECT * FROM grouped_by_points
     `;
 
     const result = await dbService.query(query, [startDate, endDate]);
@@ -241,18 +279,15 @@ export class MonthlyReportService {
       return [];
     }
 
-    // Process with LLM for human-readable descriptions
+    // Process each point group with LLM
     const lowlights: Lowlight[] = [];
     for (const row of result.rows) {
-      const issueText = row.critical_issues_count === 1 ? 'issue' : 'issues';
+      const points = row.points;
+      const mrs = row.mrs;
 
-      const llmDescription = await this.generateLowlightDescription(
-        row.project_name,
-        row.title,
-        row.description || '',
-        row.critical_issues_count,
-        issueText,
-        row.author_username
+      const llmDescription = await this.generateLowlightDescriptionFromMultipleMRs(
+        points,
+        mrs
       );
 
       lowlights.push({
@@ -331,9 +366,91 @@ export class MonthlyReportService {
   }
 
   /**
-   * Call LLM to generate human-readable highlight description
+   * Call LLM to generate human-readable highlight description from multiple MRs
    */
-  private async generateHighlightDescription(
+  private async generateHighlightDescriptionFromMultipleMRs(
+    points: number,
+    mrs: Array<{
+      task_title: string;
+      project_name: string;
+      mr_title: string;
+      mr_description: string;
+      author_username: string;
+      mr_url: string;
+    }>
+  ): Promise<string> {
+    try {
+      if (!OPENROUTER_API_KEY) {
+        // Fallback to simple format if no API key
+        const mrCount = mrs.length;
+        const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+        return `${points}-point achievement across ${mrCount} MR${mrCount > 1 ? 's' : ''} (${projects})`;
+      }
+
+      // Build MR details for prompt
+      const mrDetails = mrs.map((mr, idx) => `
+MR ${idx + 1}:
+- Task: ${mr.task_title}
+- Project: ${mr.project_name}
+- Title: ${mr.mr_title}
+- Description: ${mr.mr_description?.substring(0, 200) || 'No description'}
+- Author: ${mr.author_username}
+`).join('\n');
+
+      const prompt = `You are a technical writer creating a monthly report highlight.
+
+This is a ${points}-point achievement (high value) completed through ${mrs.length} merge request${mrs.length > 1 ? 's' : ''}:
+
+${mrDetails}
+
+Create ONE concise, human-readable highlight (max 120 characters) that summarizes these achievements in a positive, professional tone. Focus on the overall impact and value delivered across all MRs.
+
+Format: Start with an emoji, then describe the achievement.
+Example: "🚀 Delivered ${points}-point feature with automated review system and performance optimizations"
+
+Return ONLY the highlight text, nothing else.`;
+
+      const api = axios.create({
+        baseURL: OPENROUTER_API_URL,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:9080',
+        },
+      });
+
+      const response = await api.post('/chat/completions', {
+        model: 'moonshotai/Kimi-K2-Instruct-0905',
+        messages: [
+          { role: 'system', content: 'You are a concise technical writer. Always respond with ONLY the requested text, no explanations or additional formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      });
+
+      const llmResponse = response.data.choices[0].message.content.trim();
+      if (llmResponse) {
+        return llmResponse;
+      }
+
+      // Fallback
+      const mrCount = mrs.length;
+      const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+      return `${points}-point achievement across ${mrCount} MR${mrCount > 1 ? 's' : ''} (${projects})`;
+    } catch (error) {
+      console.error('Error generating highlight description with LLM:', error);
+      // Fallback to simple format
+      const mrCount = mrs.length;
+      const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+      return `${points}-point achievement across ${mrCount} MR${mrCount > 1 ? 's' : ''} (${projects})`;
+    }
+  }
+
+  /**
+   * OLD METHOD - NOT USED ANYMORE
+   */
+  private async generateHighlightDescription_OLD(
     projectName: string,
     title: string,
     description: string,
@@ -391,9 +508,93 @@ Return ONLY the highlight text, nothing else.`;
   }
 
   /**
-   * Call LLM to generate human-readable lowlight description
+   * Call LLM to generate human-readable lowlight description from multiple MRs
    */
-  private async generateLowlightDescription(
+  private async generateLowlightDescriptionFromMultipleMRs(
+    points: number,
+    mrs: Array<{
+      task_title: string;
+      project_name: string;
+      mr_title: string;
+      mr_description: string;
+      author_username: string;
+      mr_url: string;
+      critical_issues_count: number;
+    }>
+  ): Promise<string> {
+    try {
+      if (!OPENROUTER_API_KEY) {
+        // Fallback to simple format if no API key
+        const mrCount = mrs.length;
+        const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+        return `${points}-point tasks with ${mrCount} MR${mrCount > 1 ? 's' : ''} needing improvement (${projects})`;
+      }
+
+      // Build MR details for prompt
+      const mrDetails = mrs.map((mr, idx) => `
+MR ${idx + 1}:
+- Task: ${mr.task_title}
+- Project: ${mr.project_name}
+- Title: ${mr.mr_title}
+- Description: ${mr.mr_description?.substring(0, 200) || 'No description'}
+- Author: ${mr.author_username}
+- Issues: ${mr.critical_issues_count || 0} critical issue(s)
+`).join('\n');
+
+      const prompt = `You are a technical writer creating a monthly report lowlight (area for improvement).
+
+This is a ${points}-point task (lower complexity) with ${mrs.length} merge request${mrs.length > 1 ? 's' : ''} that had some issues:
+
+${mrDetails}
+
+Create ONE concise, constructive lowlight (max 120 characters) that summarizes these issues in a professional, non-blaming tone. Focus on the learning opportunity and improvement areas.
+
+Format: Start with an emoji, then describe the issue constructively.
+Example: "⚠️ ${points}-point tasks revealed need for better testing and code review practices"
+
+Return ONLY the lowlight text, nothing else.`;
+
+      const api = axios.create({
+        baseURL: OPENROUTER_API_URL,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:9080',
+        },
+      });
+
+      const response = await api.post('/chat/completions', {
+        model: 'moonshotai/Kimi-K2-Instruct-0905',
+        messages: [
+          { role: 'system', content: 'You are a concise technical writer. Always respond with ONLY the requested text, no explanations or additional formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      });
+
+      const llmResponse = response.data.choices[0].message.content.trim();
+      if (llmResponse) {
+        return llmResponse;
+      }
+
+      // Fallback
+      const mrCount = mrs.length;
+      const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+      return `${points}-point tasks with ${mrCount} MR${mrCount > 1 ? 's' : ''} needing improvement (${projects})`;
+    } catch (error) {
+      console.error('Error generating lowlight description with LLM:', error);
+      // Fallback to simple format
+      const mrCount = mrs.length;
+      const projects = [...new Set(mrs.map(mr => mr.project_name))].join(', ');
+      return `${points}-point tasks with ${mrCount} MR${mrCount > 1 ? 's' : ''} needing improvement (${projects})`;
+    }
+  }
+
+  /**
+   * OLD METHOD - NOT USED ANYMORE
+   */
+  private async generateLowlightDescription_OLD(
     projectName: string,
     title: string,
     description: string,

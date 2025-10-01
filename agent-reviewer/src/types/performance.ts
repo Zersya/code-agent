@@ -157,6 +157,7 @@ export interface NotionTask {
   // New fields for bug fix lead time
   task_type?: string;
   notion_created_at?: Date;
+  points?: number;
 
   updated_at?: Date;
   // Joined fields

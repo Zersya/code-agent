@@ -848,6 +848,66 @@ export class NotionService {
     return undefined;
   }
 
+
+  /**
+   * Extract points/story points from Notion page properties
+   */
+  private extractPoints(properties: Record<string, any>): number | undefined {
+    // Common property names for points fields
+    const pointsPropertyNames = [
+      'points', 'story points', 'estimate', 'size', 'complexity', 'sp', 'point'
+    ];
+
+    for (const propName of pointsPropertyNames) {
+      for (const [key, prop] of Object.entries(properties || {})) {
+        if (key.toLowerCase() === propName) {
+          try {
+            const p: any = prop as any;
+
+            // Handle number type
+            if (p.type === 'number' && typeof p.number === 'number') {
+              return Math.round(p.number);
+            }
+
+            // Handle select type (e.g., "3 points", "5", "Medium (5)")
+            if (p.type === 'select' && p.select?.name) {
+              const match = p.select.name.match(/\d+/);
+              if (match) {
+                return parseInt(match[0], 10);
+              }
+            }
+
+            // Handle formula type
+            if (p.type === 'formula') {
+              if (p.formula?.type === 'number' && typeof p.formula.number === 'number') {
+                return Math.round(p.formula.number);
+              }
+            }
+
+            // Handle title/rich_text type (fallback)
+            if (p.type === 'title' && Array.isArray(p.title) && p.title[0]?.plain_text) {
+              const match = p.title[0].plain_text.match(/\d+/);
+              if (match) {
+                return parseInt(match[0], 10);
+              }
+            }
+
+            if (p.type === 'rich_text' && Array.isArray(p.rich_text) && p.rich_text[0]?.plain_text) {
+              const match = p.rich_text[0].plain_text.match(/\d+/);
+              if (match) {
+                return parseInt(match[0], 10);
+              }
+            }
+          } catch {
+            // Continue to next property
+          }
+        }
+      }
+    }
+
+    return undefined;
+  }
+
 /**
    * Extract task status from Notion page properties
    */
@@ -1209,6 +1269,9 @@ export class NotionService {
         }
       }
 
+      // Extract points
+      const points = this.extractPoints(pageContent.properties);
+
       // Create task data
       const taskData = {
         notion_page_id: pageContent.id,
@@ -1225,7 +1288,8 @@ export class NotionService {
         developer_end: developerEnd,
         ready_to_test_at: readyToTestAt,
         task_type: taskType ? taskType.toLowerCase() : undefined,
-        notion_created_at: pageContent.createdTime ? new Date(pageContent.createdTime) : undefined
+        notion_created_at: pageContent.createdTime ? new Date(pageContent.createdTime) : undefined,
+        points
       } as any;
 
       // Store in database
