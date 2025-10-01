@@ -1,10 +1,16 @@
 <template>
   <div class="space-y-6 max-h-[70vh] overflow-y-auto px-2">
     <!-- Header -->
-    <div class="border-b pb-4">
+    <div class="border-b pb-4 flex justify-between items-center">
       <h2 class="text-2xl font-bold text-gray-900">
         {{ getMonthName(report.month) }} {{ report.year }}
       </h2>
+      <button @click="copyAsMarkdown" class="text-sm text-blue-600 hover:text-blue-900 flex items-center space-x-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+        </svg>
+        <span>Copy as Markdown</span>
+      </button>
     </div>
 
     <!-- 1. Last-Month Action Points -->
@@ -383,6 +389,102 @@ const removeLesson = (index: number) => {
 
 const save = () => {
   emit('save', localData.value)
+}
+
+const copyAsMarkdown = () => {
+  const markdown = generateMarkdown()
+  navigator.clipboard.writeText(markdown).then(() => {
+    alert('Report copied to clipboard as Markdown!')
+  }).catch(() => {
+    alert('Failed to copy to clipboard')
+  })
+}
+
+const generateMarkdown = () => {
+  const data = localData.value
+  let markdown = `# ${getMonthName(props.report.month)} ${props.report.year} Monthly Report\n\n`
+  
+  // 1. Last-Month Action Points
+  markdown += `## 1. Last-Month Action Points\n\n`
+  markdown += `| Date | Project | Action | PIC | Status |\n`
+  markdown += `|------|---------|--------|-----|--------|\n`
+  data.actionPoints.forEach(point => {
+    markdown += `| ${formatDate(point.date)} | ${point.project_name} | ${point.action} | ${point.pic} | ${getStatusEmoji(point.status)} |\n`
+  })
+  markdown += `\n`
+  
+  // 2. Highlights
+  markdown += `## 2. Highlights 🚀\n\n`
+  data.highlights.forEach(highlight => {
+    markdown += `- [${highlight.completed ? 'x' : ' '}] ${highlight.description}\n`
+  })
+  markdown += `\n`
+  
+  // 3. Lowlights
+  markdown += `## 3. Lowlights ⚠️\n\n`
+  data.lowlights.forEach(lowlight => {
+    markdown += `- [${lowlight.completed ? 'x' : ' '}] ${lowlight.description}\n`
+  })
+  markdown += `\n`
+  
+  // 4. Tech Update
+  markdown += `## 4. Tech Update 🔧\n\n`
+  
+  // 4.1 MR Dashboard
+  markdown += `### 4.1 Merge-Request Dashboard\n\n`
+  markdown += `| Metric | Value |\n`
+  markdown += `|--------|-------|\n`
+  markdown += `| Total MR Created | ${data.techUpdate.mergeRequestDashboard.totalMRCreated} |\n`
+  markdown += `| Total MR Merged | ${data.techUpdate.mergeRequestDashboard.totalMRMerged} |\n`
+  markdown += `| Merge-rate | ${data.techUpdate.mergeRequestDashboard.mergeRate}% |\n`
+  markdown += `\n`
+  
+  markdown += `**Top-3 Contributors**\n`
+  data.techUpdate.mergeRequestDashboard.topContributors.forEach((contributor, index) => {
+    markdown += `${index + 1}. ${contributor.username} – ${contributor.mrCount} MRs\n`
+  })
+  markdown += `\n`
+  
+  // 4.2 Tooling Changes
+  markdown += `### 4.2 Tooling / Infra Changes\n\n`
+  data.techUpdate.toolingChanges.forEach(change => {
+    markdown += `- ${change.description}\n`
+  })
+  markdown += `\n`
+  
+  // 5. Lessons Learned
+  markdown += `## 5. Lessons & Learned 📚\n\n`
+  markdown += `| What happened? | Why it matters | Next action |\n`
+  markdown += `|---------------|---------------|-------------|\n`
+  data.lessonsLearned.forEach(lesson => {
+    markdown += `| ${lesson.whatHappened} | ${lesson.whyItMatters} | ${lesson.nextAction} |\n`
+  })
+  markdown += `\n`
+  
+  // 6. Product Development Strategy
+  markdown += `## 6. Product Development Strategy 🎯\n\n`
+  
+  // 6.1 Feedback Snapshot
+  markdown += `### 6.1 Feedback Snapshot\n\n`
+  markdown += `${data.productStrategy.feedbackSummary}\n\n`
+  if (data.productStrategy.feedbackLink) {
+    markdown += `[View full survey/NPS](${data.productStrategy.feedbackLink})\n\n`
+  }
+  
+  // 6.2 Quality Metrics
+  markdown += `### 6.2 Quality Metrics\n\n`
+  markdown += `| Metric | Previous | Current | Trend |\n`
+  markdown += `|--------|----------|---------|-------|\n`
+  data.productStrategy.qualityMetrics.forEach(metric => {
+    markdown += `| ${metric.metric} | ${metric.previousValue} ${metric.unit} | ${metric.currentValue} ${metric.unit} | ${getTrendEmoji(metric.trend)} |\n`
+  })
+  markdown += `\n`
+  
+  // 7. Thank You Note
+  markdown += `## 8. Terima Kasih 👏\n\n`
+  markdown += `${data.thankYouNote}\n`
+  
+  return markdown
 }
 </script>
 
