@@ -403,12 +403,12 @@ This is a ${points}-point achievement (high value) completed through ${mrs.lengt
 
 ${mrDetails}
 
-Create ONE concise, human-readable highlight (max 120 characters) that summarizes these achievements in a positive, professional tone. Focus on the overall impact and value delivered across all MRs.
+Create ONE concise, human-readable highlight (max 240 characters) that summarizes these achievements in a positive, professional tone. Focus on the overall impact and value delivered across all MRs.
 
 Format: Start with an emoji, then describe the achievement.
 Example: "🚀 Delivered feature with automated review system and performance optimizations"
 
-Return ONLY the highlight text with Project Name inside that highlight, nothing else.`;
+Return ONLY the highlight text with Project Name (Do not shortened) inside that highlight, nothing else.`;
 
       const api = axios.create({
         baseURL: OPENROUTER_API_URL,
