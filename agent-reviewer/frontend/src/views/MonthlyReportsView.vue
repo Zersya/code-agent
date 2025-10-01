@@ -208,7 +208,7 @@
       </p>
       <template #footer>
         <BaseButton @click="showDeleteModal = false" variant="secondary">Cancel</BaseButton>
-        <BaseButton @click="deleteReport" :loading="isDeleting" variant="danger">Delete</BaseButton>
+        <BaseButton @click="deleteReport" :loading="isDeleting" variant="error">Delete</BaseButton>
       </template>
     </BaseModal>
   </div>
