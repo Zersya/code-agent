@@ -7,7 +7,7 @@
           Generate and manage monthly team reports
         </p>
       </div>
-      <BaseButton @click="showCreateModal = true" size="sm">
+      <BaseButton @click="handleNewReportClick" size="sm">
         <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -173,7 +173,7 @@
     </BaseCard>
 
     <!-- Create Modal -->
-    <BaseModal v-if="showCreateModal" @close="showCreateModal = false" title="Create Monthly Report">
+    <BaseModal :show="showCreateModal" @close="showCreateModal = false" title="Create Monthly Report">
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -207,12 +207,13 @@
 
     <!-- View/Edit Modal -->
     <BaseModal
-      v-if="showViewModal && selectedReport"
+      :show="showViewModal && !!selectedReport"
       @close="closeViewModal"
-      :title="`${isEditing ? 'Edit' : 'View'} Monthly Report - ${getMonthName(selectedReport.month)} ${selectedReport.year}`"
+      :title="selectedReport ? `${isEditing ? 'Edit' : 'View'} Monthly Report - ${getMonthName(selectedReport.month)} ${selectedReport.year}` : ''"
       size="xl"
     >
       <MonthlyReportView
+        v-if="selectedReport"
         :report="selectedReport"
         :editable="isEditing"
         @save="saveReport"
@@ -225,7 +226,7 @@
     </BaseModal>
 
     <!-- Delete Confirmation Modal -->
-    <BaseModal v-if="showDeleteModal" @close="showDeleteModal = false" title="Delete Monthly Report">
+    <BaseModal :show="showDeleteModal" @close="showDeleteModal = false" title="Delete Monthly Report">
       <p class="text-sm text-gray-500">
         Are you sure you want to delete the report for {{ getMonthName(reportToDelete?.month || 1) }} {{ reportToDelete?.year }}?
         This action cannot be undone.
@@ -259,12 +260,19 @@ const isEditing = ref(false)
 const isCreating = ref(false)
 const isDeleting = ref(false)
 
-const filters = ref({
-  year: undefined as number | undefined,
-  month: undefined as number | undefined,
-  page: 1,
-  limit: 20
-})
+// Default filters to current year and previous month
+const getDefaultFilters = () => {
+  const now = new Date()
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  return {
+    year: prevMonth.getFullYear(),
+    month: prevMonth.getMonth() + 1,
+    page: 1,
+    limit: 20
+  }
+}
+
+const filters = ref(getDefaultFilters())
 
 // Default to previous month
 const getPreviousMonth = () => {
@@ -307,6 +315,12 @@ const loadReports = async () => {
 const changePage = (page: number) => {
   filters.value.page = page
   loadReports()
+}
+
+const handleNewReportClick = () => {
+  console.log('New Report button clicked!')
+  showCreateModal.value = true
+  console.log('showCreateModal set to:', showCreateModal.value)
 }
 
 const createReport = async () => {
