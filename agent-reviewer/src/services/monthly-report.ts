@@ -406,7 +406,7 @@ ${mrDetails}
 Create ONE concise, human-readable highlight (max 120 characters) that summarizes these achievements in a positive, professional tone. Focus on the overall impact and value delivered across all MRs.
 
 Format: Start with an emoji, then describe the achievement.
-Example: "🚀 Delivered ${points}-point feature with automated review system and performance optimizations"
+Example: "🚀 Delivered feature with automated review system and performance optimizations"
 
 Return ONLY the highlight text with Project Name inside that highlight, nothing else.`;
 
