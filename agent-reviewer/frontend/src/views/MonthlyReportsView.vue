@@ -212,9 +212,12 @@
       :title="`${isEditing ? 'Edit' : 'View'} Monthly Report - ${getMonthName(selectedReport.month)} ${selectedReport.year}`"
       size="xl"
     >
-      <div class="p-4">
-        <pre class="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-96">{{ JSON.stringify(selectedReport, null, 2) }}</pre>
-      </div>
+      <MonthlyReportView
+        :report="selectedReport"
+        :editable="isEditing"
+        @save="saveReport"
+        @cancel="isEditing = false"
+      />
       <template #footer v-if="!isEditing">
         <BaseButton @click="closeViewModal" variant="secondary">Close</BaseButton>
         <BaseButton @click="isEditing = true">Edit</BaseButton>
@@ -242,6 +245,7 @@ import type { MonthlyReport } from '@/types'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import MonthlyReportView from '@/components/MonthlyReportView.vue'
 import { format } from 'date-fns'
 
 const monthlyReportStore = useMonthlyReportStore()
@@ -354,7 +358,7 @@ const closeViewModal = () => {
 
 const saveReport = async (reportData: any) => {
   if (!selectedReport.value?.id) return
-  
+
   const result = await monthlyReportStore.updateReport(selectedReport.value.id, reportData)
   if (result) {
     isEditing.value = false
