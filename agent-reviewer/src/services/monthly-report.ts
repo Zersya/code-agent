@@ -9,6 +9,13 @@ import {
   Lowlight
 } from '../models/monthly-report.js';
 import { startOfMonth, endOfMonth, subMonths, format, differenceInHours } from 'date-fns';
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_API_URL = process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1';
 
 export class MonthlyReportService {
   /**
@@ -146,20 +153,26 @@ export class MonthlyReportService {
   }
 
   /**
-   * Generate highlights from most time-consuming MRs
+   * Generate highlights from most time-consuming MRs (from different projects)
    */
   private async generateHighlights(startDate: Date, endDate: Date): Promise<Highlight[]> {
     const query = `
-      SELECT
-        mrt.title,
-        mrt.author_username,
-        p.name as project_name,
-        EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at))/3600 as merge_time_hours
-      FROM merge_request_tracking mrt
-      LEFT JOIN projects p ON mrt.project_id = p.project_id
-      WHERE mrt.merged_at BETWEEN $1 AND $2
-        AND mrt.status = 'merged'
-        AND mrt.merged_at IS NOT NULL
+      WITH ranked_mrs AS (
+        SELECT
+          mrt.title,
+          mrt.author_username,
+          mrt.description,
+          p.name as project_name,
+          EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at))/3600 as merge_time_hours,
+          ROW_NUMBER() OVER (PARTITION BY p.project_id ORDER BY EXTRACT(EPOCH FROM (mrt.merged_at - mrt.created_at))/3600 DESC) as rn
+        FROM merge_request_tracking mrt
+        LEFT JOIN projects p ON mrt.project_id = p.project_id
+        WHERE mrt.merged_at BETWEEN $1 AND $2
+          AND mrt.status = 'merged'
+          AND mrt.merged_at IS NOT NULL
+      )
+      SELECT * FROM ranked_mrs
+      WHERE rn = 1
       ORDER BY merge_time_hours DESC
       LIMIT 5
     `;
@@ -170,37 +183,55 @@ export class MonthlyReportService {
       return [{ description: 'Add your highlights here', completed: false }];
     }
 
-    return result.rows.map(row => {
+    // Process with LLM for human-readable descriptions
+    const highlights: Highlight[] = [];
+    for (const row of result.rows) {
       const hours = Math.round(row.merge_time_hours);
       const days = Math.floor(hours / 24);
       const timeStr = days > 0 ? `${days}d ${hours % 24}h` : `${hours}h`;
 
-      return {
-        description: `${row.project_name}: ${row.title.substring(0, 50)}${row.title.length > 50 ? '...' : ''} (${timeStr} - ${row.author_username})`,
+      const llmDescription = await this.generateHighlightDescription(
+        row.project_name,
+        row.title,
+        row.description || '',
+        timeStr,
+        row.author_username
+      );
+
+      highlights.push({
+        description: llmDescription,
         completed: true
-      };
-    });
+      });
+    }
+
+    return highlights;
   }
 
   /**
-   * Generate lowlights from MRs with minor issues
+   * Generate lowlights from MRs with minor issues (from different projects)
    */
   private async generateLowlights(startDate: Date, endDate: Date): Promise<Lowlight[]> {
     const query = `
-      SELECT
-        mrt.title,
-        mrt.author_username,
-        p.name as project_name,
-        mrr.critical_issues_count
-      FROM merge_request_tracking mrt
-      LEFT JOIN projects p ON mrt.project_id = p.project_id
-      LEFT JOIN merge_request_reviews mrr ON mrt.project_id = mrr.project_id
-        AND mrt.merge_request_iid = mrr.merge_request_iid
-      WHERE mrt.merged_at BETWEEN $1 AND $2
-        AND mrt.status = 'merged'
-        AND mrr.critical_issues_count > 0
-        AND mrr.critical_issues_count <= 3
-      ORDER BY mrr.critical_issues_count DESC, mrt.merged_at DESC
+      WITH ranked_mrs AS (
+        SELECT
+          mrt.title,
+          mrt.author_username,
+          mrt.description,
+          p.name as project_name,
+          mrr.critical_issues_count,
+          ROW_NUMBER() OVER (PARTITION BY p.project_id ORDER BY mrr.critical_issues_count DESC, mrt.merged_at DESC) as rn
+        FROM merge_request_tracking mrt
+        LEFT JOIN projects p ON mrt.project_id = p.project_id
+        LEFT JOIN merge_request_reviews mrr ON mrt.project_id = mrr.project_id
+          AND mrt.merge_request_iid = mrr.merge_request_iid
+        WHERE mrt.merged_at BETWEEN $1 AND $2
+          AND mrt.status = 'merged'
+          AND mrr.critical_issues_count > 0
+          AND mrr.critical_issues_count <= 3
+      )
+      SELECT * FROM ranked_mrs
+      WHERE rn = 1
+      ORDER BY critical_issues_count DESC
       LIMIT 5
     `;
 
@@ -210,13 +241,27 @@ export class MonthlyReportService {
       return [];
     }
 
-    return result.rows.map(row => {
+    // Process with LLM for human-readable descriptions
+    const lowlights: Lowlight[] = [];
+    for (const row of result.rows) {
       const issueText = row.critical_issues_count === 1 ? 'issue' : 'issues';
-      return {
-        description: `${row.project_name}: ${row.title.substring(0, 50)}${row.title.length > 50 ? '...' : ''} (${row.critical_issues_count} ${issueText} - ${row.author_username})`,
+
+      const llmDescription = await this.generateLowlightDescription(
+        row.project_name,
+        row.title,
+        row.description || '',
+        row.critical_issues_count,
+        issueText,
+        row.author_username
+      );
+
+      lowlights.push({
+        description: llmDescription,
         completed: false
-      };
-    });
+      });
+    }
+
+    return lowlights;
   }
 
   /**
@@ -283,6 +328,127 @@ export class MonthlyReportService {
       mergeRequestDashboard,
       qualityMetrics
     };
+  }
+
+  /**
+   * Call LLM to generate human-readable highlight description
+   */
+  private async generateHighlightDescription(
+    projectName: string,
+    title: string,
+    description: string,
+    timeStr: string,
+    author: string
+  ): Promise<string> {
+    try {
+      if (!OPENROUTER_API_KEY) {
+        // Fallback to simple format if no API key
+        return `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${timeStr} - ${author})`;
+      }
+
+      const prompt = `You are a technical writer creating a monthly report highlight.
+
+Given this merge request information:
+- Project: ${projectName}
+- Title: ${title}
+- Description: ${description}
+- Time taken: ${timeStr}
+- Author: ${author}
+
+Create a concise, human-readable highlight (max 100 characters) that describes the achievement in a positive, professional tone. Focus on the impact and value delivered.
+
+Format: Start with an emoji, then describe the achievement.
+Example: "🚀 Implemented automated GitLab review system, reducing review time by 50%"
+
+Return ONLY the highlight text, nothing else.`;
+
+      const api = axios.create({
+        baseURL: OPENROUTER_API_URL,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:9080',
+        },
+      });
+
+      const response = await api.post('/chat/completions', {
+        model: 'moonshotai/Kimi-K2-Instruct-0905',
+        messages: [
+          { role: 'system', content: 'You are a concise technical writer. Always respond with ONLY the requested text, no explanations or additional formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 150,
+      });
+
+      const llmResponse = response.data.choices[0].message.content.trim();
+      return llmResponse || `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${timeStr} - ${author})`;
+    } catch (error) {
+      console.error('Error generating highlight description with LLM:', error);
+      // Fallback to simple format
+      return `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${timeStr} - ${author})`;
+    }
+  }
+
+  /**
+   * Call LLM to generate human-readable lowlight description
+   */
+  private async generateLowlightDescription(
+    projectName: string,
+    title: string,
+    description: string,
+    issueCount: number,
+    issueText: string,
+    author: string
+  ): Promise<string> {
+    try {
+      if (!OPENROUTER_API_KEY) {
+        // Fallback to simple format if no API key
+        return `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${issueCount} ${issueText} - ${author})`;
+      }
+
+      const prompt = `You are a technical writer creating a monthly report lowlight (area for improvement).
+
+Given this merge request information:
+- Project: ${projectName}
+- Title: ${title}
+- Description: ${description}
+- Issues found: ${issueCount} ${issueText}
+- Author: ${author}
+
+Create a concise, constructive lowlight (max 100 characters) that describes the issue in a professional, non-blaming tone. Focus on the learning opportunity.
+
+Format: Start with an emoji, then describe the issue constructively.
+Example: "⚠️ Authentication module needed refactoring for better error handling"
+
+Return ONLY the lowlight text, nothing else.`;
+
+      const api = axios.create({
+        baseURL: OPENROUTER_API_URL,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:9080',
+        },
+      });
+
+      const response = await api.post('/chat/completions', {
+        model: 'moonshotai/Kimi-K2-Instruct-0905',
+        messages: [
+          { role: 'system', content: 'You are a concise technical writer. Always respond with ONLY the requested text, no explanations or additional formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1150,
+      });
+
+      const llmResponse = response.data.choices[0].message.content.trim();
+      return llmResponse || `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${issueCount} ${issueText} - ${author})`;
+    } catch (error) {
+      console.error('Error generating lowlight description with LLM:', error);
+      // Fallback to simple format
+      return `${projectName}: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''} (${issueCount} ${issueText} - ${author})`;
+    }
   }
 }
 
