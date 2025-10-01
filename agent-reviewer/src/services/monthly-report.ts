@@ -550,9 +550,9 @@ ${mrDetails}
 Create ONE concise, constructive lowlight (max 120 characters) that summarizes these issues in a professional, non-blaming tone. Focus on the learning opportunity and improvement areas.
 
 Format: Start with an emoji, then describe the issue constructively.
-Example: "⚠️ ${points}-point tasks revealed need for better testing and code review practices"
+Example: "⚠️ Multiple tasks revealed need for better testing and code review practices"
 
-Return ONLY the lowlight text, nothing else.`;
+Return ONLY the lowlight text with Project Name (Do not shortened) inside that lowlight, nothing else.`;
 
       const api = axios.create({
         baseURL: OPENROUTER_API_URL,
