@@ -101,9 +101,12 @@ class ApiClient {
 
   async post<T>(url: string, data?: any): Promise<ApiResponse<T>> {
     try {
+      console.log(`API POST ${url}:`, data)
       const response = await this.client.post(url, data)
+      console.log(`API POST ${url} response:`, response.data)
       return this.handleResponse<T>(response)
     } catch (error) {
+      console.error(`API POST ${url} error:`, error)
       return this.handleError(error)
     }
   }

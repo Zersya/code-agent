@@ -15,6 +15,30 @@
       </BaseButton>
     </div>
 
+    <!-- Error Alert -->
+    <div v-if="monthlyReportStore.error" class="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">Error</h3>
+          <div class="mt-2 text-sm text-red-700">
+            {{ monthlyReportStore.error }}
+          </div>
+        </div>
+        <div class="ml-auto pl-3">
+          <button @click="monthlyReportStore.clearError()" class="text-red-500 hover:text-red-700">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Filters -->
     <BaseCard class="mb-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -188,12 +212,9 @@
       :title="`${isEditing ? 'Edit' : 'View'} Monthly Report - ${getMonthName(selectedReport.month)} ${selectedReport.year}`"
       size="xl"
     >
-      <MonthlyReportView
-        :report="selectedReport"
-        :editable="isEditing"
-        @save="saveReport"
-        @cancel="isEditing = false"
-      />
+      <div class="p-4">
+        <pre class="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-96">{{ JSON.stringify(selectedReport, null, 2) }}</pre>
+      </div>
       <template #footer v-if="!isEditing">
         <BaseButton @click="closeViewModal" variant="secondary">Close</BaseButton>
         <BaseButton @click="isEditing = true">Edit</BaseButton>
@@ -221,7 +242,6 @@ import type { MonthlyReport } from '@/types'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseCard from '@/components/BaseCard.vue'
 import BaseModal from '@/components/BaseModal.vue'
-import MonthlyReportView from '@/components/MonthlyReportView.vue'
 import { format } from 'date-fns'
 
 const monthlyReportStore = useMonthlyReportStore()
@@ -242,9 +262,18 @@ const filters = ref({
   limit: 20
 })
 
+// Default to previous month
+const getPreviousMonth = () => {
+  const now = new Date()
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  return {
+    month: prevMonth.getMonth() + 1,
+    year: prevMonth.getFullYear()
+  }
+}
+
 const newReport = ref({
-  month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
+  ...getPreviousMonth(),
   autoGenerate: true
 })
 
@@ -277,18 +306,29 @@ const changePage = (page: number) => {
 }
 
 const createReport = async () => {
+  console.log('Creating report with data:', newReport.value)
   isCreating.value = true
   try {
     const result = await monthlyReportStore.createReport(newReport.value)
+    console.log('Create report result:', result)
+    console.log('Store error:', monthlyReportStore.error)
+
     if (result) {
       showCreateModal.value = false
-      // Reset form
+      // Reset form to previous month
       newReport.value = {
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
+        ...getPreviousMonth(),
         autoGenerate: true
       }
+      // Reload the list to show the new report
+      await loadReports()
+    } else {
+      // Show error to user
+      alert(`Failed to create report: ${monthlyReportStore.error || 'Unknown error'}`)
     }
+  } catch (error) {
+    console.error('Error creating report:', error)
+    alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
     isCreating.value = false
   }

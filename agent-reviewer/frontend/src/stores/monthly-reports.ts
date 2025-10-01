@@ -74,8 +74,10 @@ export const useMonthlyReportStore = defineStore('monthlyReports', () => {
     error.value = null
 
     try {
+      console.log('Store: Creating monthly report with request:', request)
       const response = await monthlyReportApi.createMonthlyReport(request)
-      
+      console.log('Store: API response:', response)
+
       if (response.success && response.data) {
         currentReport.value = response.data
         // Refresh the list
@@ -83,10 +85,12 @@ export const useMonthlyReportStore = defineStore('monthlyReports', () => {
         return response.data
       } else {
         error.value = response.message || 'Failed to create monthly report'
+        console.error('Store: Failed to create report:', error.value)
         return null
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to create monthly report'
+      console.error('Store: Exception creating report:', err)
       return null
     } finally {
       isLoading.value = false
