@@ -1517,7 +1517,13 @@ export async function getBugFixLeadTimeDetails(req: Request, res: Response) {
         bflt.issue_type,
         bflt.notion_created_at,
         bflt.merged_at,
-        bflt.lead_time_hours
+        bflt.lead_time_hours,
+        mrt.approved_at,
+        CASE
+          WHEN mrt.approved_at IS NOT NULL AND mrt.created_at IS NOT NULL
+          THEN ROUND(EXTRACT(EPOCH FROM (mrt.approved_at - mrt.created_at)) / 3600.0, 2)
+          ELSE NULL
+        END as approval_time_hours
       FROM bug_fix_lead_times bflt
       LEFT JOIN notion_tasks nt ON nt.id = bflt.notion_task_id
       LEFT JOIN merge_request_tracking mrt ON mrt.project_id = bflt.project_id AND mrt.merge_request_iid = bflt.merge_request_iid
@@ -1588,7 +1594,13 @@ export async function getFeatureCompletionLeadTimeDetails(req: Request, res: Res
         fclt.issue_type,
         fclt.notion_created_at,
         fclt.merged_at,
-        fclt.lead_time_hours
+        fclt.lead_time_hours,
+        mrt.approved_at,
+        CASE
+          WHEN mrt.approved_at IS NOT NULL AND mrt.created_at IS NOT NULL
+          THEN ROUND(EXTRACT(EPOCH FROM (mrt.approved_at - mrt.created_at)) / 3600.0, 2)
+          ELSE NULL
+        END as approval_time_hours
       FROM feature_completion_lead_times fclt
       LEFT JOIN notion_tasks nt ON nt.id = fclt.notion_task_id
       LEFT JOIN merge_request_tracking mrt ON mrt.project_id = fclt.project_id AND mrt.merge_request_iid = fclt.merge_request_iid

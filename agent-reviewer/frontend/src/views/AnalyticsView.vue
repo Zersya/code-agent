@@ -1293,6 +1293,8 @@ interface BugFixLeadTimeRecord {
   notion_created_at?: string | Date
   merged_at?: string | Date
   lead_time_hours?: number
+  approved_at?: string | Date
+  approval_time_hours?: number
 }
 const bugFixColumns: { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }[] = [
   { key: 'task_title', label: 'Task', type: 'text' },
@@ -1302,6 +1304,7 @@ const bugFixColumns: { key: string; label: string; sortable?: boolean; type?: 't
   { key: 'notion_created_at', label: 'Estimation Start', type: 'date' },
   { key: 'merged_at', label: 'MR Merged', type: 'date' },
   { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
+  { key: 'approval_time_hours', label: 'Approval Time (H)', type: 'number' },
 ]
 const bugFixRows = ref<BugFixLeadTimeRecord[]>([])
 
@@ -1322,6 +1325,8 @@ interface FeatureCompletionLeadTimeRecord {
   notion_created_at?: string | Date
   merged_at?: string | Date
   lead_time_hours?: number
+  approved_at?: string | Date
+  approval_time_hours?: number
 }
 const featureColumns: { key: string; label: string; sortable?: boolean; type?: 'text' | 'number' | 'date' | 'boolean'; format?: string }[] = [
   { key: 'task_title', label: 'Task', type: 'text' },
@@ -1331,6 +1336,7 @@ const featureColumns: { key: string; label: string; sortable?: boolean; type?: '
   { key: 'notion_created_at', label: 'Estimation Start', type: 'date' },
   { key: 'merged_at', label: 'MR Merged', type: 'date' },
   { key: 'lead_time_hours', label: 'Lead Time (h)', type: 'number' },
+  { key: 'approval_time_hours', label: 'Approval Time (H)', type: 'number' },
 ]
 const featureRows = ref<FeatureCompletionLeadTimeRecord[]>([])
 
