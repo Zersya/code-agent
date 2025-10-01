@@ -408,7 +408,7 @@ Create ONE concise, human-readable highlight (max 120 characters) that summarize
 Format: Start with an emoji, then describe the achievement.
 Example: "🚀 Delivered ${points}-point feature with automated review system and performance optimizations"
 
-Return ONLY the highlight text, nothing else.`;
+Return ONLY the highlight text with Project Name inside that highlight, nothing else.`;
 
       const api = axios.create({
         baseURL: OPENROUTER_API_URL,
