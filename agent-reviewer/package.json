@@ -17,6 +17,7 @@
     "setup:documentation": "ts-node scripts/setup-documentation.ts",
     "backfill-completion-rates": "node dist/scripts/backfill-completion-rates.js",
     "backfill-notion-timing-fields": "node dist/scripts/backfill-notion-timing-fields.js",
+    "backfill-notion-points": "bun run src/scripts/backfill-notion-points.ts",
     "backfill-mr-approvals": "node dist/scripts/backfill-mr-approvals.js",
     "backfill-bug-fix-lead-times": "node dist/scripts/backfill-bug-fix-lead-times.js",
     "migrate-lead-times-to-estimation-start": "node dist/scripts/migrate-lead-times-to-estimation-start.js",
