@@ -13,6 +13,7 @@ export interface ActionPoint {
   action: string
   pic: string
   status: 'finish' | 'ongoing' | 'drop'
+  project_name: string
 }
 
 export interface Highlight {

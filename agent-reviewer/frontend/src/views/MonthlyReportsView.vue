@@ -260,19 +260,13 @@ const isEditing = ref(false)
 const isCreating = ref(false)
 const isDeleting = ref(false)
 
-// Default filters to current year and previous month
-const getDefaultFilters = () => {
-  const now = new Date()
-  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  return {
-    year: prevMonth.getFullYear(),
-    month: prevMonth.getMonth() + 1,
-    page: 1,
-    limit: 20
-  }
-}
-
-const filters = ref(getDefaultFilters())
+// Default filters to show all years and all months
+const filters = ref({
+  year: undefined as number | undefined,
+  month: undefined as number | undefined,
+  page: 1,
+  limit: 20
+})
 
 // Default to previous month
 const getPreviousMonth = () => {

@@ -11,40 +11,45 @@
     <section>
       <h3 class="text-lg font-semibold text-gray-900 mb-3">1. Last-Month Action Points</h3>
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 border">
+        <table class="min-w-full divide-y divide-gray-200 border text-xs">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action Point</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PIC</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th v-if="editable" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24">Date</th>
+              <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-32">Project</th>
+              <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+              <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24">PIC</th>
+              <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-20">Status</th>
+              <th v-if="editable" class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="(point, index) in localData.actionPoints" :key="index">
-              <td class="px-4 py-2">
-                <input v-if="editable" v-model="point.date" type="date" class="input text-sm" />
-                <span v-else class="text-sm">{{ point.date }}</span>
+            <tr v-for="(point, index) in localData.actionPoints" :key="index" class="hover:bg-gray-50">
+              <td class="px-2 py-1.5">
+                <input v-if="editable" v-model="point.date" type="date" class="input text-xs w-full" />
+                <span v-else class="text-xs">{{ formatDate(point.date) }}</span>
               </td>
-              <td class="px-4 py-2">
-                <input v-if="editable" v-model="point.action" class="input text-sm" />
-                <span v-else class="text-sm">{{ point.action }}</span>
+              <td class="px-2 py-1.5">
+                <input v-if="editable" v-model="point.project_name" class="input text-xs w-full" />
+                <span v-else class="text-xs font-medium text-gray-700" :title="point.project_name">{{ point.project_name }}</span>
               </td>
-              <td class="px-4 py-2">
-                <input v-if="editable" v-model="point.pic" class="input text-sm" />
-                <span v-else class="text-sm">{{ point.pic }}</span>
+              <td class="px-2 py-1.5">
+                <input v-if="editable" v-model="point.action" class="input text-xs w-full" />
+                <span v-else class="text-xs" :title="point.action">{{ point.action }}</span>
               </td>
-              <td class="px-4 py-2">
-                <select v-if="editable" v-model="point.status" class="input text-sm">
+              <td class="px-2 py-1.5">
+                <input v-if="editable" v-model="point.pic" class="input text-xs w-full" />
+                <span v-else class="text-xs">{{ point.pic }}</span>
+              </td>
+              <td class="px-2 py-1.5">
+                <select v-if="editable" v-model="point.status" class="input text-xs w-full">
                   <option value="finish">✅ Finish</option>
                   <option value="ongoing">🔄 On-going</option>
                   <option value="drop">❌ Drop</option>
                 </select>
-                <span v-else class="text-sm">{{ getStatusEmoji(point.status) }} {{ point.status }}</span>
+                <span v-else class="text-xs">{{ getStatusEmoji(point.status) }}</span>
               </td>
-              <td v-if="editable" class="px-4 py-2">
-                <button @click="removeActionPoint(index)" class="text-red-600 hover:text-red-900 text-sm">Remove</button>
+              <td v-if="editable" class="px-2 py-1.5">
+                <button @click="removeActionPoint(index)" class="text-red-600 hover:text-red-900 text-xs">Remove</button>
               </td>
             </tr>
           </tbody>
@@ -322,8 +327,14 @@ const addActionPoint = () => {
     date: new Date().toISOString().split('T')[0],
     action: '',
     pic: '',
-    status: 'ongoing'
+    status: 'ongoing',
+    project_name: ''
   })
+}
+
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 const removeActionPoint = (index: number) => {
