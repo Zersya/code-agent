@@ -1,3 +1,4 @@
+import { endOfDay } from 'date-fns';
 import { dbService } from './database.js';
 import { taskMRMappingService } from './task-mr-mapping.js';
 import {
@@ -71,7 +72,8 @@ export class CompletionRateService {
 
         const devStart = toDate(task.developer_start);
         const devEnd = toDate(task.developer_end);
-        const estEnd = toDate(task.estimation_end);
+        // Normalize estimation_end to end of day for fair overrun calculations
+        const estEnd = task.estimation_end ? endOfDay(toDate(task.estimation_end)!) : undefined;
         const doneAt = toDate(task.completed_at);
         const rttAt = toDate((task as any).ready_to_test_at);
 
